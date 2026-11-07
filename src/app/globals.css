@@ -4,14 +4,16 @@
 
 :root {
   --vin: #934f5e;          /* couleur du logo */
-  --bordeaux: #4a1f2a;     /* zones fortes, tableau d'affichage */
-  --moutarde: #e8b23a;     /* scores, direct */
+  --bordeaux: #3e1621;     /* grands aplats, tableau d'affichage */
+  --moutarde: #f2b53a;     /* scores, direct, accents */
+  --rose: #f6e4e8;         /* rosé pâle tiré du logo */
   --encre: #2a1419;        /* texte */
-  --fond: #fcf9f9;
+  --fond: #fcf7f8;
   --surface: #ffffff;
   --sourdine: #7a6166;     /* texte secondaire */
-  --trait: #ead9dc;        /* séparateurs */
-  --teinte: #f5e9eb;       /* fonds légers */
+  --trait: #ecd9dd;        /* séparateurs */
+  --teinte: #f6e9ec;       /* fonds légers */
+  --pelouse: #2f6b45;      /* rare : lignes de terrain */
   --ok: #2f7d4f;
   --alerte: #b3261e;
 }
@@ -19,14 +21,16 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --vin: #c98595;
-    --bordeaux: #2d1219;
-    --moutarde: #f0c25a;
+    --bordeaux: #260d14;
+    --moutarde: #f5c45a;
+    --rose: #3a1f27;
     --encre: #f6ecee;
-    --fond: #1a0d11;
-    --surface: #241318;
+    --fond: #170a0e;
+    --surface: #221217;
     --sourdine: #b49ca1;
     --trait: #3d242b;
-    --teinte: #2f1a20;
+    --teinte: #2d1820;
+    --pelouse: #6fb98a;
     --ok: #6cc28f;
     --alerte: #ff8a80;
   }
@@ -36,30 +40,23 @@
   --color-vin: var(--vin);
   --color-bordeaux: var(--bordeaux);
   --color-moutarde: var(--moutarde);
+  --color-rose: var(--rose);
   --color-encre: var(--encre);
   --color-fond: var(--fond);
   --color-surface: var(--surface);
   --color-sourdine: var(--sourdine);
   --color-trait: var(--trait);
   --color-teinte: var(--teinte);
+  --color-pelouse: var(--pelouse);
   --color-ok: var(--ok);
   --color-alerte: var(--alerte);
   --font-sans: var(--font-texte);
   --font-display: var(--font-titre);
+  --font-groovy: var(--font-groovy);
 }
 
-html {
-  background: var(--fond);
-  color: var(--encre);
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  background: var(--fond);
-  color: var(--encre);
-  font-family: var(--font-texte), system-ui, sans-serif;
-  font-feature-settings: "kern";
-}
+html { background: var(--fond); color: var(--encre); -webkit-text-size-adjust: 100%; }
+body { background: var(--fond); color: var(--encre); font-family: var(--font-texte), system-ui, sans-serif; overflow-x: clip; }
 
 .tnum { font-variant-numeric: tabular-nums; }
 
@@ -69,27 +66,24 @@ h1, h2, h3, .titre {
   text-wrap: balance;
 }
 
-:focus-visible {
-  outline: 2px solid var(--moutarde);
-  outline-offset: 2px;
-  border-radius: 4px;
+/* titres groovy, cousins du logo */
+.groovy {
+  font-family: var(--font-groovy), var(--font-titre), serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 0.95;
 }
 
+:focus-visible { outline: 2px solid var(--moutarde); outline-offset: 2px; border-radius: 4px; }
 ::selection { background: var(--moutarde); color: var(--bordeaux); }
 
-/* défilement horizontal discret du tableau d'affichage */
-.defile { scrollbar-width: none; }
-.defile::-webkit-scrollbar { display: none; }
+.defile-scroll { scrollbar-width: none; }
+.defile-scroll::-webkit-scrollbar { display: none; }
 
-/* point "en direct" */
-.pastille {
-  width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: var(--moutarde);
-  animation: pulse 1.6s ease-in-out infinite;
-}
-@keyframes pulse { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .pastille { animation: none; } }
+/* déborde du conteneur pour les bandes pleine largeur */
+.pleine-largeur { width: 100vw; margin-left: calc(50% - 50vw); }
 
-/* contenu des articles */
+/* ---------------- contenus d'articles ---------------- */
 .prose-ar { font-size: 1.0625rem; line-height: 1.7; max-width: 68ch; }
 .prose-ar > * + * { margin-top: 1.1em; }
 .prose-ar h2 { font-size: 1.5rem; font-weight: 700; margin-top: 1.8em; line-height: 1.2; }
@@ -99,25 +93,132 @@ h1, h2, h3, .titre {
 .prose-ar ol { list-style: decimal; padding-left: 1.3em; }
 .prose-ar li + li { margin-top: 0.35em; }
 .prose-ar blockquote { border-left: 3px solid var(--vin); padding-left: 1em; font-style: italic; color: var(--sourdine); }
-.prose-ar img { border-radius: 6px; }
+.prose-ar img { border-radius: 8px; }
 .prose-ar strong { font-weight: 650; }
 
-/* champs de formulaire */
+/* ---------------- formulaires et boutons ---------------- */
 .champ {
   width: 100%; border: 1px solid var(--trait); background: var(--surface); color: var(--encre);
-  border-radius: 6px; padding: 0.55rem 0.75rem; font-size: 0.95rem;
+  border-radius: 8px; padding: 0.55rem 0.75rem; font-size: 0.95rem;
 }
 .champ:focus { outline: 2px solid var(--vin); outline-offset: 0; border-color: transparent; }
 .etiquette { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; }
 .bouton {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-  background: var(--vin); color: #fff; font-weight: 600; border-radius: 6px; padding: 0.55rem 1rem; font-size: 0.95rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+  background: var(--vin); color: #fff; font-weight: 650; border-radius: 999px; padding: 0.6rem 1.15rem; font-size: 0.95rem;
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
-.bouton:hover { filter: brightness(1.08); }
+.bouton:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.bouton:active { transform: translateY(1px); }
 .bouton:disabled { opacity: 0.6; }
+.bouton-or {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+  background: var(--moutarde); color: var(--bordeaux); font-weight: 750; border-radius: 999px; padding: 0.65rem 1.25rem;
+  transition: transform 0.15s ease;
+}
+.bouton-or:hover { transform: translateY(-2px) rotate(-1deg); }
 .bouton-discret {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
   border: 1px solid var(--trait); background: var(--surface); color: var(--encre); font-weight: 600;
-  border-radius: 6px; padding: 0.5rem 0.9rem; font-size: 0.9rem;
+  border-radius: 999px; padding: 0.5rem 0.95rem; font-size: 0.9rem;
 }
 .bouton-discret:hover { background: var(--teinte); }
+.bouton:hover .tourne, .bouton-or:hover .tourne, .bouton-discret:hover .tourne { animation: tourne 0.6s ease-in-out; }
+
+/* ======================================================================
+   ANIMATIONS : l'ambiance rugby
+   ====================================================================== */
+
+/* point "en direct" */
+.pastille { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: var(--moutarde); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; transform: scale(0.8); } }
+
+@keyframes tourne { to { transform: rotate(360deg); } }
+
+/* défilé : bande d'icônes qui défile en continu */
+.defile { display: flex; width: max-content; animation: defile var(--duree, 38s) linear infinite; }
+.defile-inverse { animation-direction: reverse; }
+@keyframes defile { to { transform: translateX(-50%); } }
+.bande-defile:hover .defile { animation-play-state: paused; }
+
+/* ballon ovale qui rebondit de façon imprévisible à travers l'en-tête */
+.ballon-trajet { position: absolute; left: 0; bottom: 0; animation: trajet 11s linear infinite; }
+.ballon-rebond { animation: rebond 11s cubic-bezier(.3,0,.7,1) infinite; }
+.ballon-rebond > svg { animation: vrille 11s linear infinite; transform-origin: 50% 50%; }
+@keyframes trajet { from { transform: translateX(-12vw); } to { transform: translateX(112vw); } }
+@keyframes rebond {
+  0% { transform: translateY(-260px); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  14% { transform: translateY(0); animation-timing-function: cubic-bezier(0,.4,.5,1); }
+  24% { transform: translateY(-150px); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  33% { transform: translateY(0); animation-timing-function: cubic-bezier(0,.4,.5,1); }
+  38% { transform: translateY(-40px); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  42% { transform: translateY(0); animation-timing-function: cubic-bezier(0,.4,.5,1); }
+  55% { transform: translateY(-190px); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  68% { transform: translateY(0); animation-timing-function: cubic-bezier(0,.4,.5,1); }
+  74% { transform: translateY(-60px); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  80% { transform: translateY(0); animation-timing-function: cubic-bezier(0,.4,.5,1); }
+  90% { transform: translateY(-110px); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  100% { transform: translateY(0); }
+}
+@keyframes vrille {
+  0% { transform: rotate(-20deg); } 14% { transform: rotate(160deg); } 24% { transform: rotate(250deg) scaleX(.9); }
+  33% { transform: rotate(390deg); } 42% { transform: rotate(420deg); } 55% { transform: rotate(600deg) scaleX(.85); }
+  68% { transform: rotate(700deg); } 80% { transform: rotate(820deg); } 100% { transform: rotate(1080deg); }
+}
+
+/* pinte qui se remplit (chargement) */
+.pinte-biere { transform-origin: bottom; animation: remplir 1.6s ease-in-out infinite; }
+.pinte-mousse { animation: mousse 1.6s ease-in-out infinite; }
+@keyframes remplir { 0% { transform: scaleY(0.05); } 70%, 100% { transform: scaleY(1); } }
+@keyframes mousse { 0%, 55% { opacity: 0; transform: translateY(18px); } 75%, 100% { opacity: 1; transform: translateY(0); } }
+
+/* bulles qui montent (troisième mi-temps) */
+.bulle { position: absolute; bottom: -20px; border-radius: 999px; background: color-mix(in srgb, var(--moutarde) 55%, transparent); animation: bulle var(--d, 7s) ease-in infinite; animation-delay: var(--delai, 0s); }
+@keyframes bulle { 0% { transform: translateY(0) translateX(0); opacity: 0; } 10% { opacity: .9; } 50% { transform: translateY(-50%) translateX(8px); } 100% { transform: translateY(-110vh) translateX(-6px); opacity: 0; } }
+
+/* ola des supporters (pied de page) */
+.ola > * { animation: ola 2.8s ease-in-out infinite; animation-delay: calc(var(--i) * 0.09s); }
+@keyframes ola { 0%, 30%, 100% { transform: translateY(0); } 12% { transform: translateY(-14px); } }
+
+/* titre de section : vague dessinée à l'apparition */
+.vague path { stroke-dasharray: 400; stroke-dashoffset: 400; transition: stroke-dashoffset 1.1s cubic-bezier(.6,0,.2,1); }
+.vu .vague path { stroke-dashoffset: 0; }
+
+/* apparition des blocs */
+.apparait { opacity: 0; transform: translateY(14px) rotate(-0.4deg); transition: opacity .6s ease, transform .6s ease; }
+.apparait.vu { opacity: 1; transform: none; }
+
+/* entrée du titre de l'en-tête : les mots tombent comme une passe */
+.mot { display: inline-block; animation: passe .8s cubic-bezier(.2,.8,.2,1.2) both; animation-delay: calc(var(--i) * 0.12s); }
+@keyframes passe { from { opacity: 0; transform: translateY(-40px) rotate(-8deg); } to { opacity: 1; transform: none; } }
+
+/* cartes : léger balancement au survol */
+.carte-vie { transition: transform .2s ease, box-shadow .2s ease; }
+.carte-vie:hover { transform: translateY(-3px) rotate(-0.4deg); box-shadow: 0 10px 0 -4px color-mix(in srgb, var(--vin) 25%, transparent); }
+
+/* logo : petit roulis au survol */
+.logo-roulis:hover img { animation: roulis .7s ease-in-out; }
+@keyframes roulis { 25% { transform: rotate(-6deg); } 60% { transform: rotate(4deg); } }
+
+/* score qui vient de changer */
+.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { 0% { background: var(--moutarde); color: var(--bordeaux); } 100% { background: transparent; } }
+
+/* célébration "Essai !" */
+.essai-voile { animation: voile 2.8s ease forwards; }
+@keyframes voile { 0% { opacity: 0; } 10%, 75% { opacity: 1; } 100% { opacity: 0; } }
+.essai-mot { animation: essai-mot 2.8s cubic-bezier(.2,.9,.2,1.3) forwards; }
+@keyframes essai-mot { 0% { transform: scale(.2) rotate(-12deg); } 18% { transform: scale(1.08) rotate(-4deg); } 30%, 80% { transform: scale(1) rotate(-4deg); } 100% { transform: scale(1.3) rotate(-4deg); opacity: 0; } }
+.essai-ballon { animation: essai-ballon 1.5s cubic-bezier(.3,.6,.4,1) forwards; }
+@keyframes essai-ballon { from { transform: translate(-40vw, 30vh) rotate(0); } to { transform: translate(0, -18vh) rotate(720deg) scale(.6); } }
+.confetti { position: absolute; top: -10px; width: 10px; height: 16px; animation: confetti 2.6s ease-in forwards; animation-delay: var(--delai); }
+@keyframes confetti { to { transform: translateY(110vh) rotate(var(--rot)); } }
+
+/* pas d'animations pour qui les a désactivées */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  .defile { animation: none; }
+  .ballon-trajet, .bulle, .confetti { display: none; }
+  .apparait { opacity: 1; transform: none; }
+  .vague path { stroke-dashoffset: 0; }
+}

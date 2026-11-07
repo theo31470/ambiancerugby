@@ -15,10 +15,10 @@ function Cover({ a, className }: { a: Article; className: string }) {
 
 export function ArticleHero({ a }: { a: Article }) {
   return (
-    <Link href={`/actus/${a.slug}`} className="group block">
-      <Cover a={a} className="w-full aspect-[16/9] rounded-lg" />
+    <Link href={`/actus/${a.slug}`} className="group block carte-vie">
+      <Cover a={a} className="w-full aspect-[16/9] rounded-2xl" />
       <p className="mt-3 text-sm text-sourdine">
-        <span className="text-vin font-semibold">{CATEGORIES[a.category] ?? a.category}</span>
+        {a.premium && <span className="mr-1.5 text-[10px] font-bold rounded-full bg-moutarde text-bordeaux px-1.5 py-0.5">Exclusif</span>}<span className="text-vin font-semibold">{CATEGORIES[a.category] ?? a.category}</span>
         {a.published_at && <span>, {fmtRelative(a.published_at)}</span>}
       </p>
       <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold leading-tight group-hover:underline underline-offset-4 decoration-2">{a.title}</h2>
@@ -29,11 +29,11 @@ export function ArticleHero({ a }: { a: Article }) {
 
 export default function ArticleCard({ a }: { a: Article }) {
   return (
-    <Link href={`/actus/${a.slug}`} className="group flex gap-3 sm:gap-4">
+    <Link href={`/actus/${a.slug}`} className="group flex gap-3 sm:gap-4 carte-vie rounded-xl">
       <Cover a={a} className="w-28 sm:w-36 aspect-[4/3] rounded-md shrink-0" />
       <div className="min-w-0">
         <p className="text-xs text-sourdine">
-          <span className="text-vin font-semibold">{CATEGORIES[a.category] ?? a.category}</span>
+          {a.premium && <span className="mr-1.5 text-[10px] font-bold rounded-full bg-moutarde text-bordeaux px-1.5 py-0.5">Exclusif</span>}<span className="text-vin font-semibold">{CATEGORIES[a.category] ?? a.category}</span>
           {a.published_at && <span>, {fmtRelative(a.published_at)}</span>}
         </p>
         <h3 className="mt-0.5 font-bold leading-snug group-hover:underline underline-offset-4">{a.title}</h3>

@@ -8,11 +8,11 @@ import type { MatchFull } from "@/lib/types";
 
 export default async function AdminHome() {
   const db = await createClient();
-  const count = async (t: string) => (await db.from(t).select("*", { count: "exact", head: true })).count ?? 0;
+  const count = async (t: string) => (await db.from(t).select("id", { count: "exact", head: true })).count ?? 0;
   const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
   const [articles, drafts, matches, teams, players, users, runs, used, live] = await Promise.all([
     count("articles"),
-    db.from("articles").select("*", { count: "exact", head: true }).eq("status", "draft").then((r) => r.count ?? 0),
+    db.from("articles").select("id", { count: "exact", head: true }).eq("status", "draft").then((r) => r.count ?? 0),
     count("matches"),
     count("teams"),
     count("players"),

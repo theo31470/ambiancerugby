@@ -39,6 +39,7 @@ export default async function AdminMatch({ params, searchParams }: PageProps<"/a
         <Link href="/admin/matchs" className="text-sm text-sourdine underline underline-offset-4">Tous les matchs</Link>
         <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold">{m.home.name} – {m.away.name}</h1>
         <p className="text-sourdine">{m.competition.name}{m.source !== "manual" && ", mis à jour automatiquement"}</p>
+        <Link href={`/admin/matchs/${m.id}/stats`} className="bouton-discret mt-3">Feuille de stats des joueurs</Link>
       </div>
       <Notice sp={sp} />
 

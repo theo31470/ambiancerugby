@@ -38,6 +38,11 @@ export type Viewer = {
   avatar_url: string | null;
   favorite_team_id: string | null;
   role: "user" | "editor" | "admin";
+  plan: "free" | "supporter";
+  plan_until: string | null;
+  /** abonnement Supporter actif (ou membre de la rédaction, qui voit tout) */
+  supporter: boolean;
+  created_at: string;
 };
 
 /** Utilisateur connecté + profil, mémorisé pour la requête. */
@@ -48,5 +53,15 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
   if (!sub) return null;
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", sub).single();
   if (!profile) return null;
-  return { ...profile, email: claims?.claims?.email as string | undefined } as Viewer;
+  const active = profile.plan === "supporter" && (!profile.plan_until || new Date(profile.plan_until) > new Date());
+  return {
+    ...profile,
+    email: claims?.claims?.email as string | undefined,
+    supporter: active || profile.role !== "user",
+  } as Viewer;
 });
+
+/** Abonné Supporter au sens strict (pour le badge). */
+export function hasBadge(v: { plan: string; plan_until: string | null } | null | undefined) {
+  return !!v && v.plan === "supporter" && (!v.plan_until || new Date(v.plan_until) > new Date());
+}

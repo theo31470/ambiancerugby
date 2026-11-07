@@ -8,7 +8,8 @@ export default async function EditArticle({ params, searchParams }: PageProps<"/
   const { id } = await params;
   const sp = await searchParams;
   const db = await createClient();
-  const { data: article } = await db.from("articles").select("*").eq("id", id).maybeSingle();
+  const { data: rows } = await db.rpc("get_article_for_edit", { p_id: id });
+  const article = (rows ?? [])[0];
   if (!article) notFound();
   const pub = publicClient();
   const [{ data: comps }, { data: teams }] = await Promise.all([

@@ -70,6 +70,7 @@ export async function saveArticle(form: FormData) {
       team_id: str(form, "team_id"),
       cover_url: cover,
       status,
+      premium: form.get("premium") === "on",
       published_at: publishedLocal ? parisLocalToIso(publishedLocal) : status === "published" ? new Date().toISOString() : null,
     };
     if (id) {
@@ -356,5 +357,58 @@ export async function setRole(form: FormData) {
     const { error } = await db.from("profiles").update({ role: String(form.get("role")) }).eq("id", id);
     fail(error, "Changement de rôle");
     redirect("/admin/utilisateurs?ok=role");
+  });
+}
+
+// ---------------- Abonnements (attribués à la main tant que le paiement n'est pas branché) ----------------
+export async function setPlan(form: FormData) {
+  return run(form, async () => {
+    const { viewer, db } = await staff();
+    if (viewer.role !== "admin") throw new Error("Seul un administrateur peut gérer les abonnements.");
+    const duree = String(form.get("duree") ?? "");
+    if (!duree) throw new Error("Choisissez une formule.");
+    let patch: Record<string, unknown>;
+    if (duree === "free") patch = { plan: "free", plan_until: null };
+    else if (duree === "0") patch = { plan: "supporter", plan_until: null };
+    else {
+      const d = new Date();
+      d.setMonth(d.getMonth() + Number(duree));
+      patch = { plan: "supporter", plan_until: d.toISOString() };
+    }
+    const { error } = await db.from("profiles").update(patch).eq("id", String(form.get("id")));
+    fail(error, "Abonnement");
+    revalidatePath("/", "layout");
+    redirect("/admin/utilisateurs?ok=enregistre");
+  });
+}
+
+// ---------------- Feuille de stats des joueurs ----------------
+const STAT_FIELDS = ["minutes", "tries", "points", "tackles", "missed_tackles", "carries", "metres", "line_breaks", "offloads", "turnovers_won", "penalties_conceded", "yellow", "red"] as const;
+
+export async function saveStats(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const matchId = String(form.get("match_id"));
+    const ids = form.getAll("player_id").map(String);
+    const motm = String(form.get("motm") ?? "");
+    const rows = [];
+    const remove: string[] = [];
+    for (const pid of ids) {
+      const played = form.get(`${pid}:joue`) === "on";
+      if (!played) { remove.push(pid); continue; }
+      const row: Record<string, unknown> = { match_id: matchId, player_id: pid, team_id: String(form.get(`${pid}:team`)), motm: motm === pid };
+      for (const f of STAT_FIELDS) {
+        const v = Number(String(form.get(`${pid}:${f}`) ?? "").replace(",", "."));
+        row[f] = Number.isFinite(v) && v >= 0 ? Math.round(v) : f === "minutes" ? 80 : 0;
+      }
+      rows.push(row);
+    }
+    if (rows.length) {
+      const { error } = await db.from("player_match_stats").upsert(rows, { onConflict: "match_id,player_id" });
+      fail(error, "Feuille de stats");
+    }
+    if (remove.length) await db.from("player_match_stats").delete().eq("match_id", matchId).in("player_id", remove);
+    revalidatePath("/", "layout");
+    redirect(`/admin/matchs/${matchId}/stats?ok=enregistre`);
   });
 }

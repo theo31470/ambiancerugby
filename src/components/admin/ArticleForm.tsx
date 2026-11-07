@@ -35,6 +35,9 @@ export default function ArticleForm({ article, competitions, teams, back }: {
           <Field name="published_at" type="datetime-local" label="Date de publication" defaultValue={article?.published_at ? isoToParisLocal(article.published_at) : ""} hint="Vide = maintenant. Une date future programme l'article." />
           <Select name="status" label="État" defaultValue={article?.status ?? "draft"} options={[{ value: "draft", label: "Brouillon" }, { value: "published", label: "Publié" }]} />
         </div>
+        <label className="inline-flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" name="premium" defaultChecked={article?.premium} /> Exclusif Supporters : seul le premier paragraphe est visible pour les autres lecteurs
+        </label>
         <div className="flex gap-3">
           <button className="bouton">Enregistrer</button>
           {article?.status === "published" && <a href={`/actus/${article.slug}`} className="bouton-discret" target="_blank">Voir l&apos;article</a>}

@@ -122,3 +122,31 @@ export async function toggleFavorite(form: FormData) {
   }
   revalidatePath(path);
 }
+
+export async function rejoindreListe() {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const uid = claims?.claims?.sub;
+  if (!uid) redirect("/connexion?suite=/abonnement");
+  await supabase.from("subscription_interest").upsert({ user_id: uid }, { onConflict: "user_id", ignoreDuplicates: true });
+  revalidatePath("/abonnement");
+  redirect("/abonnement?ok=1");
+}
+
+export async function toutLu() {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const uid = claims?.claims?.sub;
+  if (!uid) return;
+  await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("user_id", uid).is("read_at", null);
+  revalidatePath("/", "layout");
+}
+
+export async function viderAlertes() {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const uid = claims?.claims?.sub;
+  if (!uid) return;
+  await supabase.from("notifications").delete().eq("user_id", uid);
+  revalidatePath("/", "layout");
+}

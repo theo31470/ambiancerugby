@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicClient } from "./supabase/server";
 import type { Article, Competition, MatchFull, Player, StandingRow, Team } from "./types";
 import { parisDayRange } from "./format";
@@ -110,7 +111,7 @@ export async function searchPlayers(q: string, position?: string, limit = 60) {
   return (data ?? []) as unknown as (Player & { team: Team | null })[];
 }
 
-export const ARTICLE_LIST = "id,slug,title,excerpt,cover_url,category,published_at,team_id,competition_id";
+export const ARTICLE_LIST = "id,slug,title,excerpt,cover_url,category,published_at,team_id,competition_id,premium";
 
 export async function getArticles(opts: { limit?: number; category?: string; teamId?: string; competitionId?: string } = {}) {
   let q = publicClient().from("articles").select(ARTICLE_LIST).eq("status", "published").lte("published_at", new Date().toISOString()).order("published_at", { ascending: false });
@@ -121,21 +122,31 @@ export async function getArticles(opts: { limit?: number; category?: string; tea
   return (data ?? []) as Article[];
 }
 
-export async function getArticle(slug: string) {
-  const { data } = await publicClient()
+/** Article publié, avec son texte seulement si le lecteur y a droit (articles exclusifs). */
+export async function getArticle(slug: string, supabase?: SupabaseClient) {
+  const db = supabase ?? publicClient();
+  const { data } = await db
     .from("articles")
-    .select(`*, author:profiles(display_name,username), team:teams(${TEAM_LITE}), competition:competitions(slug,name)`)
+    .select(`${ARTICLE_LIST},status,author_id,created_at,updated_at, author:profiles(display_name), team:teams(${TEAM_LITE}), competition:competitions(slug,name)`)
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();
-  return data as (Article & { author: { display_name: string | null } | null; team: Team | null; competition: { slug: string; name: string } | null }) | null;
+  if (!data) return null;
+  const { data: body } = await db.rpc("get_article_body", { p_slug: slug });
+  const b = (body ?? [])[0] as { content: string; locked: boolean } | undefined;
+  return { ...(data as object), content: b?.content ?? "", locked: b?.locked ?? false } as Article & {
+    locked: boolean;
+    author: { display_name: string | null } | null;
+    team: Team | null;
+    competition: { slug: string; name: string } | null;
+  };
 }
 
 export async function getComments(target: { articleId?: string; matchId?: string }) {
-  let q = publicClient().from("comments").select("id,body,created_at,user_id, author:profiles(display_name,username,avatar_url)").order("created_at");
+  let q = publicClient().from("comments").select("id,body,created_at,user_id, author:profiles(display_name,username,avatar_url,plan,plan_until)").order("created_at");
   q = target.articleId ? q.eq("article_id", target.articleId) : q.eq("match_id", target.matchId!);
   const { data } = await q.limit(300);
-  return (data ?? []) as unknown as { id: string; body: string; created_at: string; user_id: string; author: { display_name: string | null; username: string | null; avatar_url: string | null } | null }[];
+  return (data ?? []) as unknown as { id: string; body: string; created_at: string; user_id: string; author: { display_name: string | null; username: string | null; avatar_url: string | null; plan: string; plan_until: string | null } | null }[];
 }
 
 /** Groupe une liste de matchs par compétition, dans l'ordre d'affichage des compétitions. */

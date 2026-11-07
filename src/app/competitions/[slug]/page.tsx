@@ -44,7 +44,7 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
         <div className="flex items-center gap-3">
           <span className="w-2.5 h-10 rounded-sm" style={{ background: c.color ?? "var(--vin)" }} aria-hidden />
           <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold leading-none">{c.name}</h1>
+            <h1 className="groovy text-4xl sm:text-6xl text-vin leading-none">{c.name}</h1>
             <p className="mt-1 text-sourdine">{c.country}</p>
           </div>
         </div>
@@ -60,7 +60,7 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
         )}
       </div>
 
-      <nav aria-label="Rubriques" className="defile mt-6 flex gap-1 border-b border-trait overflow-x-auto">
+      <nav aria-label="Rubriques" className="defile-scroll mt-6 flex gap-1 border-b border-trait overflow-x-auto">
         {tabs.map((t) => (
           <Link key={t.id} href={href(t.id)} aria-current={t.id === tab ? "page" : undefined}
             className={`shrink-0 px-4 py-2.5 font-semibold border-b-2 -mb-px ${t.id === tab ? "border-vin text-vin" : "border-transparent text-sourdine hover:text-encre"}`}>
@@ -101,7 +101,7 @@ async function Calendrier({ compId, season, upcoming }: { compId: string; season
       {[...groups.entries()].map(([label, list]) => (
         <section key={label}>
           <h2 className="font-bold mb-2 first-letter:uppercase">{label}</h2>
-          <ul className="bg-surface border border-trait rounded-lg divide-y divide-trait overflow-hidden">
+          <ul className="bg-surface border border-trait rounded-2xl divide-y divide-trait overflow-hidden">
             {list.map((m) => <li key={m.id}><MatchRow m={m} showDate /></li>)}
           </ul>
         </section>
@@ -117,7 +117,7 @@ async function Equipes({ compId, season }: { compId: string; season: string }) {
     <ul className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
       {teams.map((t) => (
         <li key={t.id}>
-          <Link href={`/clubs/${t.slug}`} className="flex items-center gap-3 bg-surface border border-trait rounded-lg p-3 hover:border-vin h-full">
+          <Link href={`/clubs/${t.slug}`} className="flex items-center gap-3 bg-surface border border-trait rounded-2xl p-3 hover:border-vin h-full">
             <TeamBadge team={t} size="md" />
             <span className="min-w-0">
               <span className="block font-bold leading-tight">{t.short_name ?? t.name}</span>
@@ -142,5 +142,5 @@ async function News({ compId }: { compId: string }) {
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="bg-surface border border-trait rounded-lg p-5 text-sourdine">{children}</p>;
+  return <p className="bg-surface border border-trait rounded-2xl p-5 text-sourdine">{children}</p>;
 }

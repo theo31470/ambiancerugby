@@ -4,9 +4,11 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Scoreboard from "@/components/Scoreboard";
+import Celebration from "@/components/deco/Celebration";
 import { getTickerMatches } from "@/lib/queries";
 
-// polices hébergées avec le site (Bricolage Grotesque pour les titres et scores, Instrument Sans pour le texte)
+// polices hébergées avec le site : Shrikhand (grands titres groovy), Bricolage Grotesque (titres, scores), Instrument Sans (texte)
+const groovy = localFont({ variable: "--font-groovy", src: "./fonts/shrikhand.woff2", weight: "400", display: "swap" });
 const titre = localFont({ variable: "--font-titre", src: "./fonts/bricolage.woff2", weight: "200 800", display: "swap" });
 const texte = localFont({
   variable: "--font-texte",
@@ -18,23 +20,23 @@ const texte = localFont({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://ambiance-rugby.vercel.app"),
-  title: { default: "Ambiance Rugby — scores en direct, classements, clubs et joueurs", template: "%s · Ambiance Rugby" },
-  description: "Le rugby comme en tribune : scores en direct, classements du Top 14, de la Pro D2 et des coupes d'Europe, fiches clubs et joueurs, actus.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://ambiancerugby.vercel.app"),
+  title: { default: "Ambiance Rugby — le rugby côté tribune", template: "%s · Ambiance Rugby" },
+  description: "Scores en direct, classements, Indice Ambiance des clubs, pronostics, stats des joueurs et actus du Top 14, de la Pro D2, des coupes d'Europe et du Tournoi.",
   openGraph: { siteName: "Ambiance Rugby", locale: "fr_FR", type: "website", images: ["/og.jpg"] },
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#4a1f2a" },
-    { media: "(prefers-color-scheme: dark)", color: "#2d1219" },
+    { media: "(prefers-color-scheme: light)", color: "#3e1621" },
+    { media: "(prefers-color-scheme: dark)", color: "#260d14" },
   ],
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const ticker = await getTickerMatches();
   return (
-    <html lang="fr" className={`${titre.variable} ${texte.variable} h-full antialiased`}>
+    <html lang="fr" className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <a href="#contenu" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:bg-surface focus:p-2">
           Aller au contenu
@@ -45,6 +47,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
         <Footer />
+        <Celebration />
       </body>
     </html>
   );

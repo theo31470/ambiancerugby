@@ -15,8 +15,8 @@ export default async function ActusPage({ searchParams }: PageProps<"/actus">) {
 
   return (
     <div>
-      <h1 className="text-3xl sm:text-4xl font-extrabold">Actus</h1>
-      <nav aria-label="Rubriques" className="defile mt-5 flex gap-2 overflow-x-auto pb-1">
+      <h1 className="groovy text-5xl sm:text-6xl text-vin">Actus</h1>
+      <nav aria-label="Rubriques" className="defile-scroll mt-5 flex gap-2 overflow-x-auto pb-1">
         <Link href="/actus" className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold border ${!cat ? "bg-encre text-fond border-encre" : "border-trait hover:bg-teinte"}`}>Tout</Link>
         {Object.entries(CATEGORIES).map(([k, v]) => (
           <Link key={k} href={`/actus?rubrique=${k}`} className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold border ${cat === k ? "bg-encre text-fond border-encre" : "border-trait hover:bg-teinte"}`}>{v}</Link>

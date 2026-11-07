@@ -14,7 +14,7 @@ export default function MatchGroups({ matches, showDate = false }: { matches: Ma
               {g.competition.name}
             </Link>
           </h3>
-          <ul className="bg-surface border border-trait rounded-lg divide-y divide-trait overflow-hidden">
+          <ul className="bg-surface border border-trait rounded-2xl divide-y divide-trait overflow-hidden">
             {g.matches.map((m) => (
               <li key={m.id}>
                 <MatchRow m={m} showDate={showDate} />

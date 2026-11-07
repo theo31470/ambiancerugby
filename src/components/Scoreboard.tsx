@@ -8,6 +8,7 @@ import type { Match, MatchFull } from "@/lib/types";
 /** Tableau d'affichage : bandeau des scores en direct, présent sur toutes les pages. */
 export default function Scoreboard({ initial }: { initial: MatchFull[] }) {
   const [matches, setMatches] = useState(initial);
+  const [flash, setFlash] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const supabase = browserClient();
@@ -15,7 +16,12 @@ export default function Scoreboard({ initial }: { initial: MatchFull[] }) {
       .channel("tableau")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches" }, (payload: { new: unknown }) => {
         const m = payload.new as Match;
-        setMatches((list) => list.map((x) => (x.id === m.id ? { ...x, ...m, home: x.home, away: x.away, competition: x.competition } : x)));
+        setMatches((list) => list.map((x) => {
+          if (x.id !== m.id) return x;
+          // le score a bougé : on fait clignoter la case
+          if (x.home_score !== m.home_score || x.away_score !== m.away_score) setFlash((f) => ({ ...f, [m.id]: Date.now() }));
+          return { ...x, ...m, home: x.home, away: x.away, competition: x.competition };
+        }));
       })
       .subscribe();
     return () => {
@@ -44,9 +50,9 @@ export default function Scoreboard({ initial }: { initial: MatchFull[] }) {
         {matches.length === 0 ? (
           <p className="px-4 py-2 text-sm text-white/70 self-center">Aucun match ces jours-ci. Le calendrier complet est dans Matchs.</p>
         ) : (
-          <ul className="defile flex overflow-x-auto" aria-label="Scores">
+          <ul className="defile-scroll flex overflow-x-auto" aria-label="Scores">
             {matches.map((m) => (
-              <li key={m.id} className="shrink-0 border-r border-white/10">
+              <li key={`${m.id}-${flash[m.id] ?? 0}`} className={`shrink-0 border-r border-white/10 ${flash[m.id] ? "flash" : ""}`}>
                 <Chip m={m} />
               </li>
             ))}

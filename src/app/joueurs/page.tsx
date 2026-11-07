@@ -16,7 +16,7 @@ export default async function JoueursPage({ searchParams }: PageProps<"/joueurs"
 
   return (
     <div>
-      <h1 className="text-3xl sm:text-4xl font-extrabold">Joueurs</h1>
+      <h1 className="groovy text-5xl sm:text-6xl text-vin">Joueurs</h1>
       <form className="mt-6 flex flex-wrap gap-2" role="search">
         <label htmlFor="q" className="sr-only">Nom du joueur</label>
         <input id="q" name="q" defaultValue={q} placeholder="Rechercher un joueur" className="champ max-w-xs" />
@@ -29,14 +29,14 @@ export default async function JoueursPage({ searchParams }: PageProps<"/joueurs"
       </form>
 
       {players.length === 0 ? (
-        <p className="mt-8 bg-surface border border-trait rounded-lg p-5 text-sourdine">
+        <p className="mt-8 bg-surface border border-trait rounded-2xl p-5 text-sourdine">
           {q || poste ? "Aucun joueur ne correspond. Essayez un autre nom ou un autre poste." : "Les fiches joueurs sont ajoutées par la rédaction et apparaîtront ici."}
         </p>
       ) : (
         <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {players.map((p) => (
             <li key={p.id}>
-              <Link href={`/joueurs/${p.slug}`} className="flex items-center gap-3 bg-surface border border-trait rounded-lg p-3 hover:border-vin">
+              <Link href={`/joueurs/${p.slug}`} className="flex items-center gap-3 bg-surface border border-trait rounded-2xl p-3 hover:border-vin carte-vie">
                 {p.photo_url ? (
                   <img src={p.photo_url} alt="" className="w-12 h-12 rounded-full object-cover" loading="lazy" />
                 ) : (

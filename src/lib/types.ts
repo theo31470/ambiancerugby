@@ -110,6 +110,7 @@ export type Article = {
   team_id: string | null;
   author_id: string | null;
   status: "draft" | "published";
+  premium: boolean;
   published_at: string | null;
   created_at: string;
   updated_at: string;

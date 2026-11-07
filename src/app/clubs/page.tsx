@@ -17,7 +17,7 @@ export default async function ClubsPage() {
 
   return (
     <div>
-      <h1 className="text-3xl sm:text-4xl font-extrabold">Clubs et sélections</h1>
+      <h1 className="groovy text-5xl sm:text-6xl text-vin">Clubs et sélections</h1>
       <div className="mt-8 grid gap-10">
         {groups.filter((g) => g.teams.length).map(({ c, teams }) => (
           <section key={c.id} aria-labelledby={`c-${c.id}`}>
@@ -43,7 +43,7 @@ function TeamGrid({ teams }: { teams: Team[] }) {
     <ul className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
       {teams.map((t) => (
         <li key={t.id}>
-          <Link href={`/clubs/${t.slug}`} className="flex items-center gap-3 bg-surface border border-trait rounded-lg p-3 hover:border-vin h-full">
+          <Link href={`/clubs/${t.slug}`} className="flex items-center gap-3 bg-surface border border-trait rounded-2xl p-3 hover:border-vin h-full">
             <TeamBadge team={t} size="md" />
             <span className="min-w-0">
               <span className="block font-bold leading-tight">{t.short_name ?? t.name}</span>

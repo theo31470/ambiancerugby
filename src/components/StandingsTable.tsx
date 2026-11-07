@@ -20,7 +20,7 @@ export default function StandingsTable({ rows, compact = false, zones = {}, high
     return "bg-transparent";
   };
   return (
-    <div className="bg-surface border border-trait rounded-lg overflow-x-auto">
+    <div className="bg-surface border border-trait rounded-2xl overflow-x-auto">
       <table className="w-full text-sm tnum">
         <thead>
           <tr className="text-sourdine text-xs border-b border-trait">

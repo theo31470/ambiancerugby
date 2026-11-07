@@ -23,11 +23,11 @@ export default async function MatchsPage({ searchParams }: PageProps<"/matchs">)
   return (
     <div>
       <LiveRefresh />
-      <h1 className="text-3xl sm:text-4xl font-extrabold">Matchs</h1>
+      <h1 className="groovy text-5xl sm:text-6xl text-vin">Matchs</h1>
 
       <nav aria-label="Choisir un jour" className="mt-6 flex items-center gap-1">
         <Link href={href(shiftDay(day, -7))} className="bouton-discret px-2.5" aria-label="Semaine précédente">‹</Link>
-        <ol className="defile flex-1 flex overflow-x-auto gap-1">
+        <ol className="defile-scroll flex-1 flex overflow-x-auto gap-1">
           {days.map((d) => {
             const active = d === day;
             return (
@@ -47,7 +47,7 @@ export default async function MatchsPage({ searchParams }: PageProps<"/matchs">)
         <Link href={href(shiftDay(day, 7))} className="bouton-discret px-2.5" aria-label="Semaine suivante">›</Link>
       </nav>
 
-      <nav aria-label="Filtrer par compétition" className="defile mt-4 flex gap-2 overflow-x-auto pb-1">
+      <nav aria-label="Filtrer par compétition" className="defile-scroll mt-4 flex gap-2 overflow-x-auto pb-1">
         <Link href={href(day, "")} className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold border ${!comp ? "bg-encre text-fond border-encre" : "border-trait hover:bg-teinte"}`}>
           Toutes
         </Link>
@@ -66,7 +66,7 @@ export default async function MatchsPage({ searchParams }: PageProps<"/matchs">)
       {matches.length ? (
         <MatchGroups matches={matches} />
       ) : (
-        <p className="bg-surface border border-trait rounded-lg p-5 text-sourdine">
+        <p className="bg-surface border border-trait rounded-2xl p-5 text-sourdine">
           Pas de match {comp ? `de ${comp.name} ` : ""}ce jour-là. Utilisez les flèches pour changer de semaine.
         </p>
       )}
