@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ambiance Rugby
 
-## Getting Started
+Média rugby : scores en direct, classements, calendriers, fiches clubs et joueurs, actus, comptes supporters (favoris, commentaires) et espace rédaction.
 
-First, run the development server:
+- **Site** : Next.js 16 (App Router), Tailwind CSS 4, hébergé sur Vercel. Chaque push sur `main` est mis en ligne.
+- **Données** : Supabase (projet `ambiance-rugby`, Paris), avec sécurité ligne par ligne (RLS).
+- **Synchronisation** : fonction Supabase `sync` (`supabase/functions/sync`), lancée par `pg_cron`.
+
+## Données de match
+
+| Source | Compétitions | Rythme |
+| --- | --- | --- |
+| Oanor Rugby API (gratuit, 3 000 appels/mois) | Top 14, Champions Cup, Premiership, URC, Super Rugby, Rugby Championship, Coupe du monde | chaque matin + toutes les 10 min pendant les matchs |
+| API-Sports Rugby (gratuit, saisons passées) | historique de toutes les compétitions | import manuel depuis la rédaction |
+| Rédaction | Pro D2, Six Nations, Challenge Cup, tests | saisie en direct dans `/admin/matchs` |
+
+Pour les compétitions saisies par la rédaction, le classement se recalcule tout seul à chaque score (4 pts victoire, 2 nul, bonus offensif à +3 essais, bonus défensif à 5 points ou moins).
+
+Clés à renseigner dans Supabase → Edge Functions → Secrets : `OANOR_KEY`, `APISPORTS_KEY`.
+
+## Rédaction
+
+Le compte `theosarrat@gmail.com` devient administrateur à l'inscription. L'espace `/admin` permet d'écrire des articles (Markdown, photos), de saisir les matchs et le score en direct, de gérer clubs, joueurs, saisons et rôles.
+
+## Développement
 
 ```bash
+cp .env.example .env.local
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

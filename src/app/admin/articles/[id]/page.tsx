@@ -1,0 +1,25 @@
+import { notFound } from "next/navigation";
+import ArticleForm from "@/components/admin/ArticleForm";
+import Notice from "@/components/admin/Notice";
+import { createClient, publicClient } from "@/lib/supabase/server";
+import type { Article } from "@/lib/types";
+
+export default async function EditArticle({ params, searchParams }: PageProps<"/admin/articles/[id]">) {
+  const { id } = await params;
+  const sp = await searchParams;
+  const db = await createClient();
+  const { data: article } = await db.from("articles").select("*").eq("id", id).maybeSingle();
+  if (!article) notFound();
+  const pub = publicClient();
+  const [{ data: comps }, { data: teams }] = await Promise.all([
+    pub.from("competitions").select("id,name").order("sort_order"),
+    pub.from("teams").select("id,name").order("name"),
+  ]);
+  return (
+    <div>
+      <h1 className="text-3xl font-extrabold mb-6">Modifier l&apos;article</h1>
+      <Notice sp={sp} />
+      <ArticleForm article={article as Article} competitions={comps ?? []} teams={teams ?? []} back={`/admin/articles/${id}`} />
+    </div>
+  );
+}

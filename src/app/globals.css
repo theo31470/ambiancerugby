@@ -1,26 +1,123 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --vin: #934f5e;          /* couleur du logo */
+  --bordeaux: #4a1f2a;     /* zones fortes, tableau d'affichage */
+  --moutarde: #e8b23a;     /* scores, direct */
+  --encre: #2a1419;        /* texte */
+  --fond: #fcf9f9;
+  --surface: #ffffff;
+  --sourdine: #7a6166;     /* texte secondaire */
+  --trait: #ead9dc;        /* séparateurs */
+  --teinte: #f5e9eb;       /* fonds légers */
+  --ok: #2f7d4f;
+  --alerte: #b3261e;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --vin: #c98595;
+    --bordeaux: #2d1219;
+    --moutarde: #f0c25a;
+    --encre: #f6ecee;
+    --fond: #1a0d11;
+    --surface: #241318;
+    --sourdine: #b49ca1;
+    --trait: #3d242b;
+    --teinte: #2f1a20;
+    --ok: #6cc28f;
+    --alerte: #ff8a80;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-vin: var(--vin);
+  --color-bordeaux: var(--bordeaux);
+  --color-moutarde: var(--moutarde);
+  --color-encre: var(--encre);
+  --color-fond: var(--fond);
+  --color-surface: var(--surface);
+  --color-sourdine: var(--sourdine);
+  --color-trait: var(--trait);
+  --color-teinte: var(--teinte);
+  --color-ok: var(--ok);
+  --color-alerte: var(--alerte);
+  --font-sans: var(--font-texte);
+  --font-display: var(--font-titre);
 }
+
+html {
+  background: var(--fond);
+  color: var(--encre);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--fond);
+  color: var(--encre);
+  font-family: var(--font-texte), system-ui, sans-serif;
+  font-feature-settings: "kern";
+}
+
+.tnum { font-variant-numeric: tabular-nums; }
+
+h1, h2, h3, .titre {
+  font-family: var(--font-titre), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--moutarde);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection { background: var(--moutarde); color: var(--bordeaux); }
+
+/* défilement horizontal discret du tableau d'affichage */
+.defile { scrollbar-width: none; }
+.defile::-webkit-scrollbar { display: none; }
+
+/* point "en direct" */
+.pastille {
+  width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: var(--moutarde);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .pastille { animation: none; } }
+
+/* contenu des articles */
+.prose-ar { font-size: 1.0625rem; line-height: 1.7; max-width: 68ch; }
+.prose-ar > * + * { margin-top: 1.1em; }
+.prose-ar h2 { font-size: 1.5rem; font-weight: 700; margin-top: 1.8em; line-height: 1.2; }
+.prose-ar h3 { font-size: 1.2rem; font-weight: 700; margin-top: 1.5em; }
+.prose-ar a { color: var(--vin); text-decoration: underline; text-underline-offset: 3px; }
+.prose-ar ul { list-style: disc; padding-left: 1.3em; }
+.prose-ar ol { list-style: decimal; padding-left: 1.3em; }
+.prose-ar li + li { margin-top: 0.35em; }
+.prose-ar blockquote { border-left: 3px solid var(--vin); padding-left: 1em; font-style: italic; color: var(--sourdine); }
+.prose-ar img { border-radius: 6px; }
+.prose-ar strong { font-weight: 650; }
+
+/* champs de formulaire */
+.champ {
+  width: 100%; border: 1px solid var(--trait); background: var(--surface); color: var(--encre);
+  border-radius: 6px; padding: 0.55rem 0.75rem; font-size: 0.95rem;
+}
+.champ:focus { outline: 2px solid var(--vin); outline-offset: 0; border-color: transparent; }
+.etiquette { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; }
+.bouton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  background: var(--vin); color: #fff; font-weight: 600; border-radius: 6px; padding: 0.55rem 1rem; font-size: 0.95rem;
+}
+.bouton:hover { filter: brightness(1.08); }
+.bouton:disabled { opacity: 0.6; }
+.bouton-discret {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  border: 1px solid var(--trait); background: var(--surface); color: var(--encre); font-weight: 600;
+  border-radius: 6px; padding: 0.5rem 0.9rem; font-size: 0.9rem;
+}
+.bouton-discret:hover { background: var(--teinte); }
