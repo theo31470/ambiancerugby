@@ -82,7 +82,13 @@ class TeamIndex {
 // ---------- Oanor ----------
 async function oanor(path: string, key: string, budget: Budget) {
   budget.take();
-  const res = await fetch(`${OANOR_BASE}${path}`, { headers: { "x-oanor-key": key } });
+  let res = await fetch(`${OANOR_BASE}${path}`, { headers: { "x-oanor-key": key } });
+  // panne passagère chez Oanor (502/503/504) : un seul nouvel essai après 3 s
+  if (res.status >= 500) {
+    await new Promise((r) => setTimeout(r, 3000));
+    budget.take();
+    res = await fetch(`${OANOR_BASE}${path}`, { headers: { "x-oanor-key": key } });
+  }
   if (!res.ok) throw new Error(`Oanor ${path} → HTTP ${res.status}`);
   const body = await res.json();
   if (body.success === false) throw new Error(`Oanor ${path} → ${body.message ?? "erreur"}`);
@@ -267,20 +273,32 @@ Deno.serve(async (req) => {
   const log: string[] = [];
   let okRun = true;
 
+  // une compétition en panne ne bloque pas les autres
+  const each = async (c: Competition, fn: () => Promise<string>) => {
+    try {
+      log.push(`${c.slug}: ${await fn()}`);
+    } catch (e) {
+      okRun = false;
+      log.push(`${c.slug}: ERREUR ${(e as Error).message}`);
+      if ((e as Error).message === "quota atteint") throw e;
+    }
+  };
+
   try {
     const { count: knownTeams } = await db.from("teams").select("id", { count: "exact", head: true }).not("oanor_id", "is", null);
     if (job === "teams" || !knownTeams) {
-      await oanorTeams(db, key, budget, oanorComps, idx);
-      log.push("équipes");
+      for (const c of oanorComps) await each(c, async () => { await oanorTeams(db, key, budget, [c], idx); return "équipes"; });
     }
     if (job === "daily" || job === "teams") {
       const from = new Date(Date.now() - 4 * 86400e3);
       const to = new Date(Date.now() + 14 * 86400e3);
       for (const c of oanorComps) {
-        const rows = await oanorMatches(db, key, budget, c, idx, from, to);
-        let st = 0;
-        if (c.standings_mode === "api") st = await oanorStandings(db, key, budget, c, idx);
-        log.push(`${c.slug}: ${rows.length} matchs, ${st} classement`);
+        await each(c, async () => {
+          const rows = await oanorMatches(db, key, budget, c, idx, from, to);
+          let st = 0;
+          if (c.standings_mode === "api") st = await oanorStandings(db, key, budget, c, idx);
+          return `${rows.length} matchs, ${st} au classement`;
+        });
       }
     }
     if (job === "live") {
@@ -295,10 +313,12 @@ Deno.serve(async (req) => {
       for (const id of compIds) {
         const c = oanorComps.find((x) => x.id === id);
         if (!c) continue;
-        const rows = await oanorMatches(db, key, budget, c, idx, yesterday, today);
-        const justFinished = rows.some((r) => r.status === "finished") && (window ?? []).some((m) => m.competition_id === id && m.status !== "finished");
-        if (justFinished && c.standings_mode === "api") await oanorStandings(db, key, budget, c, idx);
-        log.push(`${c.slug}: live ${rows.length}`);
+        await each(c, async () => {
+          const rows = await oanorMatches(db, key, budget, c, idx, yesterday, today);
+          const justFinished = rows.some((r) => r.status === "finished") && (window ?? []).some((m) => m.competition_id === id && m.status !== "finished");
+          if (justFinished && c.standings_mode === "api") await oanorStandings(db, key, budget, c, idx);
+          return `direct ${rows.length}`;
+        });
       }
     }
   } catch (e) {
