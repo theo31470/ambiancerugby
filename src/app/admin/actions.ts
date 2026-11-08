@@ -357,7 +357,9 @@ export async function setRole(form: FormData) {
     if (id === viewer.id) throw new Error("Vous ne pouvez pas changer votre propre rôle.");
     const { error } = await db.from("profiles").update({ role: String(form.get("role")) }).eq("id", id);
     fail(error, "Changement de rôle");
-    redirect("/admin/utilisateurs?ok=role");
+    revalidatePath("/admin", "layout");
+    const back = String(form.get("_back") ?? "/admin/utilisateurs");
+    redirect(`${back}${back.includes("?") ? "&" : "?"}ok=role`);
   });
 }
 
@@ -649,5 +651,81 @@ export async function analyserMatch(form: FormData) {
     fail(error, "Proposition de Claude");
     const [chemin, ancre] = back.split("#");
     redirect(`${chemin}${chemin.includes("?") ? "&" : "?"}ia=${prop!.id}${ancre ? `#${ancre}` : ""}`);
+  });
+}
+
+
+// ---------- membres (administrateurs) ----------
+async function admin() {
+  const { viewer, db } = await staff();
+  if (viewer.role !== "admin") throw new Error("Réservé aux administrateurs.");
+  return { viewer, db };
+}
+const retour = (form: FormData, ok: string) => {
+  const back = String(form.get("_back") ?? "/admin/utilisateurs");
+  redirect(`${back}${back.includes("?") ? "&" : "?"}ok=${ok}`);
+};
+
+export async function saveMembre(form: FormData) {
+  return run(form, async () => {
+    const { db } = await admin();
+    const username = str(form, "username");
+    if (username && !/^[a-z0-9_.-]{2,30}$/i.test(username)) throw new Error("Pseudo : 2 à 30 caractères, lettres, chiffres, point, tiret ou souligné.");
+    const { error } = await db.from("profiles").update({
+      display_name: str(form, "display_name"), username, favorite_team_id: str(form, "favorite_team_id"), admin_note: str(form, "admin_note"),
+    }).eq("id", String(form.get("id")));
+    if (error?.code === "23505") throw new Error("Ce pseudo est déjà pris.");
+    fail(error, "Profil");
+    revalidatePath("/", "layout");
+    retour(form, "enregistre");
+  });
+}
+
+export async function setAbonnement(form: FormData) {
+  return run(form, async () => {
+    const { db } = await admin();
+    const plan = String(form.get("plan"));
+    const fin = str(form, "plan_until");
+    const patch = plan === "free" ? { plan: "free", plan_until: null } : { plan: "supporter", plan_until: fin ? new Date(`${fin}T23:59:59`).toISOString() : null };
+    const { error } = await db.from("profiles").update(patch).eq("id", String(form.get("id")));
+    fail(error, "Abonnement");
+    revalidatePath("/", "layout");
+    retour(form, "enregistre");
+  });
+}
+
+export async function suspendreMembre(form: FormData) {
+  return run(form, async () => {
+    const { viewer, db } = await admin();
+    const id = String(form.get("id"));
+    if (id === viewer.id) throw new Error("Vous ne pouvez pas vous suspendre vous-même.");
+    const jours = String(form.get("jours"));
+    let until: string | null = null;
+    if (jours === "toujours") until = "2999-12-31T00:00:00Z";
+    else if (jours !== "lever") { const d = new Date(); d.setDate(d.getDate() + Number(jours)); until = d.toISOString(); }
+    const { error } = await db.from("profiles").update({ suspended_until: until }).eq("id", id);
+    fail(error, "Suspension");
+    retour(form, "enregistre");
+  });
+}
+
+export async function supprimerMembre(form: FormData) {
+  return run(form, async () => {
+    const { db } = await admin();
+    if (form.get("confirme") !== "on") throw new Error("Cochez la case de confirmation pour supprimer ce compte.");
+    const { error } = await db.rpc("admin_supprimer_membre", { p_id: String(form.get("id")) });
+    fail(error, "Suppression du compte");
+    revalidatePath("/", "layout");
+    redirect("/admin/utilisateurs?ok=supprime");
+  });
+}
+
+export async function supprimerCommentaire(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const { error } = await db.from("comments").delete().eq("id", String(form.get("id")));
+    fail(error, "Suppression du commentaire");
+    revalidatePath("/", "layout");
+    retour(form, "supprime");
   });
 }
