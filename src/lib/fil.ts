@@ -1,20 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Fait de jeu proposé par Claude, déjà rattaché à un joueur quand c'est possible. */
+/** Fait de jeu lu automatiquement (feuille ESPN ou Claude), déjà rattaché à un joueur quand c'est possible. */
 export type EvtPropose = { minute: number | null; cote: "home" | "away"; player_id: string | null; nom: string; type: string };
 
 /**
- * Écrit le fil du match proposé par Claude. Ne touche jamais à un fil saisi à la main :
- * s'il en existe un, on ne fait rien. Les faits de Claude d'une analyse précédente sont remplacés.
+ * Écrit le fil du match lu automatiquement. Ne touche jamais à un fil saisi à la main :
+ * s'il en existe un, on ne fait rien. Les faits d'une lecture automatique précédente sont remplacés.
  */
-export async function ecrireFil(db: SupabaseClient, m: { id: string; home_team_id: string; away_team_id: string }, evts: EvtPropose[]) {
+export async function ecrireFil(db: SupabaseClient, m: { id: string; home_team_id: string; away_team_id: string }, evts: EvtPropose[], source: "claude" | "espn" = "claude") {
   if (!evts.length) return 0;
   const { count: manuels } = await db.from("match_events").select("id", { count: "exact", head: true }).eq("match_id", m.id).eq("source", "manuel");
   if (manuels) return 0;
-  await db.from("match_events").delete().eq("match_id", m.id).eq("source", "claude");
+  await db.from("match_events").delete().eq("match_id", m.id).in("source", ["claude", "espn"]);
   const rows = evts.map((e) => ({
     match_id: m.id, kind: e.type, minute: e.minute, team_id: e.cote === "home" ? m.home_team_id : m.away_team_id,
-    player_id: e.player_id, text: e.player_id ? null : e.nom || null, source: "claude",
+    player_id: e.player_id, text: e.type === "sub" ? e.nom || null : e.player_id ? null : e.nom || null, source,
   }));
   const { error } = await db.from("match_events").insert(rows);
   return error ? 0 : rows.length;

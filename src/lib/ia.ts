@@ -151,9 +151,8 @@ export async function analyserFeuille(opts: {
 }
 
 // ---------- recherche autonome sur le web ----------
-// Sites de statistiques exclus : leurs bases sont protégées (droit des bases de données, conditions d'utilisation).
-// Claude ne lit que des comptes rendus de presse et des sites de clubs.
-export const SITES_EXCLUS = ["all.rugby", "allrugby.com", "lnr.fr", "turnover-rugby.fr", "itsrugby.fr", "espnscrum.com", "statbunker.com", "rugbypass.com/stats"];
+// Bases de statistiques d'autres sites exclues. Les feuilles de match publiques (LNR, FFR, ligues, clubs) et la presse sont lues.
+export const SITES_EXCLUS = ["all.rugby", "allrugby.com", "turnover-rugby.fr", "itsrugby.fr", "statbunker.com"];
 const PRIX_RECHERCHE = 0.01; // 10 $ les 1 000 recherches
 
 export async function chercherFeuille(opts: {
@@ -167,7 +166,8 @@ export async function chercherFeuille(opts: {
     `Match de ${opts.competition} du ${opts.date} : ${opts.domicile} (home) contre ${opts.exterieur} (away).`,
     opts.scoreDom != null && opts.scoreExt != null ? `Score final officiel : ${opts.scoreDom} – ${opts.scoreExt}.` : "",
     "",
-    "Cherche sur le web un compte rendu de ce match dans la presse (L'Équipe, Midi Olympique, Rugbyrama, Ouest-France, presse régionale, BBC, RTE…) ou sur le site d'un des deux clubs.",
+    "Cherche sur le web la feuille de match officielle (site de la ligue : top14.lnr.fr ou prod2.lnr.fr « feuille de match », ffr.fr, epcrugby.com, premiershiprugby.com, unitedrugby.com) ou un compte rendu de presse (L'Équipe, Midi Olympique, Rugbyrama, presse régionale, BBC…) ou le site d'un des deux clubs.",
+    "Fais au plus 3 recherches, n'écris aucun texte : appelle directement l'outil feuille_de_match dès que tu as les marqueurs.",
     "Relève pour chaque joueur ses essais, transformations réussies, pénalités réussies, drops réussis et cartons, puis appelle l'outil feuille_de_match.",
     "Relie chaque joueur à sa référence dans les listes ci-dessous. S'il n'y figure pas, mets ref à null. Un essai de pénalité ne se rattache à aucun joueur : signale-le dans les remarques.",
     "Si les comptes rendus donnent les minutes (essais, pénalités, cartons…), remplis aussi le fil du match (evenements) dans l'ordre chronologique ; sinon laisse-le vide.",
@@ -179,21 +179,24 @@ export async function chercherFeuille(opts: {
   ].join("\n");
 
   const outils = [
-    { type: "web_search_20250305", name: "web_search", max_uses: 4, blocked_domains: SITES_EXCLUS },
+    { type: "web_search_20250305", name: "web_search", max_uses: 3, blocked_domains: SITES_EXCLUS },
     OUTIL,
   ];
   const messages: { role: "user" | "assistant"; content: unknown }[] = [{ role: "user", content: consigne }];
   let inputTokens = 0, outputTokens = 0, recherches = 0;
   let outil: { input?: unknown } | undefined;
   // la recherche peut demander plusieurs allers-retours (« pause_turn ») : trois au maximum
-  for (let tour = 0; tour < 3 && !outil; tour++) {
+  // dernier tour : on oblige Claude à remplir la feuille avec ce qu'il a trouvé (avant, il pouvait s'arrêter sur du texte)
+  for (let tour = 0; tour < 4 && !outil; tour++) {
+    const dernier = tour === 3;
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": cle, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
-        model: IA_MODELE, max_tokens: 2500,
-        system: "Tu es secrétaire de rédaction d'un média rugby. Tu relèves les marqueurs et les cartons avec une exactitude absolue, à partir de sources de presse.",
+        model: IA_MODELE, max_tokens: 6000,
+        system: "Tu es secrétaire de rédaction d'un média rugby. Tu relèves les marqueurs et les cartons avec une exactitude absolue, à partir de feuilles de match et de la presse. Tu ne rédiges jamais de texte : tu appelles l'outil feuille_de_match.",
         tools: outils, messages,
+        ...(dernier ? { tool_choice: { type: "tool", name: OUTIL.name } } : {}),
       }),
       signal: AbortSignal.timeout(90_000),
     });
@@ -207,8 +210,14 @@ export async function chercherFeuille(opts: {
     outputTokens += body?.usage?.output_tokens ?? 0;
     recherches += body?.usage?.server_tool_use?.web_search_requests ?? 0;
     outil = (body?.content ?? []).find((c: { type: string; name?: string }) => c.type === "tool_use" && c.name === OUTIL.name);
-    if (outil || body?.stop_reason !== "pause_turn") break;
-    messages.push({ role: "assistant", content: body.content });
+    if (outil) break;
+    // recherche en pause : on relance tel quel ; arrêt sur du texte : on garde ce qu'il a lu et on exige la feuille
+    const contenu = (body?.content ?? []) as { type: string }[];
+    if (body?.stop_reason === "pause_turn") { messages.push({ role: "assistant", content: contenu }); continue; }
+    const utile = contenu.filter((c) => c.type !== "text" || (c as { text?: string }).text?.trim());
+    if (utile.length) messages.push({ role: "assistant", content: utile });
+    messages.push({ role: "user", content: "Appelle maintenant l'outil feuille_de_match avec ce que tu as trouvé (listes vides et explication dans remarques si rien de fiable)." });
+    tour = Math.max(tour, 2);
   }
   // au-delà de 100 000 tokens, Haiku 5.5 est facturé au tarif « long contexte » : on compte large
   const long = inputTokens > 100_000;

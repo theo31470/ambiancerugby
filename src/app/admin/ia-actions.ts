@@ -4,20 +4,42 @@ import { createClient, getViewer } from "@/lib/supabase/server";
 import { chercherFeuille, IA_MODELE, IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { fmtDay } from "@/lib/format";
 import { ecrireFil, filDepuisIA } from "@/lib/fil";
+import { importerFeuilleEspn, SELECT_MATCH_ESPN, type MatchLocal } from "@/lib/feuilles/espn";
 
 export type EtatRecherche = { matchId: string; etat: "valide" | "proposition" | "rien" | "erreur" | "deja"; message: string; propId?: string };
 
 const pts = (l: { tries: number; conversions: number; penalty_goals: number; drop_goals: number }) => 5 * l.tries + 2 * l.conversions + 3 * (l.penalty_goals + l.drop_goals);
 
 /**
- * Claude cherche le compte rendu d'un match sur le web et relève marqueurs et cartons.
- * Validation automatique seulement si tout colle : joueurs reconnus et points = score officiel des deux équipes.
+ * Remplit un match : d'abord la feuille de match publique d'ESPN (compositions, minutes, marqueurs, cartons, gratuit),
+ * puis, si ESPN ne couvre pas le match, Claude cherche le compte rendu sur le web.
  */
-export async function chercherMatchIA(matchId: string, auto: boolean): Promise<EtatRecherche> {
+export async function chercherMatchIA(matchId: string, auto: boolean, remplacer = false): Promise<EtatRecherche> {
   try {
     const viewer = await getViewer();
     if (!viewer || viewer.role === "user") return { matchId, etat: "erreur", message: "Accès réservé à la rédaction." };
     const db = await createClient();
+
+    // 1. feuille de match ESPN
+    const { data: me } = await db.from("matches").select(SELECT_MATCH_ESPN).eq("id", matchId).single();
+    let raisonEspn = "";
+    if (me && (me as { status: string }).status === "finished" && (me as unknown as MatchLocal).competition?.espn_league) {
+      try {
+        const r = await importerFeuilleEspn(db, me as unknown as MatchLocal, { remplacer });
+        await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: r.ok ? `espn ${r.dom}-${r.ext}` : r.raison }).eq("id", matchId);
+        if (r.ok) {
+          revalidatePath("/", "layout");
+          const detail = `${r.joueurs} joueurs (compositions, minutes, points, cartons)${r.crees ? `, ${r.crees} nouveaux joueurs créés` : ""}${r.fil ? `, ${r.fil} faits de jeu` : ""}`;
+          return r.conforme
+            ? { matchId, etat: "valide", message: `Feuille ESPN : ${detail}. ${r.dom}–${r.ext}, conforme au score.` }
+            : { matchId, etat: "proposition", message: `Feuille ESPN enregistrée : ${detail}. Points relevés ${r.dom}–${r.ext} pour ${(me as { home_score: number }).home_score}–${(me as { away_score: number }).away_score} affiché : vérifiez le score ou les buteurs.` };
+        }
+        if (r.raison === "déjà saisi à la main") return { matchId, etat: "deja", message: "Déjà saisi à la main : cochez « Remplacer les matchs déjà saisis » pour reprendre la feuille ESPN." };
+        raisonEspn = r.raison;
+      } catch (e) {
+        raisonEspn = (e as Error).message;
+      }
+    }
 
     const { data: depense } = await db.rpc("ia_depense_mois");
     if (Number(depense ?? 0) >= IA_PLAFOND_MOIS_USD) return { matchId, etat: "erreur", message: "Plafond mensuel atteint : la recherche revient le 1er du mois." };
@@ -55,7 +77,7 @@ export async function chercherMatchIA(matchId: string, auto: boolean): Promise<E
     const lignes = r.lignes.filter((l) => l.ref && refs.has(l.ref) && (l.ref.startsWith("H") ? l.equipe === "home" : l.equipe === "away"))
       .map((l) => ({ cote: l.equipe, player_id: refs.get(l.ref!)!, tries: l.essais, conversions: l.transformations, penalty_goals: l.penalites, drop_goals: l.drops, yellow: l.cartons_jaunes, red: l.cartons_rouges }));
     const inconnus = r.lignes.filter((l) => !l.ref || !refs.has(l.ref)).map((l) => ({ cote: l.equipe, nom: l.nom_lu, essais: l.essais, transformations: l.transformations, penalites: l.penalites, drops: l.drops, cj: l.cartons_jaunes, cr: l.cartons_rouges }));
-    if (!lignes.length && !inconnus.length) return { matchId, etat: "rien", message: r.remarques || "Aucun compte rendu trouvé." };
+    if (!lignes.length && !inconnus.length) return { matchId, etat: "rien", message: `${raisonEspn ? `ESPN : ${raisonEspn}. ` : ""}Claude : ${r.remarques || "aucun compte rendu trouvé."}` };
 
     const totalDom = lignes.filter((l) => l.cote === "home").reduce((s, l) => s + pts(l), 0);
     const totalExt = lignes.filter((l) => l.cote === "away").reduce((s, l) => s + pts(l), 0);

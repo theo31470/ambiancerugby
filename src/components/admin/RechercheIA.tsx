@@ -26,7 +26,7 @@ export default function RechercheJournee({ matchs, lien }: { matchs: MatchCible[
   async function lancer() {
     for (const m of cibles) {
       setEnCours(m.id);
-      const r = await chercherMatchIA(m.id, auto);
+      const r = await chercherMatchIA(m.id, auto, aussiSaisis);
       setRes((x) => ({ ...x, [m.id]: r }));
     }
     setEnCours(null);
@@ -36,18 +36,19 @@ export default function RechercheJournee({ matchs, lien }: { matchs: MatchCible[
   if (!matchs.length) return null;
   return (
     <section aria-labelledby="h-ia" className="rounded-2xl bg-bordeaux text-white p-5">
-      <h2 id="h-ia" className="titre font-extrabold text-xl">Remplir la journée avec Claude</h2>
+      <h2 id="h-ia" className="titre font-extrabold text-xl">Remplir la journée automatiquement</h2>
       <p className="mt-1 text-sm text-white/80 max-w-prose">
-        Claude cherche le compte rendu de chaque match dans la presse et relève marqueurs et cartons. Environ 4 centimes par match.
+        Pour chaque match : la feuille de match publique (compositions, minutes, marqueurs, cartons, remplacements), gratuite, pour le Top 14, les coupes d&apos;Europe, la Premiership, l&apos;URC et les tests.
+        Sinon (Pro D2…), Claude cherche la feuille de match ou un compte rendu sur le web, environ 3 centimes par match. Les matchs du Top 14 se remplissent aussi tout seuls toutes les 20 minutes.
       </p>
       <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} disabled={!!enCours} />
           Enregistrer seul quand tout colle au score officiel</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={aussiSaisis} onChange={(e) => setAussiSaisis(e.target.checked)} disabled={!!enCours} />
-          Inclure les matchs déjà saisis</label>
+          Remplacer les matchs déjà saisis</label>
       </div>
       <button onClick={lancer} disabled={!!enCours || !cibles.length} className="mt-4 bouton-or disabled:opacity-60">
-        {enCours ? "Claude cherche…" : cibles.length ? `Chercher ${cibles.length} match${cibles.length > 1 ? "s" : ""}` : "Tous les matchs sont déjà saisis"}
+        {enCours ? "Lecture en cours…" : cibles.length ? `Chercher ${cibles.length} match${cibles.length > 1 ? "s" : ""}` : "Tous les matchs sont déjà saisis"}
       </button>
       {(enCours || Object.keys(res).length > 0) && (
         <ul className="mt-4 grid gap-1.5 text-sm" aria-live="polite">
@@ -62,7 +63,7 @@ export default function RechercheJournee({ matchs, lien }: { matchs: MatchCible[
                     <span className="text-white/80">{r.message}</span>
                     {r.propId && <a href={`${lien}&ia=${r.propId}#m-${m.id}`} className="ml-auto underline underline-offset-2 font-semibold">Vérifier</a>}
                   </>
-                ) : enCours === m.id ? <span className="text-white/70 animate-pulse">recherche en cours…</span> : <span className="text-white/50">en attente</span>}
+                ) : enCours === m.id ? <span className="text-white/70 animate-pulse">lecture de la feuille…</span> : <span className="text-white/50">en attente</span>}
               </li>
             );
           })}
@@ -87,7 +88,7 @@ export function RechercheMatch({ matchId, lien }: { matchId: string; lien: strin
         if (r.propId) router.push(`${lien}&ia=${r.propId}#m-${matchId}`);
         else router.refresh();
       }}>
-        {enCours ? "Claude cherche…" : "Chercher sur le web"}
+        {enCours ? "Lecture en cours…" : "Chercher sur le web"}
       </button>
       {etat && !etat.propId && <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${STYLE[etat.etat]}`}>{etat.message}</span>}
     </div>
