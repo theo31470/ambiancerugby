@@ -729,3 +729,36 @@ export async function supprimerCommentaire(form: FormData) {
     retour(form, "supprime");
   });
 }
+
+// ---------- compétitions ----------
+export async function saveCompetition(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const id = String(form.get("id"));
+    const couleur = (k: string) => { const v = str(form, k); if (v && !/^#[0-9a-f]{6}$/i.test(v)) throw new Error("Couleur au format #RRGGBB."); return v; };
+    const logo = (await upload(db, form.get("logo_file"), "logos")) ?? str(form, "logo_url");
+    const { error } = await db.from("competitions").update({
+      name: str(form, "name") ?? undefined, short_name: str(form, "short_name"), country: str(form, "country"), region: str(form, "region"),
+      color: couleur("color"), text_color: couleur("text_color"), logo_url: logo,
+      kind: str(form, "kind") ?? undefined, standings_mode: str(form, "standings_mode") ?? undefined,
+      sort_order: num(form, "sort_order") ?? 0, niveau: num(form, "niveau") ?? 1500,
+      active: form.get("active") === "on", is_featured: form.get("is_featured") === "on",
+    }).eq("id", id);
+    fail(error, "Compétition");
+    revalidatePath("/", "layout");
+    redirect(`/admin/competitions/${id}?ok=enregistre`);
+  });
+}
+
+// ---------- commentaires ----------
+export async function supprimerCommentaires(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const ids = form.getAll("ids").map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x));
+    if (!ids.length) throw new Error("Cochez au moins un commentaire.");
+    const { error } = await db.from("comments").delete().in("id", ids);
+    fail(error, "Suppression des commentaires");
+    revalidatePath("/", "layout");
+    retour(form, "supprime");
+  });
+}

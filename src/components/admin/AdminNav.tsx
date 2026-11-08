@@ -2,17 +2,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { Ballon, Coupe, Journal, Maillot, Podium, Poteaux, Sifflet, Supporter } from "../deco/Icones";
+import { Ballon, Coupe, Echarpe, Journal, Maillot, Podium, Poteaux, Sifflet, Supporter, Trompette } from "../deco/Icones";
 
 type Lien = { href: string; label: string; Icone: ComponentType<{ className?: string }>; badge?: number; exact?: boolean };
 type Groupe = { titre: string; liens: Lien[] };
 
 /** Navigation de l'admin, par grands espaces, avec compteurs de ce qui attend. */
-export default function AdminNav({ brouillons, aSaisir, admin }: { brouillons: number; aSaisir: number; admin: boolean }) {
+export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0 }: { brouillons: number; aSaisir: number; admin: boolean; commentaires?: number }) {
   const path = usePathname();
   const groupes: Groupe[] = [
     { titre: "", liens: [{ href: "/admin", label: "Aujourd'hui", Icone: Ballon, exact: true }] },
-    { titre: "Rédaction", liens: [{ href: "/admin/articles", label: "Articles", Icone: Journal, badge: brouillons }] },
+    {
+      titre: "Rédaction",
+      liens: [
+        { href: "/admin/articles", label: "Articles", Icone: Journal, badge: brouillons },
+        { href: "/admin/commentaires", label: "Commentaires", Icone: Trompette, badge: commentaires },
+      ],
+    },
     {
       titre: "Matchs et stats",
       liens: [
@@ -22,8 +28,9 @@ export default function AdminNav({ brouillons, aSaisir, admin }: { brouillons: n
       ],
     },
     {
-      titre: "Clubs et joueurs",
+      titre: "Compétitions, clubs, joueurs",
       liens: [
+        { href: "/admin/competitions", label: "Compétitions", Icone: Coupe },
         { href: "/admin/clubs", label: "Clubs", Icone: Poteaux },
         { href: "/admin/joueurs", label: "Joueurs", Icone: Maillot },
       ],
@@ -31,8 +38,9 @@ export default function AdminNav({ brouillons, aSaisir, admin }: { brouillons: n
     {
       titre: "Réglages",
       liens: [
-        { href: "/admin/donnees", label: "Données et synchros", Icone: Coupe },
         ...(admin ? [{ href: "/admin/utilisateurs", label: "Membres", Icone: Supporter }] : []),
+        ...(admin ? [{ href: "/admin/site", label: "Contenu du site", Icone: Echarpe }] : []),
+        { href: "/admin/donnees", label: "Données et synchros", Icone: Ballon },
       ],
     },
   ];
