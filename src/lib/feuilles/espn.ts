@@ -110,7 +110,7 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
   const cible = await trouverMatchEspn(m);
   if (!cible) return { ok: false, raison: m.competition.espn_league ? "match introuvable sur ESPN" : "compétition non couverte par ESPN" };
 
-  const s = await espn<{ rosters?: Roster[]; header?: { competitions?: { details?: Detail[]; status?: { type?: { completed?: boolean } } }[] } }>(`/${m.competition.espn_league}/summary?event=${cible.eventId}`);
+  const s = await espn<{ rosters?: Roster[]; header?: { competitions?: { details?: Detail[]; status?: { displayClock?: string; type?: { completed?: boolean } } }[] } }>(`/${m.competition.espn_league}/summary?event=${cible.eventId}`);
   const rosters = s.rosters ?? [];
   const details = s.header?.competitions?.[0]?.details ?? [];
   if (!rosters.some((r) => r.roster?.length)) return { ok: false, raison: "feuille de match pas encore publiée sur ESPN" };
@@ -241,6 +241,11 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
   const dom = rows.filter((r) => r.team_id === m.home_team_id).reduce((s, l) => s + pts(l), 0) + essaisPen("home");
   const ext = rows.filter((r) => r.team_id === m.away_team_id).reduce((s, l) => s + pts(l), 0) + essaisPen("away");
   const conforme = m.home_score === dom && m.away_score === ext;
+  // en direct, ESPN est plus rapide qu'API-Sports : score et chrono pris ici (la base refuse ensuite tout retour en arrière)
+  if (m.live) {
+    const horloge = s.header?.competitions?.[0]?.status?.displayClock;
+    await db.from("matches").update({ home_score: Math.max(dom, m.home_score ?? 0), away_score: Math.max(ext, m.away_score ?? 0), ...(horloge ? { clock: horloge } : {}) }).eq("id", m.id);
+  }
   return { ok: true, joueurs: rows.length, crees, fil: nFil, dom, ext, conforme };
 }
 
