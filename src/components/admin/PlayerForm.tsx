@@ -40,6 +40,13 @@ export default function PlayerForm({ player, teams, back, defaultTeam }: { playe
           <Field name="photo_url" label="ou adresse de l'image" defaultValue={player?.photo_url} hint="Utilisez une photo dont vous avez les droits." />
         </fieldset>
         <Area name="bio" label="Biographie" rows={5} defaultValue={player?.bio} />
+        <Field name="wiki_title" label="Page Wikipédia (anglais)" defaultValue={(player as Player & { wiki_title?: string | null })?.wiki_title} hint="Sert à importer son parcours en carrière." />
+        <fieldset className="grid gap-2">
+          <legend className="etiquette">Statut</legend>
+          <input type="hidden" name="verrou_present" value="1" />
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="in_squad" defaultChecked={(player as Player & { in_squad?: boolean })?.in_squad ?? true} /> Dans l&apos;effectif actuel de son club</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="verrou" defaultChecked={(player as Player & { verrou?: boolean })?.verrou ?? true} /> Verrouillé : la synchro automatique (Wikipédia, TheSportsDB) ne modifie plus ce joueur</label>
+        </fieldset>
         <Field name="slug" label="Adresse de la page" defaultValue={player?.slug} hint="Laissez vide pour la créer depuis le nom." />
         <div><button className="bouton">Enregistrer</button></div>
       </form>

@@ -37,6 +37,10 @@ export default function TeamForm({ team, competitions, inComps, back }: {
         <Field name="logo_url" label="ou adresse de l'image" defaultValue={team?.logo_url} />
       </fieldset>
       <Area name="description" label="Présentation" rows={4} defaultValue={team?.description} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field name="wiki_title" label="Page Wikipédia (anglais) de l'effectif" defaultValue={(team as Team & { wiki_title?: string | null })?.wiki_title} hint="Ex. « Stade Toulousain ». Sert à créer et mettre à jour les joueurs chaque lundi." />
+        <Field name="slug" label="Adresse de la page" defaultValue={team?.slug} hint="Changez-la seulement si nécessaire : les anciens liens ne marcheront plus." />
+      </div>
       <Field name="aliases" label="Autres noms" defaultValue={team?.aliases?.join(", ")}
         hint="Séparés par des virgules. Servent à reconnaître l'équipe dans les données automatiques (ex. Toulouse, Stade Toulousain Rugby)." />
       <fieldset>

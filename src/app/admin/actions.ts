@@ -104,9 +104,8 @@ export async function saveTeam(form: FormData) {
     const name = str(form, "name");
     if (!name) throw new Error("Le nom est obligatoire.");
     const logo = (await upload(db, form.get("logo_file"), "logos")) ?? str(form, "logo_url");
-    const row = {
+    const row: Record<string, unknown> = {
       name,
-      slug: slugify(str(form, "slug") ?? name),
       short_name: str(form, "short_name"),
       abbreviation: str(form, "abbreviation")?.toUpperCase() ?? null,
       aliases: (str(form, "aliases") ?? "").split(",").map((s) => s.trim()).filter(Boolean),
@@ -118,7 +117,11 @@ export async function saveTeam(form: FormData) {
       logo_url: logo,
       description: str(form, "description"),
       is_national: form.get("is_national") === "on",
+      wiki_title: str(form, "wiki_title"),
     };
+    // l'adresse de la page ne change pas quand on renomme, sauf si on la modifie exprès
+    const slugVoulu = str(form, "slug");
+    if (slugVoulu || !id) row.slug = slugify(slugVoulu ?? name);
     let teamId = id;
     if (id) {
       const { error } = await db.from("teams").update(row).eq("id", id);
@@ -139,7 +142,7 @@ export async function saveTeam(form: FormData) {
       }
     }
     revalidatePath("/", "layout");
-    redirect("/admin/clubs?ok=enregistre");
+    redirect(`/admin/clubs/${teamId}?ok=enregistre`);
   });
 }
 
@@ -151,11 +154,11 @@ export async function savePlayer(form: FormData) {
     const first = str(form, "first_name");
     const last = str(form, "last_name");
     if (!first || !last) throw new Error("Prénom et nom sont obligatoires.");
-    const photo = (await upload(db, form.get("photo_file"), "joueurs")) ?? str(form, "photo_url");
-    const row = {
+    const envoi = await upload(db, form.get("photo_file"), "joueurs");
+    const photo = envoi ?? str(form, "photo_url");
+    const row: Record<string, unknown> = {
       first_name: first,
       last_name: last,
-      slug: slugify(str(form, "slug") ?? `${first} ${last}`),
       team_id: str(form, "team_id"),
       position: str(form, "position"),
       number: num(form, "number"),
@@ -167,11 +170,16 @@ export async function savePlayer(form: FormData) {
       career_points: num(form, "career_points"),
       career_tries: num(form, "career_tries"),
       photo_url: photo,
-      photo_source: photo ? "Ambiance Rugby" : null,
       bio: str(form, "bio"),
-      // corrigé à la main : la synchro automatique n'y touche plus
-      verrou: true,
+      wiki_title: str(form, "wiki_title"),
+      in_squad: form.get("in_squad") !== null ? form.get("in_squad") === "on" : true,
+      // corrigé à la main : par défaut la synchro automatique n'y touche plus
+      verrou: form.get("verrou_present") ? form.get("verrou") === "on" : true,
     };
+    if (envoi) row.photo_source = "Ambiance Rugby";
+    else if (!photo) row.photo_source = null;
+    const slugVoulu = str(form, "slug");
+    if (slugVoulu || !id) row.slug = slugify(slugVoulu ?? `${first} ${last}`);
     if (id) {
       const { error } = await db.from("players").update(row).eq("id", id);
       fail(error, "Enregistrement du joueur");
@@ -180,7 +188,7 @@ export async function savePlayer(form: FormData) {
       fail(error, "Création du joueur");
     }
     revalidatePath("/", "layout");
-    redirect(`/admin/joueurs?ok=enregistre${row.team_id ? `&club=${row.team_id}` : ""}`);
+    redirect(id ? `/admin/joueurs/${id}?ok=enregistre` : `/admin/joueurs?ok=enregistre${row.team_id ? `&club=${row.team_id}` : ""}`);
   });
 }
 
@@ -760,5 +768,28 @@ export async function supprimerCommentaires(form: FormData) {
     fail(error, "Suppression des commentaires");
     revalidatePath("/", "layout");
     retour(form, "supprime");
+  });
+}
+
+
+// ---------- parcours d'un joueur (saisie manuelle) ----------
+export async function saveParcours(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const playerId = String(form.get("player_id"));
+    const n = Number(form.get("n") ?? 0);
+    const rows: Record<string, unknown>[] = [];
+    for (let i = 0; i < n; i++) {
+      const equipe = str(form, `${i}.equipe`);
+      if (!equipe) continue;
+      rows.push({ player_id: playerId, kind: str(form, `${i}.kind`) === "selection" ? "selection" : "club", ordre: i + 1, equipe, periode: str(form, `${i}.periode`), matchs: num(form, `${i}.matchs`), points: num(form, `${i}.points`), source: "manuel" });
+    }
+    const { error: e1 } = await db.from("player_career").delete().eq("player_id", playerId);
+    fail(e1, "Parcours");
+    if (rows.length) { const { error } = await db.from("player_career").insert(rows); fail(error, "Parcours"); }
+    // parcours corrigé à la main : la synchro ne le remplace plus
+    await db.from("players").update({ verrou: true }).eq("id", playerId);
+    revalidatePath("/", "layout");
+    redirect(`/admin/joueurs/${playerId}?ok=enregistre#parcours`);
   });
 }
