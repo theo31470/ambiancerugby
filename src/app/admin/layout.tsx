@@ -38,7 +38,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   return (
     <div className="pleine-largeur -my-6 sm:-my-10 bg-teinte/40 min-h-[80vh]">
-      <div className="max-w-[90rem] mx-auto lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
+      <div className="max-w-[90rem] mx-auto lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:min-h-[80vh]">
         <aside className="bg-bordeaux text-white lg:min-h-full">
           <div className="lg:sticky lg:top-16 p-4 lg:p-5 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
             <div className="flex items-center justify-between gap-3 mb-4 lg:mb-6">

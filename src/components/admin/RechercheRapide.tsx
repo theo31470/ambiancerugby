@@ -64,9 +64,9 @@ export default function RechercheRapide() {
 
   return (
     <>
-      <button type="button" onClick={() => setOuvert(true)} className="flex items-center gap-2 rounded-full bg-surface border border-trait px-3.5 py-1.5 text-sm text-sourdine hover:border-vin w-full sm:w-72">
+      <button type="button" onClick={() => setOuvert(true)} className="flex items-center gap-2 whitespace-nowrap rounded-full bg-surface border border-trait px-3.5 py-1.5 text-sm text-sourdine hover:border-vin w-full sm:w-80">
         <span aria-hidden>⌕</span>
-        <span className="flex-1 text-left">Chercher un club, un joueur…</span>
+        <span className="flex-1 text-left truncate">Chercher un club, un joueur…</span>
         <kbd className="hidden sm:inline text-[11px] rounded border border-trait px-1.5">Ctrl K</kbd>
       </button>
       {ouvert && (
