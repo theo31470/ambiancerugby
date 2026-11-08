@@ -244,7 +244,8 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
   // en direct, ESPN est plus rapide qu'API-Sports : score et chrono pris ici (la base refuse ensuite tout retour en arrière)
   if (m.live) {
     const horloge = s.header?.competitions?.[0]?.status?.displayClock;
-    await db.from("matches").update({ home_score: Math.max(dom, m.home_score ?? 0), away_score: Math.max(ext, m.away_score ?? 0), ...(horloge ? { clock: horloge } : {}) }).eq("id", m.id);
+    // score exact de la feuille (un essai annulé après arbitrage vidéo fait redescendre le score) ; feuille_tentee_at signe l'écriture ESPN
+    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: new Date().toISOString(), ...(horloge ? { clock: horloge } : {}) }).eq("id", m.id);
   }
   return { ok: true, joueurs: rows.length, crees, fil: nFil, dom, ext, conforme };
 }
