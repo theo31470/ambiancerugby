@@ -1,12 +1,31 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createClient, getViewer } from "@/lib/supabase/server";
-import { chercherFeuille, IA_MODELE, IA_PLAFOND_MOIS_USD } from "@/lib/ia";
+import { analyserFeuille, chercherFeuille, IA_MODELE, IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { fmtDay } from "@/lib/format";
 import { ecrireFil, filDepuisIA } from "@/lib/fil";
 import { importerFeuilleEspn, SELECT_MATCH_ESPN, type MatchLocal } from "@/lib/feuilles/espn";
 
 export type EtatRecherche = { matchId: string; etat: "valide" | "proposition" | "rien" | "erreur" | "deja"; message: string; propId?: string };
+
+const LNR: Record<string, string> = { "top-14": "https://top14.lnr.fr", "pro-d2": "https://prod2.lnr.fr" };
+const normer = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const VIDES = new Set(["stade", "rugby", "club", "union", "section", "olympique", "racing", "provence", "pays", "sporting"]);
+
+/** Texte de la feuille de match LNR (page du match et ses statistiques), retrouvée dans le calendrier de la journée. */
+async function texteLnr(base: string, saison: string, journee: string, dom: string, ext: string) {
+  const get = (u: string) => fetch(u, { cache: "no-store", signal: AbortSignal.timeout(15_000), headers: { "user-agent": "Mozilla/5.0 AmbianceRugby" } }).then((x) => (x.ok ? x.text() : ""));
+  const cal = await get(`${base}/calendrier-et-resultats/${saison}/j${journee}`);
+  const liens = [...new Set([...cal.matchAll(/\/feuille-de-match\/[a-z0-9\-/]+/g)].map((x) => x[0].split("/").slice(0, 5).join("/")))];
+  const mots = (n: string) => normer(n).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !VIDES.has(w));
+  const colle = (n: string, slug: string) => mots(n).some((w) => slug.split("-").some((t) => t.length >= 3 && (w.startsWith(t) || t.startsWith(w))));
+  const lien = liens.find((l) => { const sl = l.split("/").pop() ?? ""; return colle(dom, sl) && colle(ext, sl); });
+  if (!lien) return null;
+  const texte = (h: string) => h.replace(/<(script|style|svg|noscript)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&#039;|&apos;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  const [page, stats] = await Promise.all([get(base + lien), get(`${base}${lien}/statistiques-du-match`)]);
+  const t = `${texte(page)}\n\nSTATISTIQUES : ${texte(stats)}`.trim();
+  return t.length > 500 ? t : null;
+}
 
 const pts = (l: { tries: number; conversions: number; penalty_goals: number; drop_goals: number }) => 5 * l.tries + 2 * l.conversions + 3 * (l.penalty_goals + l.drop_goals);
 
@@ -45,7 +64,7 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
     if (Number(depense ?? 0) >= IA_PLAFOND_MOIS_USD) return { matchId, etat: "erreur", message: "Plafond mensuel atteint : la recherche revient le 1er du mois." };
 
     const { data: m } = await db.from("matches")
-      .select("id, status, kickoff_at, home_score, away_score, home_team_id, away_team_id, home:teams!matches_home_team_id_fkey(name), away:teams!matches_away_team_id_fkey(name), competition:competitions(name)")
+      .select("id, status, kickoff_at, home_score, away_score, home_team_id, away_team_id, home:teams!matches_home_team_id_fkey(name), away:teams!matches_away_team_id_fkey(name), competition:competitions(name, slug), round, season")
       .eq("id", matchId).single();
     if (!m) return { matchId, etat: "erreur", message: "Match introuvable." };
     if (m.status !== "finished") return { matchId, etat: "rien", message: "Match pas encore terminé." };
@@ -61,8 +80,19 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
     const nom = (x: unknown) => (x as { name: string } | null)?.name ?? "";
 
     let r;
+    let source = "recherche web";
     try {
-      r = await chercherFeuille({
+      // feuille de match officielle de la LNR (Top 14, Pro D2) : le site la récupère, Claude la lit
+      const slug = (m.competition as unknown as { slug: string } | null)?.slug ?? "";
+      const texte = LNR[slug] && m.round && /^\d+$/.test(String(m.round)) ? await texteLnr(LNR[slug], String(m.season), String(m.round), nom(m.home), nom(m.away)).catch(() => null) : null;
+      if (texte) {
+        const lu = await analyserFeuille({
+          domicile: nom(m.home), exterieur: nom(m.away), scoreDom: m.home_score, scoreExt: m.away_score,
+          effectifDom: effectif(m.home_team_id, "H"), effectifExt: effectif(m.away_team_id, "A"), texte, image: null,
+        });
+        if (lu.lignes.length) { r = { ...lu, recherches: 0 }; source = "feuille LNR"; refs.clear(); effectif(m.home_team_id, "H"); effectif(m.away_team_id, "A"); }
+      }
+      if (!r) r = await chercherFeuille({
         domicile: nom(m.home), exterieur: nom(m.away), competition: nom(m.competition),
         date: fmtDay(m.kickoff_at, { day: "numeric", month: "long", year: "numeric" }),
         scoreDom: m.home_score, scoreExt: m.away_score,
@@ -72,7 +102,7 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
       await db.from("ia_usage").insert({ user_id: viewer.id, match_id: matchId, model: IA_MODELE, ok: false, message: (e as Error).message.slice(0, 300) });
       return { matchId, etat: "erreur", message: (e as Error).message };
     }
-    await db.from("ia_usage").insert({ user_id: viewer.id, match_id: matchId, model: IA_MODELE, input_tokens: r.inputTokens, output_tokens: r.outputTokens, cost_usd: r.coutUsd, message: `recherche web (${r.recherches})` });
+    await db.from("ia_usage").insert({ user_id: viewer.id, match_id: matchId, model: IA_MODELE, input_tokens: r.inputTokens, output_tokens: r.outputTokens, cost_usd: r.coutUsd, message: source === "feuille LNR" ? source : `recherche web (${r.recherches})` });
 
     const lignes = r.lignes.filter((l) => l.ref && refs.has(l.ref) && (l.ref.startsWith("H") ? l.equipe === "home" : l.equipe === "away"))
       .map((l) => ({ cote: l.equipe, player_id: refs.get(l.ref!)!, tries: l.essais, conversions: l.transformations, penalty_goals: l.penalites, drop_goals: l.drops, yellow: l.cartons_jaunes, red: l.cartons_rouges }));
