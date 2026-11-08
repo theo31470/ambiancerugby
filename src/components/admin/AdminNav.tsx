@@ -2,13 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { Ballon, Coupe, Echarpe, Journal, Maillot, Podium, Poteaux, Sifflet, Supporter, Trompette } from "../deco/Icones";
+import { Ballon, Beret, Coupe, Echarpe, Journal, Maillot, Pinte, Podium, Poteaux, Sifflet, Supporter, Trompette } from "../deco/Icones";
 
 type Lien = { href: string; label: string; Icone: ComponentType<{ className?: string }>; badge?: number; exact?: boolean };
 type Groupe = { titre: string; liens: Lien[] };
 
 /** Navigation de l'admin, par grands espaces, avec compteurs de ce qui attend. */
-export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0 }: { brouillons: number; aSaisir: number; admin: boolean; commentaires?: number }) {
+export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0, aTraiter = 0 }: { brouillons: number; aSaisir: number; admin: boolean; commentaires?: number; aTraiter?: number }) {
   const path = usePathname();
   const groupes: Groupe[] = [
     { titre: "", liens: [{ href: "/admin", label: "Aujourd'hui", Icone: Ballon, exact: true }] },
@@ -25,6 +25,14 @@ export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0 
         { href: "/admin/journee", label: "Saisie de journée", Icone: Sifflet, badge: aSaisir },
         { href: "/admin/matchs", label: "Matchs et direct", Icone: Coupe },
         { href: "/admin/stats-depart", label: "Stats de départ", Icone: Podium },
+      ],
+    },
+    {
+      titre: "Boutique",
+      liens: [
+        { href: "/admin/boutique", label: "Commandes", Icone: Pinte, badge: aTraiter, exact: true },
+        { href: "/admin/boutique/produits", label: "Produits", Icone: Maillot },
+        { href: "/admin/boutique/reglages", label: "Réglages boutique", Icone: Beret },
       ],
     },
     {
