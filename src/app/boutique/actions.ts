@@ -58,12 +58,17 @@ export async function preparerPaiement(lignes: LignePanier[], a: Adresse) {
     const sousTotal = items.reduce((s, i) => s + i.prix_cents * i.quantite, 0);
     const viewer = await getViewer();
     const db = shopDb();
+    // boutique pas encore ouverte : seule la rédaction peut passer une commande d'essai (en brouillon chez Printful)
+    const { data: reglages } = await db.from("shop_settings").select("mode_test").eq("id", 1).single();
+    const fermee = reglages?.mode_test !== false;
+    const staff = !!viewer && viewer.role !== "user";
+    if (fermee && !enModeTest() && !staff) return { ok: false as const, message: "La boutique ouvre très bientôt : les commandes ne sont pas encore ouvertes." };
     const { data: cree, error } = await db.rpc("shop_creer_commande", {
       p_secret: null,
       p_commande: {
         user_id: viewer?.id ?? null, email: a.email.trim(), items, sous_total_cents: sousTotal, livraison_cents: liv.cents, total_cents: sousTotal + liv.cents,
         nom: a.nom.trim(), adresse1: a.adresse1.trim(), adresse2: a.adresse2?.trim() || null, cp: a.cp.trim(), ville: a.ville.trim(), pays: a.pays, tel: a.tel?.trim() || null,
-        methode: liv.methode, mode_test: enModeTest(),
+        methode: liv.methode, mode_test: enModeTest() || fermee,
       },
     });
     if (error || !cree?.[0]) return { ok: false as const, message: error?.message ?? "Création de la commande impossible." };

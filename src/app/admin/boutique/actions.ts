@@ -167,3 +167,17 @@ export async function connecterPrintful(form: FormData) {
     ok(form, "lance");
   });
 }
+
+/** Ouvre ou ferme la boutique. Fermée : seules les commandes d'essai de la rédaction passent, en brouillon chez Printful. */
+export async function ouvrirBoutique(form: FormData) {
+  return run(form, async () => {
+    const { viewer, db } = await staff();
+    if (viewer.role !== "admin") throw new Error("Réservé aux administrateurs.");
+    const ouvrir = form.get("ouvrir") === "1";
+    if (ouvrir && form.get("confirme") !== "on") throw new Error("Cochez la case pour confirmer l'ouverture.");
+    const { error } = await db.from("shop_settings").update({ mode_test: !ouvrir, updated_at: new Date().toISOString() }).eq("id", 1);
+    if (error) throw new Error(error.message);
+    revalidatePath("/boutique", "layout");
+    ok(form);
+  });
+}
