@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import LiveRefresh from "@/components/LiveRefresh";
 import Comments from "@/components/Comments";
+import Confrontations from "@/components/stats/Confrontations";
 import Prono from "@/components/algo/Prono";
 import TribuneLive from "@/components/deco/TribuneLive";
 import Forme from "@/components/algo/Forme";
@@ -202,6 +203,8 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           </ol>
         </section>
       )}
+
+      <Confrontations matchId={m.id} home={m.home} away={m.away} />
 
       {m.status !== "cancelled" && <TribuneLive matchId={m.id} enDirect={live} />}
 

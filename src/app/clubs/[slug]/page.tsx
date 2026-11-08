@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import MatchRow from "@/components/MatchRow";
-import StandingsTable, { zonesFor } from "@/components/StandingsTable";
+import BilanSaison from "@/components/stats/BilanSaison";
+import { StandingsPools, zonesFor } from "@/components/StandingsTable";
 import ArticleCard from "@/components/ArticleCard";
 import FavoriteButton from "@/components/FavoriteButton";
 import Forme from "@/components/algo/Forme";
@@ -34,9 +35,10 @@ export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
     getTeamCompetitions(team.id),
     getArticles({ teamId: team.id, limit: 4 }),
   ]);
+  // championnat en priorité, sinon la compétition de la saison qui a un classement (coupe, sélections)
   const league = comps
-    .filter((x) => x.competition.kind === "league" && x.season === x.competition.current_season)
-    .sort((a, b) => a.competition.sort_order - b.competition.sort_order)[0]?.competition;
+    .filter((x) => x.season === x.competition.current_season && x.competition.active && x.competition.standings_mode !== "none")
+    .sort((a, b) => Number(b.competition.kind === "league") - Number(a.competition.kind === "league") || a.competition.sort_order - b.competition.sort_order)[0]?.competition;
   const standings = league ? await getStandings(league.id, league.current_season) : [];
   const [ratings, forms, history, viewer] = await Promise.all([getRatings([team.id]), getForms([team.id]), getRatingHistory(team.id), getViewer()]);
   const rating = ratings.get(team.id);
@@ -126,10 +128,12 @@ export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
         </section>
       </div>
 
+      <BilanSaison teamId={team.id} />
+
       {league && standings.length > 0 && (
         <section aria-labelledby="h-class" className="mt-10">
-          <h2 id="h-class" className="text-xl font-bold mb-3">Classement du {league.name}</h2>
-          <StandingsTable rows={standings} zones={zonesFor(league.slug)} highlight={team.id} />
+          <h2 id="h-class" className="text-xl font-bold mb-3">Classement : {league.name}</h2>
+          <StandingsPools rows={standings} zones={zonesFor(league.slug)} highlight={team.id} onlyPoolOf={team.id} />
         </section>
       )}
 

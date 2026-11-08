@@ -1,80 +1,174 @@
 import Link from "next/link";
-import { isoFromNow } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { MATCH_SELECT } from "@/lib/queries";
-import { fmtRelative } from "@/lib/format";
+import { fmtRelative, isoFromNow } from "@/lib/format";
+import { deleteComment } from "@/app/actions";
 import MatchRow from "@/components/MatchRow";
 import type { MatchFull } from "@/lib/types";
 
+const QUOTA_JOUR = 7500; // API-Sports PRO
+/** Synchro de plus de 36 h : compétition en retard. */
+const vieux = (iso: string | null) => !iso || Date.now() - new Date(iso).getTime() > 36 * 3600e3;
+
 export default async function AdminHome() {
   const db = await createClient();
-  const count = async (t: string) => (await db.from(t).select("id", { count: "exact", head: true })).count ?? 0;
-  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
-  const [articles, drafts, matches, teams, players, users, runs, used, live] = await Promise.all([
-    count("articles"),
-    db.from("articles").select("id", { count: "exact", head: true }).eq("status", "draft").then((r) => r.count ?? 0),
-    count("matches"),
-    count("teams"),
-    count("players"),
-    count("profiles"),
-    db.from("sync_runs").select("*").order("id", { ascending: false }).limit(1),
-    db.from("sync_runs").select("calls").eq("provider", "oanor").gte("created_at", monthStart.toISOString()),
-    db.from("matches").select(MATCH_SELECT).eq("source", "manual").gte("kickoff_at", isoFromNow(-6 * 3600e3)).lte("kickoff_at", isoFromNow(36 * 3600e3)).order("kickoff_at").limit(10),
-  ]);
-  const lastRun = runs.data?.[0];
-  const quota = (used.data ?? []).reduce((a, r) => a + r.calls, 0);
+  const count = async (t: string, f?: (q: any) => any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    let q = db.from(t).select("*", { count: "exact", head: true });
+    if (f) q = f(q);
+    return (await q).count ?? 0;
+  };
+  const jour = new Date(); jour.setUTCHours(0, 0, 0, 0);
+  const il30j = isoFromNow(-30 * 86400e3);
 
-  const stats = [
-    { label: "Articles", value: articles, sub: drafts ? `${drafts} brouillon${drafts > 1 ? "s" : ""}` : "aucun brouillon", href: "/admin/articles" },
-    { label: "Matchs", value: matches, href: "/admin/matchs" },
-    { label: "Équipes", value: teams, href: "/admin/clubs" },
-    { label: "Joueurs", value: players, href: "/admin/joueurs" },
-    { label: "Inscrits", value: users, href: "/admin/utilisateurs" },
+  const [articles, brouillons, inscrits, supporters, attente, joueurs, photos, aCompleter, commentaires7j,
+    appels, inscriptions, comps, live, coms, runs] = await Promise.all([
+    count("articles", (q) => q.eq("status", "published")),
+    count("articles", (q) => q.eq("status", "draft")),
+    count("profiles"),
+    count("profiles", (q) => q.neq("plan", "free")),
+    count("subscription_interest"),
+    count("players", (q) => q.eq("in_squad", true)),
+    count("players", (q) => q.eq("in_squad", true).not("photo_url", "is", null)),
+    count("players", (q) => q.eq("in_squad", true).is("tsdb_checked_at", null)),
+    count("comments", (q) => q.gte("created_at", isoFromNow(-7 * 86400e3))),
+    db.from("sync_runs").select("calls").eq("provider", "apisports").gte("created_at", jour.toISOString()),
+    db.from("profiles").select("created_at").gte("created_at", il30j),
+    db.from("competitions").select("id,slug,name,short_name,color,active,last_synced_at,standings_source,current_season").eq("active", true).order("sort_order"),
+    db.from("matches").select(MATCH_SELECT).in("status", ["live", "halftime"]).order("kickoff_at").limit(12),
+    db.from("comments").select("id, body, created_at, article_id, match_id, author:profiles(display_name, username)").order("created_at", { ascending: false }).limit(8),
+    db.from("sync_runs").select("id, created_at, provider, job, ok, message").order("created_at", { ascending: false }).limit(6),
+  ]);
+
+  const quota = (appels.data ?? []).reduce((a, r) => a + (r.calls ?? 0), 0);
+  const pctQuota = Math.min(100, Math.round((quota / QUOTA_JOUR) * 100));
+  // inscriptions des 30 derniers jours, jour par jour
+  const parJour = Array.from({ length: 30 }, (_, i) => {
+    const d = isoFromNow(-(29 - i) * 86400e3).slice(0, 10);
+    return { d, n: (inscriptions.data ?? []).filter((p) => p.created_at.slice(0, 10) === d).length };
+  });
+  const maxJour = Math.max(1, ...parJour.map((x) => x.n));
+  const total30 = parJour.reduce((a, x) => a + x.n, 0);
+
+  const kpis = [
+    { label: "Inscrits", value: inscrits, sub: `+${total30} sur 30 jours`, href: "/admin/utilisateurs" },
+    { label: "Supporters", value: supporters, sub: `${attente} sur liste d'attente`, href: "/admin/utilisateurs" },
+    { label: "Articles en ligne", value: articles, sub: brouillons ? `${brouillons} brouillon${brouillons > 1 ? "s" : ""}` : "aucun brouillon", href: "/admin/articles" },
+    { label: "Joueurs", value: joueurs, sub: `${photos} avec photo${aCompleter ? `, ${aCompleter} à compléter` : ""}`, href: "/admin/joueurs" },
+    { label: "Commentaires", value: commentaires7j, sub: "sur 7 jours", href: "#moderation" },
   ];
 
   return (
-    <div className="grid gap-10">
+    <div className="grid gap-8">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-extrabold mr-auto">Tableau de bord</h1>
-        <Link href="/admin/articles/nouveau" className="bouton">Écrire un article</Link>
-        <Link href="/admin/matchs/nouveau" className="bouton-discret">Ajouter un match</Link>
+        <h1 className="groovy text-4xl text-vin mr-auto">Le vestiaire de la rédaction</h1>
+        <Link href="/admin/journee" className="bouton">Saisir une journée</Link>
+        <Link href="/admin/articles/nouveau" className="bouton-discret">Écrire un article</Link>
       </div>
 
-      <dl className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {stats.map((s) => (
-          <Link key={s.label} href={s.href} className="bg-surface border border-trait rounded-lg p-4 hover:border-vin">
-            <dt className="text-sm text-sourdine">{s.label}</dt>
-            <dd className="titre text-3xl font-extrabold tnum">{s.value}</dd>
-            {s.sub && <dd className="text-xs text-sourdine">{s.sub}</dd>}
+      <dl className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {kpis.map((k) => (
+          <Link key={k.label} href={k.href} className="bg-surface border border-trait rounded-2xl p-4 hover:border-vin carte-vie">
+            <dt className="text-sm text-sourdine">{k.label}</dt>
+            <dd className="titre text-3xl font-extrabold tnum">{k.value}</dd>
+            <dd className="text-xs text-sourdine">{k.sub}</dd>
           </Link>
         ))}
       </dl>
 
-      <section aria-labelledby="h-direct">
-        <h2 id="h-direct" className="text-xl font-bold">Matchs saisis par la rédaction, aujourd&apos;hui et demain</h2>
-        <p className="text-sm text-sourdine mb-3">Pro D2, Six Nations, Challenge Cup… Ouvrez un match pour saisir le score en direct.</p>
+      <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+        <section aria-labelledby="h-inscr" className="bg-surface border border-trait rounded-2xl p-5">
+          <h2 id="h-inscr" className="font-bold">Inscriptions, 30 derniers jours</h2>
+          <div className="mt-4 h-28 flex items-end gap-[3px]" role="img" aria-label={`${total30} inscriptions sur 30 jours`}>
+            {parJour.map((x) => (
+              <span key={x.d} title={`${x.d} : ${x.n}`} className="flex-1 rounded-t bg-vin/80 hover:bg-vin min-h-[2px]" style={{ height: `${(x.n / maxJour) * 100}%` }} />
+            ))}
+          </div>
+          <div className="mt-1 flex justify-between text-xs text-sourdine"><span>il y a 30 jours</span><span>aujourd&apos;hui</span></div>
+        </section>
+
+        <section aria-labelledby="h-quota" className="bg-bordeaux text-white rounded-2xl p-5">
+          <h2 id="h-quota" className="font-bold">API-Sports aujourd&apos;hui</h2>
+          <p className="mt-2 groovy text-5xl text-moutarde tnum">{quota.toLocaleString("fr-FR")}</p>
+          <p className="text-sm text-white/70">appels sur {QUOTA_JOUR.toLocaleString("fr-FR")} autorisés</p>
+          <div className="mt-3 h-3 rounded-full bg-white/15 overflow-hidden" role="meter" aria-valuemin={0} aria-valuemax={QUOTA_JOUR} aria-valuenow={quota} aria-label="Quota du jour">
+            <div className={`h-full rounded-full ${pctQuota > 85 ? "bg-alerte" : "bg-moutarde"}`} style={{ width: `${Math.max(pctQuota, 1)}%` }} />
+          </div>
+          <Link href="/admin/donnees" className="mt-4 inline-block text-sm underline underline-offset-4 text-white/80">Synchronisations et effectifs</Link>
+        </section>
+      </div>
+
+      <section aria-labelledby="h-live">
+        <h2 id="h-live" className="text-xl font-bold mb-3">En direct maintenant</h2>
         {(live.data ?? []).length ? (
-          <ul className="bg-surface border border-trait rounded-lg divide-y divide-trait overflow-hidden">
+          <ul className="bg-surface border border-trait rounded-2xl divide-y divide-trait overflow-hidden">
             {(live.data as unknown as MatchFull[]).map((m) => (
               <li key={m.id} className="flex items-center">
                 <div className="flex-1 min-w-0"><MatchRow m={m} showDate /></div>
-                <Link href={`/admin/matchs/${m.id}`} className="bouton-discret mr-3 shrink-0">Saisir</Link>
+                <Link href={`/admin/matchs/${m.id}/stats`} className="bouton-discret mr-3 shrink-0">Feuille</Link>
               </li>
             ))}
           </ul>
-        ) : <p className="text-sourdine">Rien de prévu.</p>}
+        ) : <p className="text-sourdine">Aucun match en cours. Les scores se mettent à jour seuls toutes les 2 minutes pendant les matchs.</p>}
       </section>
 
-      <section aria-labelledby="h-sync" className="bg-surface border border-trait rounded-lg p-5">
-        <h2 id="h-sync" className="text-xl font-bold">Données automatiques</h2>
-        <p className="mt-1 text-sm text-sourdine tnum">{quota} appels Oanor ce mois-ci sur 2 800 autorisés par le site (offre gratuite : 3 000).</p>
-        {lastRun ? (
-          <p className={`mt-3 text-sm ${lastRun.ok ? "" : "text-alerte font-semibold"}`}>
-            Dernière synchronisation {fmtRelative(lastRun.created_at)} : {lastRun.ok ? "réussie" : "en échec"}. {lastRun.message}
-          </p>
-        ) : <p className="mt-3 text-sm">Aucune synchronisation pour l&apos;instant.</p>}
-        <Link href="/admin/donnees" className="mt-4 bouton-discret">Gérer les données</Link>
+      <section aria-labelledby="h-sante">
+        <h2 id="h-sante" className="text-xl font-bold mb-3">Santé des compétitions</h2>
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {(comps.data ?? []).map((c) => (
+            <li key={c.id} className="flex items-center gap-3 bg-surface border border-trait rounded-xl px-3 py-2.5">
+              <span className="w-2 self-stretch rounded-sm" style={{ background: c.color ?? "var(--vin)" }} aria-hidden />
+              <span className="min-w-0 flex-1">
+                <Link href={`/competitions/${c.slug}`} className="font-semibold hover:underline underline-offset-4 block truncate">{c.short_name ?? c.name}</Link>
+                <span className="text-xs text-sourdine block">
+                  {c.last_synced_at ? `à jour ${fmtRelative(c.last_synced_at)}` : "jamais synchronisée"}
+                  {c.standings_source === "calcul" ? ", classement calculé" : c.standings_source === "api" ? ", classement officiel" : ""}
+                </span>
+              </span>
+              <span aria-label={vieux(c.last_synced_at) ? "En retard" : "À jour"} className={`w-2.5 h-2.5 rounded-full shrink-0 ${vieux(c.last_synced_at) ? "bg-alerte" : "bg-ok"}`} />
+            </li>
+          ))}
+        </ul>
       </section>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section id="moderation" aria-labelledby="h-coms" className="scroll-mt-24">
+          <h2 id="h-coms" className="text-xl font-bold mb-3">Derniers commentaires</h2>
+          {(coms.data ?? []).length ? (
+            <ul className="bg-surface border border-trait rounded-2xl divide-y divide-trait">
+              {(coms.data as unknown as { id: string; body: string; created_at: string; article_id: string | null; match_id: string | null; author: { display_name: string | null; username: string | null } | null }[]).map((c) => (
+                <li key={c.id} className="p-3 flex gap-3 items-start">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm"><span className="font-semibold">{c.author?.display_name ?? c.author?.username ?? "Anonyme"}</span> <span className="text-sourdine">{fmtRelative(c.created_at)}</span></p>
+                    <p className="text-sm mt-0.5 line-clamp-2">{c.body}</p>
+                    {c.match_id && <Link href={`/matchs/${c.match_id}`} className="text-xs text-vin underline underline-offset-2">Voir le match</Link>}
+                  </div>
+                  <form action={deleteComment}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <input type="hidden" name="path" value="/admin" />
+                    <button className="text-xs font-semibold text-alerte hover:underline">Supprimer</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sourdine">Aucun commentaire pour l&apos;instant.</p>}
+        </section>
+
+        <section aria-labelledby="h-runs">
+          <h2 id="h-runs" className="text-xl font-bold mb-3">Journal des synchronisations</h2>
+          <ul className="bg-surface border border-trait rounded-2xl divide-y divide-trait text-sm">
+            {(runs.data ?? []).map((r) => (
+              <li key={r.id} className="p-3">
+                <p className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${r.ok ? "bg-ok" : "bg-alerte"}`} aria-hidden />
+                  <span className="font-semibold">{r.job}</span>
+                  <span className="text-sourdine">{r.provider}, {fmtRelative(r.created_at)}</span>
+                </p>
+                <p className="text-xs text-sourdine mt-0.5 line-clamp-2">{r.message}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }

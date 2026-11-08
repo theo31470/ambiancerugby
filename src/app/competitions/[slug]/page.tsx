@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import StandingsTable, { zonesFor } from "@/components/StandingsTable";
+import { StandingsPools, zonesFor } from "@/components/StandingsTable";
 import MatchRow from "@/components/MatchRow";
 import TeamBadge from "@/components/TeamBadge";
 import ArticleCard from "@/components/ArticleCard";
@@ -40,25 +40,31 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
   return (
     <div>
       <LiveRefresh />
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-        <div className="flex items-center gap-3">
-          <span className="w-2.5 h-10 rounded-sm" style={{ background: c.color ?? "var(--vin)" }} aria-hidden />
-          <div>
-            <h1 className="groovy text-4xl sm:text-6xl text-vin leading-none">{c.name}</h1>
-            <p className="mt-1 text-sourdine">{c.country}</p>
+      <header className="pleine-largeur -mt-6 sm:-mt-10 relative overflow-hidden" style={{ background: c.color ?? "var(--vin)", color: c.text_color ?? "#fff" }}>
+        <span aria-hidden className="absolute -right-16 -top-24 w-80 h-80 rounded-full opacity-10" style={{ background: c.text_color ?? "#fff" }} />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-wrap items-center gap-x-6 gap-y-4 relative">
+          <span className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-2xl bg-white grid place-items-center p-2 shadow-[0_6px_0_-2px_rgba(0,0,0,.25)]">
+            {c.logo_url
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={c.logo_url} alt="" className="max-w-full max-h-full object-contain" />
+              : <span className="groovy text-3xl text-vin">{(c.short_name ?? c.name).slice(0, 2)}</span>}
+          </span>
+          <div className="min-w-0">
+            <h1 className="groovy text-4xl sm:text-6xl leading-none">{c.name}</h1>
+            <p className="mt-2 opacity-80">{c.region ?? c.country}, saison {season}</p>
           </div>
+          {seasons.length > 1 && (
+            <nav aria-label="Saison" className="flex gap-1 flex-wrap sm:ml-auto">
+              {seasons.map((s) => (
+                <Link key={s} href={href(tab, s)} aria-current={s === season ? "true" : undefined}
+                  className={`rounded-full px-3 py-1 text-sm font-semibold ${s === season ? "bg-white text-encre" : "bg-black/10 hover:bg-black/20"}`}>
+                  {s}
+                </Link>
+              ))}
+            </nav>
+          )}
         </div>
-        {seasons.length > 1 && (
-          <nav aria-label="Saison" className="flex gap-1 flex-wrap ml-auto">
-            {seasons.map((s) => (
-              <Link key={s} href={href(tab, s)} aria-current={s === season ? "true" : undefined}
-                className={`rounded-md px-2.5 py-1 text-sm font-semibold ${s === season ? "bg-encre text-fond" : "hover:bg-teinte"}`}>
-                {s}
-              </Link>
-            ))}
-          </nav>
-        )}
-      </div>
+      </header>
 
       <nav aria-label="Rubriques" className="defile-scroll mt-6 flex gap-1 border-b border-trait overflow-x-auto">
         {tabs.map((t) => (
@@ -70,7 +76,7 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
       </nav>
 
       <div className="mt-6">
-        {tab === "classement" && <Classement compId={c.id} season={season} slug={c.slug} />}
+        {tab === "classement" && <Classement compId={c.id} season={season} slug={c.slug} calcule={c.standings_source === "calcul"} />}
         {tab === "calendrier" && <Calendrier compId={c.id} season={season} upcoming />}
         {tab === "resultats" && <Calendrier compId={c.id} season={season} upcoming={false} />}
         {tab === "clubs" && <Equipes compId={c.id} season={season} />}
@@ -81,10 +87,19 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
   );
 }
 
-async function Classement({ compId, season, slug }: { compId: string; season: string; slug: string }) {
+async function Classement({ compId, season, slug, calcule }: { compId: string; season: string; slug: string; calcule: boolean }) {
   const rows = await getStandings(compId, season);
   if (!rows.length) return <Empty>Le classement s&apos;affichera dès les premiers résultats.</Empty>;
-  return <StandingsTable rows={rows} zones={zonesFor(slug)} />;
+  return (
+    <div>
+      <StandingsPools rows={rows} zones={zonesFor(slug)} />
+      {calcule && (
+        <p className="mt-3 text-xs text-sourdine max-w-prose">
+          Classement calculé par Ambiance Rugby à partir des résultats : 4 points la victoire, 2 le nul, 1 point de bonus défensif. Les bonus offensifs (nombre d&apos;essais) ne sont pas encore comptés.
+        </p>
+      )}
+    </div>
+  );
 }
 
 async function Calendrier({ compId, season, upcoming }: { compId: string; season: string; upcoming: boolean }) {

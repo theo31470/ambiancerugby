@@ -94,3 +94,25 @@ function Legend({ cls, label }: { cls: string; label: string }) {
     </span>
   );
 }
+
+/** Classement découpé par poule (Champions Cup, Coupe du monde…) ; un seul tableau s'il n'y a pas de poules. */
+export function StandingsPools({ rows, zones = {}, highlight, onlyPoolOf }: { rows: StandingRow[]; zones?: Zones; highlight?: string; onlyPoolOf?: string }) {
+  const pools = new Map<string, StandingRow[]>();
+  for (const r of rows) pools.set(r.pool ?? "", [...(pools.get(r.pool ?? "") ?? []), r]);
+  let list = [...pools.entries()].sort(([a], [b]) => a.localeCompare(b, "fr"));
+  if (onlyPoolOf) {
+    const mine = list.find(([, rs]) => rs.some((r) => r.team.id === onlyPoolOf));
+    if (mine) list = [mine];
+  }
+  if (list.length <= 1) return <StandingsTable rows={list[0]?.[1] ?? []} zones={zones} highlight={highlight} />;
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      {list.map(([pool, rs]) => (
+        <section key={pool} aria-label={pool} className="min-w-0">
+          <h3 className="groovy text-2xl text-vin mb-2">{pool}</h3>
+          <StandingsTable rows={rs} highlight={highlight} />
+        </section>
+      ))}
+    </div>
+  );
+}
