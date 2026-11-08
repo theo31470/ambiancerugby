@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EVENT_LABEL, EVENT_POINTS } from "@/lib/format";
+import { phraseAction } from "@/lib/commentaires";
 
 type Evt = { id: string; minute: number | null; kind: string; text: string | null; team_id: string | null; player: unknown };
 type Equipe = { id: string; name: string; short_name: string | null };
@@ -62,6 +63,11 @@ export default function FilDuMatch({ events, home, away, live, clock }: { events
                     <div className="min-w-0">{domicile && cote(l, true)}</div>
                     <span className="text-center titre font-extrabold tnum text-vin">{l.e.minute != null ? `${l.e.minute}'` : ""}</span>
                     <div className="min-w-0">{!domicile && cote(l, false)}</div>
+                    {(() => {
+                      const p = l.e.player as { first_name: string; last_name: string } | null;
+                      const phrase = l.e.kind === "note" ? null : phraseAction(l.e.kind, l.e.id, p ? `${p.first_name} ${p.last_name}` : null, nom(domicile ? home : away));
+                      return phrase && <p className={`col-span-3 text-sm italic text-sourdine ${domicile ? "" : "text-right"}`}>{phrase}</p>;
+                    })()}
                   </li>
                 );
               })}
