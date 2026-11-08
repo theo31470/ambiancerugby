@@ -47,11 +47,14 @@ type Joueur = { nom: string; prenom: string; complet: string; pays: string | nul
 /** Lit le premier effectif « {{RU squad player|NAT|Nom}} » d'une page Wikipédia anglaise. */
 function lireEffectif(wikitext: string): Joueur[] {
   let txt = wikitext;
-  const debut = txt.search(/\{\{\s*rugby union squad start/i);
+  const debut = txt.search(/\{\{\s*(template:\s*)?rugby union squad start/i);
   if (debut >= 0) {
     txt = txt.slice(debut);
-    const fin = txt.search(/\{\{\s*rugby union squad end/i);
-    if (fin > 0) txt = txt.slice(0, fin);
+    // fin du premier effectif : modèle de fin, effectif suivant (Espoirs, féminines…) ou nouvelle section
+    const suite = txt.slice(20);
+    const fins = [/\{\{\s*(template:\s*)?rugby union squad end/i, /\{\{\s*(template:\s*)?rugby union squad start/i, /\n==[^=]/, /\{\{\s*end\s*\}\}/i, /'''[^'\n]*(academy|espoirs|development|under-?2[03]|u2[03]|women)[^'\n]*'''/i]
+      .map((re) => suite.search(re)).filter((i) => i >= 0);
+    if (fins.length) txt = txt.slice(0, 20 + Math.min(...fins));
   } else {
     const i = txt.search(/\{\{\s*(RU|rugby union) squad player/i);
     if (i < 0) return [];
@@ -154,9 +157,16 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
     .filter((t) => (params.force && params.slugs?.length) || !t.squad_synced_at || new Date(t.squad_synced_at).getTime() < semaine)
     .sort((a, b) => (prio.get(b.id) ?? 0) - (prio.get(a.id) ?? 0) || (a.squad_synced_at ?? "").localeCompare(b.squad_synced_at ?? ""));
 
-  const { data: existants } = await db.from("players").select("id, slug, name_key, team_id, verrou, source");
-  const slugs = new Set(((existants ?? []) as any[]).map((p) => p.slug));
-  const parCle = new Map(((existants ?? []) as any[]).filter((p) => p.name_key).map((p) => [p.name_key, p]));
+  // tous les joueurs, par pages de 1 000 (limite de l'API Supabase)
+  const existants: any[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data: page, error } = await db.from("players").select("id, slug, name_key, team_id, verrou, source").order("id").range(de, de + 999);
+    if (error) throw new Error(error.message);
+    existants.push(...(page ?? []));
+    if (!page || page.length < 1000) break;
+  }
+  const slugs = new Set(existants.map((p) => p.slug));
+  const parCle = new Map(existants.filter((p) => p.name_key).map((p) => [p.name_key, p]));
   const lignes: string[] = [];
   let crees = 0, maj = 0, sansPage = 0, clubs = 0;
 
@@ -201,11 +211,12 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
           if (error) { lignes.push(`${j.complet} : ${error.message}`); continue; }
           slugs.add(slug);
           parCle.set(cle, data);
+          existants.push(data);
           crees++;
         }
       }
       // joueurs partis du club (seulement ceux venus de Wikipédia et non verrouillés)
-      const partis = ((existants ?? []) as any[]).filter((p) => p.team_id === t.id && p.source === "wikipedia" && !p.verrou && p.name_key && !vus.has(p.name_key)).map((p) => p.id);
+      const partis = existants.filter((p) => p.team_id === t.id && p.source === "wikipedia" && !p.verrou && p.name_key && !vus.has(p.name_key)).map((p) => p.id);
       if (partis.length) await db.from("players").update({ in_squad: false }).in("id", partis);
       await db.from("teams").update({ wiki_title: page.titre, wiki_checked_at: new Date().toISOString(), squad_synced_at: new Date().toISOString(), squad_count: joueurs.length }).eq("id", t.id);
     } catch (e) {
