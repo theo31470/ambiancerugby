@@ -34,7 +34,7 @@ function tableau(ligue: string, d: string) {
   return cacheTableaux.get(k)!;
 }
 
-type EquipeLocale = { id: string; name: string; short_name: string | null; abbreviation: string | null; aliases: string[] | null; espn_id: string | null };
+type EquipeLocale = { is_national?: boolean; id: string; name: string; short_name: string | null; abbreviation: string | null; aliases: string[] | null; espn_id: string | null };
 /** Ressemblance entre une équipe du site et une équipe ESPN : 2 = même id ESPN, 1 = un mot du nom en commun. */
 function ressemblance(t: EquipeLocale, e: EquipeEspn) {
   if (t.espn_id) return t.espn_id === e.id ? 2 : -5;
@@ -153,7 +153,7 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
       for (let n = 1; n < 6 && !id; n++) {
         const slug = slugify(nom) + (n > 1 ? `-${n}` : "");
         const { data, error } = await db.from("players").insert({
-          slug, first_name: prenom, last_name: famille || prenom, team_id: p.team_id, name_key: cle || null, source: "espn", in_squad: true, espn_id: p.athlete.id,
+          slug, first_name: prenom, last_name: famille || prenom, team_id: (p.team_id === m.home_team_id ? m.home : m.away).is_national ? null : p.team_id, name_key: cle || null, source: "espn", in_squad: true, espn_id: p.athlete.id,
         }).select("id").single();
         if (data) { id = data.id; crees++; }
         else if (error?.code !== "23505") break;
@@ -163,7 +163,8 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
     if (!id) continue;
     joueurDe.set(p.athlete.id, id);
     // il joue pour ce club : on corrige son club (transfert) si le match est récent et la fiche non verrouillée
-    if (Date.now() - new Date(m.kickoff_at).getTime() < 45 * 86400e3) await db.from("players").update({ team_id: p.team_id, in_squad: true }).eq("id", id).eq("verrou", false).neq("team_id", p.team_id);
+    const selection = (p.team_id === m.home_team_id ? m.home : m.away).is_national;
+    if (!selection && Date.now() - new Date(m.kickoff_at).getTime() < 45 * 86400e3) await db.from("players").update({ team_id: p.team_id, in_squad: true }).eq("id", id).eq("verrou", false).neq("team_id", p.team_id);
     await db.from("players").update({ espn_id: p.athlete.id }).eq("id", id).is("espn_id", null);
   }
 
@@ -244,4 +245,4 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
 }
 
 /** Sélection Supabase d'un match prêt pour importerFeuilleEspn. */
-export const SELECT_MATCH_ESPN = "id, competition_id, kickoff_at, home_score, away_score, home_team_id, away_team_id, espn_event_id, status, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id), competition:competitions(name, espn_league)";
+export const SELECT_MATCH_ESPN = "id, competition_id, kickoff_at, home_score, away_score, home_team_id, away_team_id, espn_event_id, status, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,is_national), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,is_national), competition:competitions(name, espn_league)";
