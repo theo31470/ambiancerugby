@@ -4,10 +4,12 @@ import type { Article, Competition, MatchFull, Player, StandingRow, Team } from 
 import { parisDayRange } from "./format";
 
 export const TEAM_LITE = "id,slug,name,short_name,abbreviation,logo_url,color";
-export const MATCH_SELECT = `*, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}), competition:competitions(id,slug,name,short_name,color)`;
+export const MATCH_SELECT = `*, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}), competition:competitions(id,slug,name,short_name,color,logo_url)`;
 
-export async function getCompetitions(): Promise<Competition[]> {
-  const { data } = await publicClient().from("competitions").select("*").order("sort_order");
+export async function getCompetitions(opts: { all?: boolean } = {}): Promise<Competition[]> {
+  let q = publicClient().from("competitions").select("*").order("sort_order");
+  if (!opts.all) q = q.eq("active", true);
+  const { data } = await q;
   return (data ?? []) as Competition[];
 }
 
@@ -66,9 +68,10 @@ export async function getTeamMatches(teamId: string, opts: { upcoming: boolean; 
 export async function getStandings(competitionId: string, season: string): Promise<StandingRow[]> {
   const { data } = await publicClient()
     .from("standings")
-    .select(`rank,played,won,drawn,lost,points_for,points_against,tries_for,tries_against,bonus,points,form, team:teams(${TEAM_LITE})`)
+    .select(`pool,rank,played,won,drawn,lost,points_for,points_against,tries_for,tries_against,bonus,points,form, team:teams(${TEAM_LITE})`)
     .eq("competition_id", competitionId)
     .eq("season", season)
+    .order("pool")
     .order("rank");
   return (data ?? []) as unknown as StandingRow[];
 }

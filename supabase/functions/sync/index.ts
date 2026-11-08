@@ -13,7 +13,7 @@ const DAILY_CAP = 7000; // plan PRO : 7 500 / jour, on garde une marge
 const TIME_BUDGET_MS = 120_000;
 
 type Team = { id: string; slug: string; name: string; short_name: string | null; aliases: string[]; apisports_id: number | null; logo_url: string | null; stadium: string | null; founded: number | null; country: string | null };
-type Competition = { id: string; slug: string; name: string; kind: string; current_season: string; standings_mode: string; apisports_id: number | null; apisports_season: number | null; active: boolean; logo_url: string | null };
+type Competition = { id: string; slug: string; name: string; short_name?: string | null; kind: string; current_season: string; standings_mode: string; apisports_id: number | null; apisports_season: number | null; active: boolean; logo_url: string | null };
 type ApiSeason = { season: number; current: boolean; start: string; end: string };
 
 const norm = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -137,7 +137,7 @@ async function syncTeams(db: SupabaseClient, api: Api, c: Competition, idx: Team
   const teams = await api.get(`/teams?league=${c.apisports_id}&season=${season}`);
   const links = [];
   for (const t of teams ?? []) {
-    const team = await idx.resolve(t.id, t.name, { logo: t.logo, national: t.national, founded: t.founded, stadium: t.arena?.name ?? null, country: t.country?.name ?? null });
+    const team = await idx.resolve(t.id, t.name ?? `Équipe ${t.id}`, { logo: t.logo, national: t.national, founded: t.founded, stadium: t.arena?.name ?? null, country: t.country?.name ?? null });
     links.push({ team_id: team.id, competition_id: c.id, season: label });
   }
   if (links.length) await db.from("team_competitions").upsert(links, { onConflict: "team_id,competition_id,season", ignoreDuplicates: true });
@@ -148,8 +148,8 @@ type GameRow = Record<string, unknown> & { external_id: string };
 
 async function gameRow(g: any, c: Competition, label: string, idx: TeamIndex): Promise<GameRow> {
   const national = c.kind === "international";
-  const home = await idx.resolve(g.teams.home.id, g.teams.home.name, { logo: g.teams.home.logo, national });
-  const away = await idx.resolve(g.teams.away.id, g.teams.away.name, { logo: g.teams.away.logo, national });
+  const home = await idx.resolve(g.teams.home.id, g.teams.home.name ?? `Équipe ${g.teams.home.id}`, { logo: g.teams.home.logo, national });
+  const away = await idx.resolve(g.teams.away.id, g.teams.away.name ?? `Équipe ${g.teams.away.id}`, { logo: g.teams.away.logo, national });
   const st = statut(g.status?.short ?? "NS");
   const p = g.periods ?? {};
   const lines = [p.first, p.second, p.overtime].filter((x: any) => x && (x.home != null || x.away != null)).map((x: any) => ({ home: x.home ?? 0, away: x.away ?? 0 }));
@@ -194,33 +194,102 @@ async function syncGames(db: SupabaseClient, api: Api, c: Competition, idx: Team
   return { total: rows.length, changed: r.changed };
 }
 
+type Ligne = { team_id: string; pool: string; played: number; won: number; drawn: number; lost: number; pf: number; pa: number; bonus: number; points: number; res: { k: number; r: string }[] };
+
+/** Classement calculé à partir de nos propres résultats (poules déduites des matchs joués entre équipes). */
+async function classementCalcule(db: SupabaseClient, c: Competition) {
+  const { data } = await db.from("matches").select("home_team_id,away_team_id,home_score,away_score,status,round,kickoff_at")
+    .eq("competition_id", c.id).eq("season", c.current_season).limit(2000);
+  let games = (data ?? []).filter((m) => m.round == null || /^\d+$/.test(String(m.round)));
+  if (!games.length) return { rows: [] as Ligne[], teams: 0 };
+  const maxK = Math.max(...games.map((m) => new Date(m.kickoff_at).getTime()));
+  games = games.filter((m) => new Date(m.kickoff_at).getTime() >= maxK - 300 * 86400e3);
+  // poules : composantes connexes du graphe des matchs de phase régulière
+  const parent = new Map<string, string>();
+  const find = (x: string): string => { const p = parent.get(x) ?? x; if (p === x) return x; const r = find(p); parent.set(x, r); return r; };
+  for (const m of games) { parent.set(m.home_team_id, find(m.home_team_id)); parent.set(m.away_team_id, find(m.away_team_id)); parent.set(find(m.home_team_id), find(m.away_team_id)); }
+  const comps = new Map<string, string[]>();
+  for (const t of parent.keys()) comps.set(find(t), [...(comps.get(find(t)) ?? []), t]);
+  const premier = new Map<string, number>();
+  for (const m of games) { const r = find(m.home_team_id); premier.set(r, Math.min(premier.get(r) ?? Infinity, new Date(m.kickoff_at).getTime())); }
+  const groupes = [...comps.keys()].sort((x, y) => (premier.get(x)! - premier.get(y)!) || x.localeCompare(y));
+  const multi = groupes.length > 1;
+  const nomPoule = new Map(groupes.map((g, i) => [g, multi ? `Poule ${String.fromCharCode(65 + i)}` : ""]));
+  const seuilBD = ["top-14", "pro-d2", "nationale"].includes(c.slug) ? 5 : 7;
+  const tab = new Map<string, Ligne>();
+  const get = (id: string) => tab.get(id) ?? (tab.set(id, { team_id: id, pool: nomPoule.get(find(id))!, played: 0, won: 0, drawn: 0, lost: 0, pf: 0, pa: 0, bonus: 0, points: 0, res: [] }), tab.get(id)!);
+  for (const m of games) {
+    get(m.home_team_id); get(m.away_team_id);
+    if (m.status !== "finished" || m.home_score == null || m.away_score == null) continue;
+    const k = new Date(m.kickoff_at).getTime();
+    for (const [id, pf, pa] of [[m.home_team_id, m.home_score, m.away_score], [m.away_team_id, m.away_score, m.home_score]] as [string, number, number][]) {
+      const l = get(id);
+      l.played++; l.pf += pf; l.pa += pa;
+      if (pf > pa) { l.won++; l.points += 4; l.res.push({ k, r: "V" }); }
+      else if (pf === pa) { l.drawn++; l.points += 2; l.res.push({ k, r: "N" }); }
+      else { l.lost++; l.res.push({ k, r: "D" }); if (pa - pf <= seuilBD) { l.bonus++; l.points++; } }
+    }
+  }
+  return { rows: [...tab.values()], teams: tab.size };
+}
+
 async function syncStandings(db: SupabaseClient, api: Api, c: Competition, idx: TeamIndex) {
-  if (c.standings_mode !== "api") return 0;
-  const groups = await api.get(`/standings?league=${c.apisports_id}&season=${c.apisports_season}`);
-  const flat: any[] = (groups ?? []).flat();
-  if (!flat.length) return 0;
-  const multi = new Set(flat.map((r) => r.group?.name ?? "")).size > 1;
-  const seen = new Set<string>();
-  const rows = [];
-  for (const r of flat) {
-    const team = await idx.resolve(r.team.id, r.team.name, { logo: r.team.logo, national: c.kind === "international" });
-    if (seen.has(team.id)) continue; // une équipe par compétition et saison
-    seen.add(team.id);
-    const w = r.games?.win?.total ?? 0, d = r.games?.draw?.total ?? 0;
-    rows.push({
-      competition_id: c.id, season: c.current_season, team_id: team.id, pool: multi ? (r.group?.name ?? "") : "",
-      rank: r.position, played: r.games?.played ?? 0, won: w, drawn: d, lost: r.games?.lose?.total ?? 0,
-      points_for: r.goals?.for ?? 0, points_against: r.goals?.against ?? 0, tries_for: null, tries_against: null,
-      bonus: Math.max(0, (r.points ?? 0) - (4 * w + 2 * d)), points: r.points ?? 0,
-      // forme API (W/D/L) en français (V/N/D)
-      form: r.form ? String(r.form).replace(/D/g, "N").replace(/W/g, "V").replace(/L/g, "D").slice(-5) : null,
-      updated_at: new Date().toISOString(),
-    });
+  if (c.standings_mode === "none") return 0;
+  const calc = await classementCalcule(db, c);
+  const now = new Date().toISOString();
+  type Row = Record<string, unknown> & { team_id: string; pool: string; points: number; pf: number; pa: number };
+  let rows: Row[] = [];
+  let source = "calcul";
+
+  if (c.standings_mode === "api") {
+    const groups = await api.get(`/standings?league=${c.apisports_id}&season=${c.apisports_season}`);
+    const flat: any[] = (groups ?? []).flat();
+    if (flat.length) {
+      const multi = new Set(flat.map((r) => r.group?.name ?? "")).size > 1;
+      const seen = new Set<string>();
+      const apiRows: Row[] = [];
+      for (const r of flat) {
+        const team = await idx.resolve(r.team.id, r.team.name ?? `Équipe ${r.team.id}`, { logo: r.team.logo, national: c.kind === "international" });
+        if (seen.has(team.id)) continue;
+        seen.add(team.id);
+        const w = r.games?.win?.total ?? 0, d = r.games?.draw?.total ?? 0;
+        apiRows.push({
+          team_id: team.id, pool: multi ? (r.group?.name ?? "") : "", played: r.games?.played ?? 0, won: w, drawn: d, lost: r.games?.lose?.total ?? 0,
+          pf: r.goals?.for ?? 0, pa: r.goals?.against ?? 0, bonus: Math.max(0, (r.points ?? 0) - (4 * w + 2 * d)), points: r.points ?? 0,
+          // forme API (W/D/L) en français (V/N/D)
+          form: r.form ? String(r.form).replace(/D/g, "N").replace(/W/g, "V").replace(/L/g, "D").slice(-5) : null,
+        });
+      }
+      // on garde le classement officiel seulement s'il colle à nos résultats (l'API est parfois en retard d'une saison)
+      const byTeam = new Map(calc.rows.map((l) => [l.team_id, l]));
+      const ok = apiRows.filter((r) => byTeam.get(r.team_id)?.played === r.played).length;
+      if (apiRows.length >= calc.teams * 0.9 && ok >= apiRows.length * 0.85) { rows = apiRows; source = "api"; }
+    }
+  }
+  if (source === "calcul") {
+    rows = calc.rows.map((l) => ({
+      team_id: l.team_id, pool: l.pool, played: l.played, won: l.won, drawn: l.drawn, lost: l.lost, pf: l.pf, pa: l.pa, bonus: l.bonus, points: l.points,
+      form: l.res.length ? l.res.sort((a, b) => a.k - b.k).slice(-5).map((x) => x.r).join("") : null,
+    }));
+  }
+  if (!rows.length) return 0;
+  // rang dans chaque poule
+  const pools = new Map<string, Row[]>();
+  for (const r of rows) pools.set(r.pool, [...(pools.get(r.pool) ?? []), r]);
+  const out: Record<string, unknown>[] = [];
+  for (const list of pools.values()) {
+    if (source === "calcul") list.sort((a, b) => b.points - a.points || (b.pf - b.pa) - (a.pf - a.pa) || b.pf - a.pf);
+    list.forEach((r, i) => out.push({
+      competition_id: c.id, season: c.current_season, team_id: r.team_id, pool: r.pool, rank: i + 1,
+      played: r.played, won: r.won, drawn: r.drawn, lost: r.lost, points_for: r.pf, points_against: r.pa,
+      tries_for: null, tries_against: null, bonus: r.bonus, points: r.points, form: r.form ?? null, updated_at: now,
+    }));
   }
   await db.from("standings").delete().eq("competition_id", c.id).eq("season", c.current_season);
-  const { error } = await db.from("standings").insert(rows);
+  const { error } = await db.from("standings").insert(out);
   if (error) throw error;
-  return rows.length;
+  await db.from("competitions").update({ standings_source: source }).eq("id", c.id);
+  return out.length;
 }
 
 async function syncH2H(db: SupabaseClient, api: Api, limit: number) {

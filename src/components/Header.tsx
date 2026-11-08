@@ -6,6 +6,7 @@ import EnteteCollant from "./nav/EnteteCollant";
 import NavBureau from "./nav/NavBureau";
 import MenuVestiaire from "./nav/MenuVestiaire";
 import SonStade from "./deco/SonStade";
+import { Ballon, Journal } from "./deco/Icones";
 
 export default async function Header() {
   const viewer = await getViewer();
@@ -19,20 +20,27 @@ export default async function Header() {
   }
   return (
     <EnteteCollant>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-3 lg:gap-6 h-16 sm:h-20 group-data-[reduit]:h-14 transition-[height] duration-300">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-3 xl:gap-5 h-16 sm:h-20 group-data-[reduit]:h-14 transition-[height] duration-300">
         <Link href="/" className="shrink-0 logo-roulis relative z-[70]" aria-label="Ambiance Rugby, accueil">
           <img src="/logo-blanc.png" alt="Ambiance Rugby" width={340} height={256} className="h-12 sm:h-16 group-data-[reduit]:h-10 w-auto transition-[height] duration-300" />
         </Link>
-        <div className="hidden lg:block flex-1 min-w-0">
+        <div className="hidden xl:block flex-1 min-w-0">
           <NavBureau />
         </div>
         <div className="ml-auto flex items-center gap-1 sm:gap-1.5 text-sm font-semibold">
           <span className="hidden sm:block"><SonStade /></span>
           {staff && (
-            <Link href="/admin" className="hidden xl:inline-flex px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20">Rédaction</Link>
+            <Link href="/admin" title="Espace rédaction" className="hidden xl:grid place-items-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20">
+              <Journal className="h-5 w-auto text-moutarde [--deco-trait:var(--vin)]" />
+              <span className="sr-only">Espace rédaction</span>
+            </Link>
           )}
           {viewer && !badge && (
-            <Link href="/abonnement" className="hidden xl:inline-flex px-3 py-1.5 rounded-full bg-moutarde text-bordeaux hover:brightness-105">Devenir Supporter</Link>
+            <Link href="/abonnement" className="hidden xl:inline-flex items-center gap-1.5 whitespace-nowrap pl-2 pr-3.5 py-1.5 rounded-full bg-moutarde text-bordeaux hover:brightness-105">
+              <Ballon className="w-6 text-bordeaux" />
+              <span className="2xl:hidden">Supporter</span>
+              <span className="hidden 2xl:inline">Devenir Supporter</span>
+            </Link>
           )}
           {viewer && <Cloche userId={viewer.id} initial={unread} />}
           {viewer ? (
@@ -47,7 +55,7 @@ export default async function Header() {
               <Link href="/inscription" className="hidden sm:inline-flex px-3.5 py-1.5 rounded-full bg-white text-vin hover:bg-white/90">Rejoindre</Link>
             </>
           )}
-          <span className="lg:hidden"><MenuVestiaire connecte={!!viewer} supporter={!!viewer?.supporter} staff={staff} /></span>
+          <span className="xl:hidden"><MenuVestiaire connecte={!!viewer} supporter={!!viewer?.supporter} staff={staff} /></span>
         </div>
       </div>
     </EnteteCollant>

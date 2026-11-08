@@ -14,6 +14,12 @@ export type Competition = {
   logo_url: string | null;
   sort_order: number;
   is_featured: boolean;
+  active: boolean;
+  region: string | null;
+  text_color: string | null;
+  apisports_season: number | null;
+  standings_source: "api" | "calcul" | null;
+  last_synced_at: string | null;
 };
 
 export type Team = {
@@ -60,10 +66,11 @@ export type Match = {
 export type MatchFull = Match & {
   home: TeamLite;
   away: TeamLite;
-  competition: Pick<Competition, "id" | "slug" | "name" | "short_name" | "color">;
+  competition: Pick<Competition, "id" | "slug" | "name" | "short_name" | "color" | "logo_url">;
 };
 
 export type StandingRow = {
+  pool: string;
   rank: number;
   played: number;
   won: number;

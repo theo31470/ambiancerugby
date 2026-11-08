@@ -36,7 +36,7 @@ export default function NavBureau() {
 
   return (
     <nav aria-label="Navigation principale" className="relative" onMouseLeave={() => poser(active)}>
-      <ul className="flex items-center gap-0.5">
+      <ul className="flex flex-nowrap items-center gap-0.5">
         {LIENS.map((l, i) => {
           const on = i === active;
           return (
@@ -47,7 +47,7 @@ export default function NavBureau() {
                 aria-current={on ? "page" : undefined}
                 onMouseEnter={() => poser(i)}
                 onFocus={() => poser(i)}
-                className={`group flex items-center gap-2 whitespace-nowrap px-2.5 xl:px-3 py-2 rounded-full text-[15px] font-semibold transition-colors ${on ? "text-white" : "text-white/80 hover:text-white"}`}
+                className={`group flex items-center gap-2 whitespace-nowrap px-2.5 2xl:px-3 py-2 rounded-full text-[15px] font-semibold text-white transition-colors ${on ? "bg-white/15" : "hover:bg-white/10"}`}
               >
                 <l.Icone className="h-5 w-auto text-moutarde group-hover:animate-[roulis_.6s_ease-in-out] [--deco-trait:var(--vin)]" />
                 {"court" in l && l.court ? l.court : l.label}
