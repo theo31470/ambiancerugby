@@ -32,7 +32,7 @@ export default function Scoreboard({ initial }: { initial: MatchFull[] }) {
   const liveCount = matches.filter((m) => isLive(m.status)).length;
 
   return (
-    <div className="bg-bordeaux text-white">
+    <div data-scoreboard className="bg-bordeaux text-white">
       <div className="max-w-6xl mx-auto flex items-stretch">
         <Link
           href="/matchs"

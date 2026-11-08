@@ -3,7 +3,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { Ballon } from "../deco/Icones";
-import { LIENS } from "./liens";
+import { LIENS as TOUS } from "./liens";
+
+const LIENS = TOUS.filter((l) => !("bureau" in l) || l.bureau !== false);
 
 /** Menu bureau : un ballon roule sous les liens, suit la souris et revient se poser sur la page active. */
 export default function NavBureau() {

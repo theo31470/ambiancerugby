@@ -7,4 +7,6 @@ export const LIENS = [
   { href: "/clubs", label: "Clubs", detail: "Fiches, forme et effectifs", Icone: Echarpe },
   { href: "/joueurs", label: "Joueurs", detail: "Stats et notes sur 10", Icone: Maillot },
   { href: "/actus", label: "Actus", detail: "Analyses, transferts, avant-matchs", Icone: Journal },
+  // sur ordinateur, la boutique a son propre bouton (sac) à côté du panier
+  { href: "/boutique", label: "Boutique", detail: "Maillots, sweats et goodies Ambiance", Icone: Maillot, bureau: false },
 ];

@@ -251,3 +251,22 @@ h1, h2, h3, .titre {
   100% { opacity: 0; transform: translate(-50%, -220px) scale(.95) rotate(-4deg); }
 }
 @media (prefers-reduced-motion: reduce) { .cri-envol { animation: none; opacity: 0; } }
+
+/* ---------------- boutique ---------------- */
+@keyframes sac { 0% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-7px) rotate(-12deg); } 70% { transform: translateY(1px) rotate(6deg); } 100% { transform: none; } }
+/* suivi de commande : le ballon avance sur le terrain */
+@keyframes suivi-roule { from { left: 0; } to { left: var(--avance); } }
+@keyframes suivi-rotation { from { transform: rotate(0); } to { transform: rotate(var(--tours)); } }
+.suivi-ballon { animation: suivi-roule 2.2s cubic-bezier(.3,.9,.4,1) both; }
+.suivi-ballon > * { animation: suivi-rotation 2.2s cubic-bezier(.3,.9,.4,1) both; }
+@keyframes suivi-essai { 0% { transform: translate(-50%, 0) scale(.6); opacity: 0; } 60% { transform: translate(-50%, -26px) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -18px) scale(1); opacity: 1; } }
+.suivi-essai { animation: suivi-essai .8s 2.1s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes etape-allume { from { background: var(--teinte); transform: scale(.8); } to { transform: scale(1); } }
+.etape-faite { animation: etape-allume .4s both; animation-delay: calc(var(--i) * .45s); }
+@media (prefers-reduced-motion: reduce) { .suivi-ballon, .suivi-ballon > *, .suivi-essai, .etape-faite { animation: none; } .suivi-ballon { left: var(--avance); } }
+@media print {
+  header, footer, nav, .no-print, [data-scoreboard] { display: none !important; }
+  body { background: #fff !important; }
+  main { max-width: none !important; padding: 0 !important; }
+}
+@keyframes apparait { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }

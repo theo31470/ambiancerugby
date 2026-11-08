@@ -6,6 +6,7 @@ import EnteteCollant from "./nav/EnteteCollant";
 import NavBureau from "./nav/NavBureau";
 import MenuVestiaire from "./nav/MenuVestiaire";
 import SonStade from "./deco/SonStade";
+import BoutonPanier from "./shop/BoutonPanier";
 import { Ballon, Journal } from "./deco/Icones";
 
 export default async function Header() {
@@ -42,6 +43,7 @@ export default async function Header() {
               <span className="hidden 2xl:inline">Devenir Supporter</span>
             </Link>
           )}
+          <span className="hidden sm:block"><BoutonPanier /></span>
           {viewer && <Cloche userId={viewer.id} initial={unread} />}
           {viewer ? (
             <Link href="/compte" className="hidden sm:flex items-center gap-2 pl-1 pr-1 py-1 rounded-full hover:bg-white/10" aria-label="Mon espace">
