@@ -18,11 +18,14 @@ async function pf<T>(chemin: string, init: RequestInit = {}): Promise<T> {
 export type Destinataire = { name: string; address1: string; address2?: string | null; city: string; country_code: string; zip: string; phone?: string | null; email?: string };
 export type Tarif = { id: string; name: string; rate: string; currency: string; minDeliveryDays?: number; maxDeliveryDays?: number };
 
-/** Tarifs de livraison pour un panier (le moins cher en premier). */
-export async function tarifsLivraison(dest: Pick<Destinataire, "country_code" | "zip" | "city">, items: { sync_variant_id: number; quantity: number }[]) {
+/**
+ * Tarifs de livraison pour un panier (le moins cher en premier).
+ * Printful calcule le port à partir de l'identifiant du modèle du catalogue (variant_id), pas de celui de la boutique.
+ */
+export async function tarifsLivraison(dest: Pick<Destinataire, "country_code" | "zip" | "city">, items: { variant_id: number; quantity: number }[]) {
   const tarifs = await pf<Tarif[]>("/shipping/rates", {
     method: "POST",
-    body: JSON.stringify({ recipient: dest, items: items.map((i) => ({ sync_variant_id: i.sync_variant_id, quantity: i.quantity })), currency: "EUR", locale: "fr_FR" }),
+    body: JSON.stringify({ recipient: dest, items: items.map((i) => ({ variant_id: String(i.variant_id), quantity: i.quantity })), currency: "EUR", locale: "fr_FR" }),
   });
   return [...tarifs].sort((a, b) => Number(a.rate) - Number(b.rate));
 }
@@ -41,10 +44,19 @@ export const lireCommandePrintful = (id: number) => pf<CommandePrintful>(`/order
 
 /** Produits de la boutique Printful (pour l'import dans l'admin). */
 export const produitsPrintful = () => pf<{ id: number; name: string; thumbnail_url: string; variants: number }[]>("/store/products?limit=100");
+export type FichierPrintful = { id?: number; type: string; url?: string | null; preview_url?: string | null; thumbnail_url?: string | null; position?: Record<string, unknown> | null; options?: unknown[] };
+export type VarianteBoutique = {
+  id: number; name: string; variant_id: number; retail_price: string; size?: string; color?: string;
+  files?: FichierPrintful[]; options?: { id: string; value: unknown }[]; product?: { variant_id: number; product_id: number; image: string; name: string };
+};
 export const produitPrintful = (id: number) => pf<{
   sync_product: { id: number; name: string; thumbnail_url: string };
-  sync_variants: { id: number; name: string; variant_id: number; retail_price: string; size?: string; color?: string; files?: { type: string; preview_url: string }[]; product?: { image: string } }[];
+  sync_variants: VarianteBoutique[];
 }>(`/store/products/${id}`);
+
+/** Remplace la liste des déclinaisons d'un produit Printful (celles avec un id sont gardées, les autres créées). */
+export const majDeclinaisonsPrintful = (id: number, variantes: Record<string, unknown>[]) =>
+  pf(`/store/products/${id}`, { method: "PUT", body: JSON.stringify({ sync_variants: variantes }) });
 
 /** Abonne la boutique aux événements Printful (expédition, échec…). */
 export const brancherWebhooks = (url: string) =>
@@ -52,7 +64,7 @@ export const brancherWebhooks = (url: string) =>
 
 // ---------- catalogue Printful (modèles vierges) et création de produits ----------
 export type ModeleCatalogue = { id: number; type: string; type_name: string; title: string; brand: string | null; model: string };
-export type VarianteCatalogue = { id: number; color: string | null; color_code: string | null; size: string | null; name: string; in_stock?: boolean };
+export type VarianteCatalogue = { id: number; product_id: number; color: string | null; color_code: string | null; color_code2?: string | null; size: string | null; name: string; image?: string; in_stock?: boolean };
 export const catalogue = () => pf<ModeleCatalogue[]>("/products");
 export const modeleCatalogue = (id: number) => pf<{ product: ModeleCatalogue; variants: VarianteCatalogue[] }>(`/products/${id}`);
 

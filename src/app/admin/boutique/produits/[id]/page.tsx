@@ -6,7 +6,10 @@ import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import { Field, Select, Area } from "@/components/admin/Field";
 import { CATEGORIES } from "@/lib/shop/catalogue";
-import { saveProduit } from "../../actions";
+import { ajouterToutesCouleurs, importerProduit, saveProduit } from "../../actions";
+import { fondPastille, teintes } from "@/lib/shop/couleurs";
+
+export const maxDuration = 300;
 
 type V = { id: string; label: string; color: string | null; color_hex: string | null; price_cents: number | null; image: string | null; active: boolean; sort_order: number };
 
@@ -23,7 +26,13 @@ export default async function EditProduit({ params, searchParams }: PageProps<"/
       <Link href="/admin/boutique/produits" className="text-sm text-sourdine underline underline-offset-4">Tous les produits</Link>
       <div className="mt-2">
         <PageHeader titre={p.name} description={p.active ? "En vente sur le site." : "Masqué : cochez « En vente » pour le publier."}
-          actions={p.active ? <Link href={`/boutique/${p.slug}`} className="bouton-discret">Voir sur le site</Link> : undefined} />
+          actions={<>
+            {p.printful_sync_product_id && <>
+              <form action={importerProduit}><input type="hidden" name="printful_id" value={p.printful_sync_product_id} /><input type="hidden" name="_back" value={back} /><button className="bouton-discret">Mettre à jour depuis Printful</button></form>
+              <form action={ajouterToutesCouleurs}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="_back" value={back} /><button className="bouton-discret">Ajouter toutes les couleurs et tailles</button></form>
+            </>}
+            {p.active && <Link href={`/boutique/${p.slug}`} className="bouton-discret">Voir sur le site</Link>}
+          </>} />
       </div>
       <Notice sp={sp} />
       <form action={saveProduit} className="grid gap-6">
@@ -42,7 +51,8 @@ export default async function EditProduit({ params, searchParams }: PageProps<"/
         <Area name="description" label="Description" rows={4} defaultValue={p.description} className="max-w-3xl" />
         <Area name="images" label="Photos (une adresse par ligne, la première est la principale)" rows={4} defaultValue={(p.images ?? []).join("\n")} className="max-w-3xl" />
         <section>
-          <h2 className="font-bold text-lg mb-2">Déclinaisons</h2>
+          <h2 className="font-bold text-lg mb-1">Déclinaisons <span className="font-normal text-sourdine text-base tnum">({variantes.length})</span></h2>
+          <p className="text-sm text-sourdine mb-3 max-w-prose">Décochez une déclinaison pour ne plus la vendre. « Ajouter toutes les couleurs et tailles » crée dans Printful celles du modèle qui manquent, avec le même visuel (version claire ou foncée selon la teinte).</p>
           <div className="bg-surface border border-trait rounded-2xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-xs text-sourdine border-b border-trait text-left">
@@ -53,7 +63,13 @@ export default async function EditProduit({ params, searchParams }: PageProps<"/
                   <tr key={v.id} className="border-b border-trait last:border-0">
                     <td className="px-3 py-1.5"><input type="hidden" name="variantes" value={v.id} /><input type="checkbox" name={`v:${v.id}:active`} defaultChecked={v.active} aria-label={`${v.label} en vente`} /></td>
                     <td className="px-3"><span className="flex items-center gap-2">{v.image && <img src={v.image} alt="" className="w-8 h-8 rounded object-cover" />}{v.label}</span></td>
-                    <td className="px-3"><input type="color" name={`v:${v.id}:hex`} defaultValue={v.color_hex ?? "#ffffff"} aria-label={`Couleur de ${v.label}`} className="h-8 w-12 rounded border border-trait" /></td>
+                    <td className="px-3">
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden className="w-6 h-6 rounded-full border border-trait" style={{ background: fondPastille(v.color_hex) }} />
+                        <input type="hidden" name={`v:${v.id}:hex0`} value={teintes(v.color_hex)[0] ?? "#cfc6bd"} />
+                        <input type="color" name={`v:${v.id}:hex`} defaultValue={teintes(v.color_hex)[0] ?? "#cfc6bd"} aria-label={`Corriger la couleur de ${v.label}`} title="Corriger la couleur (rarement utile : elle vient de Printful)" className="h-8 w-10 rounded border border-trait opacity-60 hover:opacity-100" />
+                      </span>
+                    </td>
                     <td className="px-3"><input name={`v:${v.id}:prix`} defaultValue={v.price_cents != null ? (v.price_cents / 100).toFixed(2).replace(".", ",") : ""} placeholder="prix du produit" aria-label={`Prix de ${v.label}`} className="champ !py-1 w-28" /></td>
                   </tr>
                 ))}

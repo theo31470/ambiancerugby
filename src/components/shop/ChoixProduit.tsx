@@ -5,16 +5,18 @@ import { useMemo, useState } from "react";
 import { panier } from "@/lib/shop/panier";
 import { euros } from "@/lib/shop/format";
 import type { Produit } from "@/lib/shop/catalogue";
-
-const ORDRE_TAILLES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
+import { fondPastille, rangTaille } from "@/lib/shop/couleurs";
 
 /** Galerie, choix de la couleur et de la taille, ajout au panier. */
 export default function ChoixProduit({ p }: { p: Produit }) {
   const couleurs = useMemo(() => [...new Map(p.variants.filter((v) => v.color).map((v) => [v.color!, v.color_hex])).entries()], [p.variants]);
   const [couleur, setCouleur] = useState<string | null>(couleurs[0]?.[0] ?? null);
   const tailles = useMemo(() => p.variants.filter((v) => !couleur || v.color === couleur).filter((v) => v.size)
-    .sort((a, b) => ORDRE_TAILLES.indexOf(a.size!) - ORDRE_TAILLES.indexOf(b.size!)), [p.variants, couleur]);
-  const [taille, setTaille] = useState<string | null>(null);
+    .sort((a, b) => rangTaille(a.size) - rangTaille(b.size)), [p.variants, couleur]);
+  const [tailleChoisie, setTaille] = useState<string | null>(null);
+  // une seule taille (casquette, mug…) : elle est choisie d'office et le sélecteur n'est pas montré
+  const tailleUnique = tailles.length === 1;
+  const taille = tailleUnique ? tailles[0].size : tailleChoisie;
   const variante = p.variants.find((v) => (!couleur || v.color === couleur) && (tailles.length ? v.size === taille : true)) ?? null;
   const images = [variante?.image, ...p.images].filter((x, i, a): x is string => !!x && a.indexOf(x) === i);
   const [vue, setVue] = useState(0);
@@ -50,7 +52,7 @@ export default function ChoixProduit({ p }: { p: Produit }) {
             <div className="flex flex-wrap gap-2">
               {couleurs.map(([nom, hex]) => (
                 <button key={nom} type="button" onClick={() => { setCouleur(nom); setTaille(null); setVue(0); }} aria-pressed={nom === couleur} title={nom}
-                  className={`w-10 h-10 rounded-full border-2 ${nom === couleur ? "border-vin ring-2 ring-vin ring-offset-2 ring-offset-fond" : "border-trait"}`} style={{ background: hex ?? "#ccc" }}>
+                  className={`w-10 h-10 rounded-full border-2 ${nom === couleur ? "border-vin ring-2 ring-vin ring-offset-2 ring-offset-fond" : "border-trait"}`} style={{ background: fondPastille(hex) }}>
                   <span className="sr-only">{nom}</span>
                 </button>
               ))}
@@ -58,7 +60,7 @@ export default function ChoixProduit({ p }: { p: Produit }) {
           </fieldset>
         )}
 
-        {tailles.length > 0 && (
+        {tailles.length > 1 && (
           <fieldset className="mt-6">
             <legend className="font-semibold mb-2">Taille</legend>
             <div className="flex flex-wrap gap-2">

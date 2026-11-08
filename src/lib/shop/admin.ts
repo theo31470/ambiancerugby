@@ -16,7 +16,7 @@ export type Commande = {
   facture_numero: string | null; facture_date: string | null; mode_test: boolean; created_at: string;
   paye_at: string | null; fabrication_at: string | null; expedie_at: string | null; livre_at: string | null;
 };
-export type ArticleCommande = { variant_id: string; sync_variant_id: number | null; nom: string; detail: string; image: string | null; prix_cents: number; quantite: number };
+export type ArticleCommande = { variant_id: string; sync_variant_id: number | null; catalogue_id?: number | null; nom: string; detail: string; image: string | null; prix_cents: number; quantite: number };
 export type Statut = "en_attente" | "payee" | "en_fabrication" | "expediee" | "livree" | "annulee" | "remboursee" | "probleme";
 
 export const STATUTS: Record<Statut, string> = {

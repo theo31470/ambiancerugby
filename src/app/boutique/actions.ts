@@ -14,17 +14,17 @@ export async function detaillerPanier(lignes: LignePanier[]): Promise<LigneDetai
   const ids = [...new Set(lignes.map((l) => l.variant_id))].filter((x) => /^[0-9a-f-]{36}$/.test(x));
   if (!ids.length) return [];
   const { data } = await shopDb().from("shop_variants")
-    .select("id, label, price_cents, printful_sync_variant_id, image, active, product:shop_products!inner(name, slug, price_cents, images, active)")
+    .select("id, label, price_cents, printful_sync_variant_id, printful_variant_id, image, active, product:shop_products!inner(name, slug, price_cents, images, active)")
     .in("id", ids);
   const out: LigneDetaillee[] = [];
   for (const l of lignes) {
     const v = (data ?? []).find((x) => x.id === l.variant_id) as unknown as {
-      id: string; label: string; price_cents: number | null; printful_sync_variant_id: number | null; image: string | null; active: boolean;
+      id: string; label: string; price_cents: number | null; printful_sync_variant_id: number | null; printful_variant_id: number | null; image: string | null; active: boolean;
       product: { name: string; slug: string; price_cents: number; images: string[]; active: boolean };
     } | undefined;
     if (!v || !v.active || !v.product.active) continue;
     out.push({
-      variant_id: v.id, sync_variant_id: v.printful_sync_variant_id, nom: v.product.name, detail: v.label, slug: v.product.slug,
+      variant_id: v.id, sync_variant_id: v.printful_sync_variant_id, catalogue_id: v.printful_variant_id, nom: v.product.name, detail: v.label, slug: v.product.slug,
       image: v.image ?? v.product.images[0] ?? null, prix_cents: v.price_cents ?? v.product.price_cents, quantite: Math.max(1, Math.min(20, Math.round(l.quantite))),
     });
   }
@@ -36,8 +36,9 @@ export async function estimerLivraison(lignes: LignePanier[], pays: string, cp: 
   try {
     const items = await detaillerPanier(lignes);
     if (!items.length) return { ok: false as const, message: "Panier vide." };
-    if (items.some((i) => !i.sync_variant_id)) return { ok: false as const, message: "Un article n'est pas encore relié à Printful." };
-    const tarifs = await tarifsLivraison({ country_code: pays, zip: cp, city: ville }, items.map((i) => ({ sync_variant_id: i.sync_variant_id!, quantity: i.quantite })));
+    const manquant = items.find((i) => !i.sync_variant_id || !i.catalogue_id);
+    if (manquant) return { ok: false as const, message: `« ${manquant.nom} (${manquant.detail}) » n'est pas encore relié à Printful : retirez-le du panier.` };
+    const tarifs = await tarifsLivraison({ country_code: pays, zip: cp, city: ville }, items.map((i) => ({ variant_id: i.catalogue_id!, quantity: i.quantite })));
     if (!tarifs.length) return { ok: false as const, message: "Pas de livraison possible vers cette adresse." };
     const t = tarifs[0];
     return { ok: true as const, cents: Math.round(Number(t.rate) * 100), methode: t.id, libelle: t.name, delai: t.minDeliveryDays && t.maxDeliveryDays ? `${t.minDeliveryDays} à ${t.maxDeliveryDays} jours` : null };

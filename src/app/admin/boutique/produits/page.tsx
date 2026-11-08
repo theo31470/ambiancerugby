@@ -5,7 +5,9 @@ import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import { produitsPrintful } from "@/lib/shop/printful";
 import { euros } from "@/lib/shop/format";
-import { creerCollection, importerProduit } from "../actions";
+import { ajouterToutesCouleurs, creerCollection, importerProduit, toutMettreAJour } from "../actions";
+
+export const maxDuration = 300;
 
 export default async function AdminProduits({ searchParams }: PageProps<"/admin/boutique/produits">) {
   const sp = await searchParams;
@@ -34,7 +36,7 @@ export default async function AdminProduits({ searchParams }: PageProps<"/admin/
           <h2 id="h-collection" className="titre font-extrabold text-xl">Première collection Ambiance Rugby</h2>
           <p className="mt-1 text-sm text-white/80 max-w-prose">
             Visuels originaux créés à partir du logo : t-shirt logo, t-shirt « Troisième mi-temps », sweat « Allez les gars », mug et autocollant.
-            Un clic les crée dans votre boutique Printful avec leurs couleurs, tailles et prix, puis les importe ici, masqués, pour que vous les vérifiiez.
+            Un clic les crée dans votre boutique Printful dans toutes les couleurs et tailles du modèle (visuel clair sur les teintes foncées, foncé sur les claires), puis les importe ici, masqués, pour que vous les vérifiiez.
           </p>
           <form action={creerCollection} className="mt-4">
             <input type="hidden" name="_back" value="/admin/boutique/produits" />
@@ -46,7 +48,15 @@ export default async function AdminProduits({ searchParams }: PageProps<"/admin/
         <img src="/merch/apercu-collection.jpg" alt="Les visuels de la collection" className="rounded-xl w-full" />
       </section>
 
-      <h2 className="font-bold text-lg mb-3">Sur le site</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h2 className="font-bold text-lg">Sur le site</h2>
+        {(data ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <form action={toutMettreAJour}><input type="hidden" name="_back" value="/admin/boutique/produits" /><button className="bouton-discret">Tout mettre à jour depuis Printful</button></form>
+            <form action={ajouterToutesCouleurs}><input type="hidden" name="_back" value="/admin/boutique/produits" /><button className="bouton-discret">Toutes les couleurs et tailles, sur tous les produits</button></form>
+          </div>
+        )}
+      </div>
       {(data ?? []).length ? (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 mb-10">
           {(data ?? []).map((p) => (

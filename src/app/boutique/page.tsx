@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
+import { fondPastille } from "@/lib/shop/couleurs";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getProduits, CATEGORIES } from "@/lib/shop/catalogue";
@@ -35,7 +36,7 @@ export default async function Boutique() {
           <h2 id={`cat-${c}`} className="groovy text-3xl text-vin mb-5">{CATEGORIES[c]}</h2>
           <ul className="grid gap-6 grid-cols-2 lg:grid-cols-4">
             {produits.filter((p) => p.category === c).map((p) => {
-              const couleurs = [...new Map(p.variants.filter((v) => v.color_hex).map((v) => [v.color_hex, v.color])).entries()];
+              const couleurs = [...new Map(p.variants.filter((v) => v.color).map((v) => [v.color!, v.color_hex])).entries()];
               return (
                 <li key={p.id}>
                   <Link href={`/boutique/${p.slug}`} className="group block">
@@ -49,7 +50,8 @@ export default async function Boutique() {
                       <span className="titre font-extrabold text-lg">{euros(p.price_cents)}</span>
                       {couleurs.length > 1 && (
                         <span className="flex -space-x-1" aria-label={`${couleurs.length} couleurs`}>
-                          {couleurs.slice(0, 5).map(([hex, nom]) => <span key={hex} title={nom ?? ""} className="w-4 h-4 rounded-full border-2 border-fond" style={{ background: hex ?? "#ccc" }} />)}
+                          {couleurs.slice(0, 5).map(([nom, hex]) => <span key={nom} title={nom} className="w-4 h-4 rounded-full border-2 border-fond" style={{ background: fondPastille(hex) }} />)}
+                          {couleurs.length > 5 && <span className="pl-2 text-xs font-semibold text-sourdine tnum">+{couleurs.length - 5}</span>}
                         </span>
                       )}
                     </div>

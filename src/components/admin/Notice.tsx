@@ -8,10 +8,12 @@ const OK: Record<string, string> = {
   role: "Rôle mis à jour.",
   collection: "Collection créée dans Printful et importée, masquée : vérifiez chaque produit puis mettez-le en vente.",
   importe: "Produit importé.",
+  couleurs: "Couleurs et tailles ajoutées dans Printful, puis réimportées.",
 };
 
 export default function Notice({ sp }: { sp: Record<string, string | string[] | undefined> }) {
-  const ok = typeof sp.ok === "string" ? OK[sp.ok] : null;
+  const bilan = typeof sp.bilan === "string" ? ` ${sp.bilan}` : "";
+  const ok = typeof sp.ok === "string" && OK[sp.ok] ? OK[sp.ok] + bilan : null;
   const err = typeof sp.erreur === "string" ? sp.erreur : null;
   if (!ok && !err) return null;
   return (
