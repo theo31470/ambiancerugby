@@ -47,7 +47,7 @@ function ressemblance(t: EquipeLocale, e: EquipeEspn) {
 }
 
 export type MatchLocal = {
-  id: string; competition_id?: string; kickoff_at: string; home_score: number | null; away_score: number | null; home_team_id: string; away_team_id: string; espn_event_id?: string | null;
+  id: string; live?: boolean; competition_id?: string; kickoff_at: string; home_score: number | null; away_score: number | null; home_team_id: string; away_team_id: string; espn_event_id?: string | null;
   home: EquipeLocale; away: EquipeLocale; competition: { espn_league: string | null };
 };
 
@@ -65,7 +65,7 @@ export async function trouverMatchEspn(m: MatchLocal): Promise<{ eventId: string
       const h = c?.competitors.find((x) => x.homeAway === "home")?.team;
       const a = c?.competitors.find((x) => x.homeAway === "away")?.team;
       if (!h || !a) continue;
-      if (ev.status?.type?.completed === false && !m.espn_event_id) continue;
+      if (ev.status?.type?.completed === false && !m.espn_event_id && !m.live) continue;
       const ecart = Math.abs(new Date(ev.date).getTime() - k.getTime()) / 3600e3;
       if (ecart > 3 && !m.espn_event_id) continue;
       const droit = ressemblance(m.home, h) + ressemblance(m.away, a);
@@ -162,6 +162,8 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
     }
     if (!id) continue;
     joueurDe.set(p.athlete.id, id);
+    // il joue pour ce club : on corrige son club (transfert) si le match est récent et la fiche non verrouillée
+    if (Date.now() - new Date(m.kickoff_at).getTime() < 45 * 86400e3) await db.from("players").update({ team_id: p.team_id, in_squad: true }).eq("id", id).eq("verrou", false).neq("team_id", p.team_id);
     await db.from("players").update({ espn_id: p.athlete.id }).eq("id", id).is("espn_id", null);
   }
 
