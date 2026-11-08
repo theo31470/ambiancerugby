@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Notice from "@/components/admin/Notice";
 import TeamBadge from "@/components/TeamBadge";
-import { saveJournee } from "../actions";
+import { analyserMatch, saveJournee } from "../actions";
+import { IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { createClient } from "@/lib/supabase/server";
 import { MATCH_SELECT } from "@/lib/queries";
 import { POSITIONS, fmtDay } from "@/lib/format";
@@ -10,6 +11,11 @@ import type { MatchFull } from "@/lib/types";
 export const metadata = { title: "Saisie de journée" };
 
 type Joueur = { id: string; first_name: string; last_name: string; position: string | null; team_id: string | null; in_squad: boolean };
+type Proposition = {
+  id: string; match_id: string; remarques: string | null;
+  lignes: { cote: "home" | "away"; player_id: string; tries: number; conversions: number; penalty_goals: number; drop_goals: number; yellow: number; red: number }[];
+  inconnus: { cote: "home" | "away"; nom: string; essais: number; transformations: number; penalites: number; drops: number; cj: number; cr: number }[];
+};
 type Ligne = { player_id: string; team_id: string; tries: number; conversions: number; penalty_goals: number; drop_goals: number; yellow: number; red: number; minutes: number | null };
 
 const CHAMPS: [keyof Ligne, string, string][] = [
@@ -46,6 +52,13 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
     matchs.length ? db.from("player_match_stats").select("player_id,team_id,match_id,tries,conversions,penalty_goals,drop_goals,yellow,red,minutes").in("match_id", matchs.map((m) => m.id)) : Promise.resolve({ data: [] }),
   ]);
   const joueurs = (jData ?? []) as Joueur[];
+  // proposition de Claude à vérifier (après « Remplir avec Claude »)
+  const [{ data: propData }, { data: depense }] = await Promise.all([
+    typeof sp.ia === "string" && /^[0-9a-f-]{36}$/.test(sp.ia) ? db.from("ia_propositions").select("id, match_id, lignes, inconnus, remarques").eq("id", sp.ia).maybeSingle() : Promise.resolve({ data: null }),
+    db.rpc("ia_depense_mois"),
+  ]);
+  const prop = propData as Proposition | null;
+  const depenseUsd = Number(depense ?? 0);
   const lignes = (sData ?? []) as (Ligne & { match_id: string })[];
   const idx = journees.indexOf(journee);
   const lien = (j: string) => `/admin/journee?comp=${comp.slug}&j=${encodeURIComponent(j)}`;
@@ -54,6 +67,7 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
     <div>
       <h1 className="text-3xl font-extrabold">Saisie de journée</h1>
       <p className="mt-1 text-sourdine max-w-prose">Tapez les marqueurs et les cartons de chaque match. Points, stats de saison, classements des buteurs et notes se mettent à jour tout seuls. Le contrôle compare vos points au score officiel.</p>
+      <p className="mt-2 text-xs text-sourdine tnum">Saisie assistée par Claude ce mois-ci : {depenseUsd.toLocaleString("fr-FR", { style: "currency", currency: "USD", maximumFractionDigits: 2 })} sur un plafond de {IA_PLAFOND_MOIS_USD} $ (environ {Math.round(IA_PLAFOND_MOIS_USD * 0.93)} €).</p>
       <div className="mt-5"><Notice sp={sp} /></div>
 
       <form className="flex flex-wrap items-end gap-2 mb-2" method="get">
@@ -96,6 +110,43 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
                   <span className="text-sm text-sourdine ml-auto">{fini ? "Terminé" : fmtDay(m.kickoff_at)}</span>
                   <Link href={`/admin/matchs/${m.id}/stats`} className="text-sm underline underline-offset-4 text-sourdine">Feuille détaillée</Link>
                 </header>
+                <details className="mt-3 rounded-xl border border-dashed border-vin/40 bg-teinte/40 open:bg-teinte">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-vin">Remplir avec Claude</summary>
+                  <form action={analyserMatch} className="px-3 pb-3 grid gap-2">
+                    <input type="hidden" name="match_id" value={m.id} />
+                    <input type="hidden" name="_back" value={`${lien(journee)}#m-${m.id}`} />
+                    <label className="grid gap-1 text-sm">Compte rendu du match (marqueurs, cartons…)
+                      <textarea name="texte" rows={4} className="champ text-sm" placeholder="Collez ici le compte rendu ou la feuille de match que vous avez consultée." />
+                    </label>
+                    <label className="grid gap-1 text-sm">Ou une photo / capture de la feuille de match
+                      <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" className="text-sm" />
+                    </label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button className="bouton-discret">Analyser</button>
+                      <span className="text-xs text-sourdine">Claude propose, vous vérifiez, rien n&apos;est enregistré sans vous. Moins d&apos;un centime par match.</span>
+                    </div>
+                  </form>
+                </details>
+                {prop?.match_id === m.id && (
+                  <div role="status" className="mt-4 rounded-xl bg-moutarde/20 border border-moutarde p-3 text-sm">
+                    <p className="font-semibold">Proposition de Claude pré-remplie ci-dessous : vérifiez puis cliquez sur « Enregistrer ce match ».</p>
+                    {prop.remarques && <p className="mt-1">{prop.remarques}</p>}
+                    {prop.inconnus.length > 0 && (
+                      <div className="mt-2">
+                        <p>Joueurs non trouvés dans l&apos;effectif, à choisir à la main dans une ligne vide :</p>
+                        <ul className="mt-1 list-disc pl-5">
+                          {prop.inconnus.map((x, i) => (
+                            <li key={i}>
+                              {x.nom} ({x.cote === "home" ? m.home.short_name ?? m.home.name : m.away.short_name ?? m.away.name}) :{" "}
+                              {[x.essais && `${x.essais} E`, x.transformations && `${x.transformations} T`, x.penalites && `${x.penalites} P`, x.drops && `${x.drops} D`, x.cj && `${x.cj} CJ`, x.cr && `${x.cr} CR`].filter(Boolean).join(", ") || "rien"}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <Link href={`${lien(journee)}#m-${m.id}`} className="mt-2 inline-block text-xs underline underline-offset-2">Ignorer la proposition</Link>
+                  </div>
+                )}
                 <form action={saveJournee} className="mt-4">
                   <input type="hidden" name="match_id" value={m.id} />
                   <input type="hidden" name="_back" value={`${lien(journee)}#m-${m.id}`} />
@@ -103,7 +154,10 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
                     {(["home", "away"] as const).map((cote) => {
                       const team = m[cote];
                       const officiel = cote === "home" ? m.home_score : m.away_score;
-                      const deja = du.filter((l) => l.team_id === team.id);
+                      const propose = prop?.match_id === m.id
+                        ? prop.lignes.filter((l) => l.cote === cote).map((l) => ({ ...l, team_id: team.id, minutes: null as number | null }))
+                        : null;
+                      const deja = propose ?? du.filter((l) => l.team_id === team.id);
                       const effectif = joueurs.filter((j) => j.team_id === team.id && (j.in_squad || deja.some((d) => d.player_id === j.id)))
                         .sort((a, b) => ORDRE.indexOf(a.position ?? "") - ORDRE.indexOf(b.position ?? "") || a.last_name.localeCompare(b.last_name, "fr"));
                       const vides = Math.max(3, 7 - deja.length);

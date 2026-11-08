@@ -583,3 +583,61 @@ export async function setWikiTitle(form: FormData) {
     redirect("/admin/donnees?ok=lance#effectifs");
   });
 }
+
+// ---------- saisie assistée par Claude ----------
+const TYPES_IMAGE = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+export async function analyserMatch(form: FormData) {
+  return run(form, async () => {
+    const { db, viewer } = await staff();
+    const { analyserFeuille, IA_MODELE, IA_PLAFOND_MOIS_USD } = await import("@/lib/ia");
+    const matchId = String(form.get("match_id"));
+    const back = String(form.get("_back"));
+    const texte = str(form, "texte") ?? "";
+    const fichier = form.get("image");
+    let image: { type: string; base64: string } | null = null;
+    if (fichier instanceof File && fichier.size > 0) {
+      if (!TYPES_IMAGE.includes(fichier.type)) throw new Error("Image : formats JPEG, PNG, WebP ou GIF uniquement.");
+      if (fichier.size > 4 * 1024 * 1024) throw new Error("Image trop lourde : 4 Mo maximum.");
+      image = { type: fichier.type, base64: Buffer.from(await fichier.arrayBuffer()).toString("base64") };
+    }
+    if (!texte && !image) throw new Error("Collez un compte rendu ou ajoutez une photo de la feuille de match.");
+
+    // plafond mensuel : aucune analyse au-delà
+    const { data: depense } = await db.rpc("ia_depense_mois");
+    if (Number(depense ?? 0) >= IA_PLAFOND_MOIS_USD) throw new Error("Plafond mensuel de la saisie assistée atteint : elle revient le 1er du mois.");
+
+    const { data: m } = await db.from("matches").select(`id, home_score, away_score, home_team_id, away_team_id, home:teams!matches_home_team_id_fkey(name), away:teams!matches_away_team_id_fkey(name)`).eq("id", matchId).single();
+    if (!m) throw new Error("Match introuvable.");
+    const { data: joueurs } = await db.from("players").select("id, first_name, last_name, position, team_id").in("team_id", [m.home_team_id, m.away_team_id]).eq("in_squad", true).order("last_name");
+    const refs = new Map<string, string>();
+    const effectif = (teamId: string, prefixe: string) => (joueurs ?? []).filter((j) => j.team_id === teamId).map((j, i) => {
+      const ref = `${prefixe}${i + 1}`;
+      refs.set(ref, j.id);
+      return { ref, nom: `${j.first_name} ${j.last_name}`.trim(), poste: j.position };
+    });
+    const effectifDom = effectif(m.home_team_id, "H");
+    const effectifExt = effectif(m.away_team_id, "A");
+
+    let r;
+    try {
+      r = await analyserFeuille({
+        domicile: (m.home as unknown as { name: string }).name, exterieur: (m.away as unknown as { name: string }).name,
+        scoreDom: m.home_score, scoreExt: m.away_score, effectifDom, effectifExt, texte, image,
+      });
+    } catch (e) {
+      await db.from("ia_usage").insert({ user_id: viewer.id, match_id: matchId, model: IA_MODELE, ok: false, message: (e as Error).message.slice(0, 300) });
+      throw e;
+    }
+    await db.from("ia_usage").insert({ user_id: viewer.id, match_id: matchId, model: IA_MODELE, input_tokens: r.inputTokens, output_tokens: r.outputTokens, cost_usd: r.coutUsd });
+
+    // on traduit les références en joueurs ; le reste est signalé
+    const lignes = r.lignes.filter((l) => l.ref && refs.has(l.ref) && (l.ref.startsWith("H") ? l.equipe === "home" : l.equipe === "away"))
+      .map((l) => ({ cote: l.equipe, player_id: refs.get(l.ref!)!, tries: l.essais, conversions: l.transformations, penalty_goals: l.penalites, drop_goals: l.drops, yellow: l.cartons_jaunes, red: l.cartons_rouges }));
+    const inconnus = r.lignes.filter((l) => !l.ref || !refs.has(l.ref)).map((l) => ({ cote: l.equipe, nom: l.nom_lu, essais: l.essais, transformations: l.transformations, penalites: l.penalites, drops: l.drops, cj: l.cartons_jaunes, cr: l.cartons_rouges }));
+    const { data: prop, error } = await db.from("ia_propositions").insert({ match_id: matchId, created_by: viewer.id, lignes, inconnus, remarques: r.remarques || null }).select("id").single();
+    fail(error, "Proposition de Claude");
+    const [chemin, ancre] = back.split("#");
+    redirect(`${chemin}${chemin.includes("?") ? "&" : "?"}ia=${prop!.id}${ancre ? `#${ancre}` : ""}`);
+  });
+}
