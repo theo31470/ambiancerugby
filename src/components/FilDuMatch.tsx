@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EVENT_LABEL, EVENT_POINTS } from "@/lib/format";
 import { phraseAction } from "@/lib/commentaires";
+import ChronoLive from "./ChronoLive";
 
 type Evt = { id: string; minute: number | null; kind: string; text: string | null; team_id: string | null; player: unknown };
 type Equipe = { id: string; name: string; short_name: string | null };
@@ -10,7 +11,7 @@ const PICTO: Record<string, string> = { try: "🏉", penalty_try: "🏉", conver
  * Fil du match à la Flashscore : dans l'ordre du match, un bandeau par mi-temps avec son score,
  * l'équipe qui reçoit à gauche, les visiteurs à droite, le score après chaque point marqué.
  */
-export default function FilDuMatch({ events, home, away, live, clock }: { events: Evt[]; home: Equipe; away: Equipe; live: boolean; clock: string | null }) {
+export default function FilDuMatch({ events, home, away, live, clock, kickoff, updatedAt, status }: { events: Evt[]; home: Equipe; away: Equipe; live: boolean; clock: string | null; kickoff: string; updatedAt: string | null; status: string }) {
   const lignes = events.reduce<{ e: Evt; sh: number; sa: number; pts: number }[]>((acc, e) => {
     const pts = EVENT_POINTS[e.kind] ?? 0;
     const p = acc[acc.length - 1] ?? { sh: 0, sa: 0 };
@@ -44,7 +45,7 @@ export default function FilDuMatch({ events, home, away, live, clock }: { events
     <section aria-labelledby="h-faits" className="mt-10 max-w-3xl">
       <div className="flex items-center justify-between gap-3 mb-3">
         <h2 id="h-faits" className="groovy text-2xl text-vin">Le fil du match</h2>
-        {live && <p className="inline-flex items-center gap-2 rounded-full bg-alerte text-white px-3 py-1 text-sm font-bold tnum"><span className="pastille" aria-hidden />{clock ?? "En direct"}</p>}
+        {live && <p className="inline-flex items-center gap-2 rounded-full bg-alerte text-white px-3 py-1 text-sm font-bold tnum"><span className="pastille" aria-hidden /><ChronoLive kickoff={kickoff} clock={clock} updatedAt={updatedAt} status={status} /></p>}
       </div>
       <div className="bg-surface border border-trait rounded-2xl overflow-hidden">
         <div className="grid grid-cols-2 text-xs font-bold text-sourdine px-4 py-2 border-b border-trait">
