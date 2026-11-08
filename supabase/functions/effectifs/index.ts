@@ -349,9 +349,10 @@ async function jobCarriere(db: SupabaseClient, t0: number) {
         const lignes: Record<string, unknown>[] = [];
         for (let k = 1; k <= 40; k++) {
           const club = ib[`clubs${k}`] ?? ib[`club${k}`];
-          if (club && propre(club)) lignes.push({ player_id: p.id, kind: "club", ordre: k, equipe: propre(club).slice(0, 80), periode: propre(ib[`years${k}`] ?? "").slice(0, 30) || null, matchs: entier(ib[`caps${k}`]), points: entier(ib[`points${k}`]) });
-          const nat = ib[`nationalteam${k}`];
-          if (nat && propre(nat)) lignes.push({ player_id: p.id, kind: "selection", ordre: k, equipe: propre(nat).slice(0, 80), periode: propre(ib[`nationalyears${k}`] ?? "").slice(0, 30) || null, matchs: entier(ib[`nationalcaps${k}`]), points: entier(ib[`nationalpoints${k}`]) });
+          // deux formats d'infobox : apps / caps pour les clubs, repteam / nationalteam pour les sélections
+          if (club && propre(club)) lignes.push({ player_id: p.id, kind: "club", ordre: k, equipe: propre(club).slice(0, 80), periode: propre(ib[`years${k}`] ?? "").slice(0, 30) || null, matchs: entier(ib[`apps${k}`] ?? ib[`caps${k}`]), points: entier(ib[`points${k}`]) });
+          const nat = ib[`repteam${k}`] ?? ib[`nationalteam${k}`];
+          if (nat && propre(nat)) lignes.push({ player_id: p.id, kind: "selection", ordre: k, equipe: propre(nat).slice(0, 80), periode: propre(ib[`repyears${k}`] ?? ib[`nationalyears${k}`] ?? "").slice(0, 30) || null, matchs: entier(ib[`repcaps${k}`] ?? ib[`nationalcaps${k}`]), points: entier(ib[`reppoints${k}`] ?? ib[`nationalpoints${k}`]) });
         }
         await db.from("player_career").delete().eq("player_id", p.id).eq("source", "wikipedia");
         if (lignes.length) {
