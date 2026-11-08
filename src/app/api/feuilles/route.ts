@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   if (ok !== true) return new Response("accès refusé", { status: 401 });
 
   const maintenant = Date.now();
-  const { data: candidats } = await db.from("matches").select(`${SELECT_MATCH_ESPN}, feuille_tentee_at, competition_id`)
+  const { data: candidats } = await db.from("matches").select(`${SELECT_MATCH_ESPN}, feuille_tentee_at`)
     .eq("status", "finished")
     .gte("kickoff_at", new Date(maintenant - 1900 * 86400e3).toISOString())
     .lte("kickoff_at", new Date(maintenant - 2 * 3600e3).toISOString())

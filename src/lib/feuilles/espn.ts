@@ -47,7 +47,7 @@ function ressemblance(t: EquipeLocale, e: EquipeEspn) {
 }
 
 export type MatchLocal = {
-  id: string; kickoff_at: string; home_score: number | null; away_score: number | null; home_team_id: string; away_team_id: string; espn_event_id?: string | null;
+  id: string; competition_id?: string; kickoff_at: string; home_score: number | null; away_score: number | null; home_team_id: string; away_team_id: string; espn_event_id?: string | null;
   home: EquipeLocale; away: EquipeLocale; competition: { espn_league: string | null };
 };
 
@@ -231,6 +231,7 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
   // nombre d'essais (essais de pénalité compris) : sert au bonus offensif du classement
   const essais = (cote: "home" | "away") => fil.filter((e) => (e.type === "try" || e.type === "penalty_try") && e.cote === cote).length;
   await db.from("matches").update({ home_tries: essais("home"), away_tries: essais("away") }).eq("id", m.id);
+  if (m.competition_id) await db.rpc("appliquer_bonus_offensif", { p_comp: m.competition_id });
 
   const pts = (l: Ligne) => 5 * l.tries + 2 * l.conversions + 3 * (l.penalty_goals + l.drop_goals);
   const essaisPen = (cote: "home" | "away") => fil.filter((e) => e.type === "penalty_try" && e.cote === cote).length * 7;
@@ -241,4 +242,4 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
 }
 
 /** Sélection Supabase d'un match prêt pour importerFeuilleEspn. */
-export const SELECT_MATCH_ESPN = "id, kickoff_at, home_score, away_score, home_team_id, away_team_id, espn_event_id, status, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id), competition:competitions(name, espn_league)";
+export const SELECT_MATCH_ESPN = "id, competition_id, kickoff_at, home_score, away_score, home_team_id, away_team_id, espn_event_id, status, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id), competition:competitions(name, espn_league)";
