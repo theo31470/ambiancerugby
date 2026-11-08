@@ -198,7 +198,7 @@ type Ligne = { team_id: string; pool: string; played: number; won: number; drawn
 
 /** Classement calculé à partir de nos propres résultats (poules déduites des matchs joués entre équipes). */
 async function classementCalcule(db: SupabaseClient, c: Competition) {
-  const { data } = await db.from("matches").select("home_team_id,away_team_id,home_score,away_score,status,round,kickoff_at")
+  const { data } = await db.from("matches").select("home_team_id,away_team_id,home_score,away_score,home_tries,away_tries,status,round,kickoff_at")
     .eq("competition_id", c.id).eq("season", c.current_season).limit(2000);
   let games = (data ?? []).filter((m) => m.round == null || /^\d+$/.test(String(m.round)));
   if (!games.length) return { rows: [] as Ligne[], teams: 0 };
@@ -222,9 +222,12 @@ async function classementCalcule(db: SupabaseClient, c: Competition) {
     get(m.home_team_id); get(m.away_team_id);
     if (m.status !== "finished" || m.home_score == null || m.away_score == null) continue;
     const k = new Date(m.kickoff_at).getTime();
-    for (const [id, pf, pa] of [[m.home_team_id, m.home_score, m.away_score], [m.away_team_id, m.away_score, m.home_score]] as [string, number, number][]) {
+    const francais = seuilBD === 5;
+    for (const [id, pf, pa, ep, ec] of [[m.home_team_id, m.home_score, m.away_score, m.home_tries, m.away_tries], [m.away_team_id, m.away_score, m.home_score, m.away_tries, m.home_tries]] as [string, number, number, number | null, number | null][]) {
       const l = get(id);
       l.played++; l.pf += pf; l.pa += pa;
+      // bonus offensif : en France, victoire avec 3 essais de plus que l'adversaire ; ailleurs, 4 essais marqués
+      if (ep != null && ec != null && (francais ? pf > pa && ep - ec >= 3 : ep >= 4)) { l.bonus++; l.points++; }
       if (pf > pa) { l.won++; l.points += 4; l.res.push({ k, r: "V" }); }
       else if (pf === pa) { l.drawn++; l.points += 2; l.res.push({ k, r: "N" }); }
       else { l.lost++; l.res.push({ k, r: "D" }); if (pa - pf <= seuilBD) { l.bonus++; l.points++; } }
