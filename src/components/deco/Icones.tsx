@@ -3,13 +3,26 @@ type P = { className?: string; title?: string };
 
 const svg = (title?: string) => (title ? { role: "img", "aria-label": title } : { "aria-hidden": true as const });
 
+/**
+ * Ballon de rugby : corps blanc, plus rond qu'un ballon de football américain, coutures
+ * des panneaux d'une pointe à l'autre et bandes imprimées, sans lacets.
+ * La couleur du texte (currentColor) donne le contour et l'impression.
+ */
 export function Ballon({ className, title }: P) {
   return (
-    <svg viewBox="0 0 64 40" className={className} {...svg(title)}>
-      <ellipse cx="32" cy="20" rx="29" ry="17" fill="currentColor" />
-      <path d="M8 13c8 3 40 3 48 0M8 27c8-3 40-3 48 0" stroke="var(--deco-trait, #fff)" strokeWidth="2" fill="none" opacity=".55" />
-      <path d="M22 20h20" stroke="var(--deco-trait, #fff)" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M25 17v6M29 17v6M33 17v6M37 17v6" stroke="var(--deco-trait, #fff)" strokeWidth="2" strokeLinecap="round" />
+    <svg viewBox="0 0 64 44" className={className} {...svg(title)}>
+      <g transform="rotate(-8 32 22)">
+        <ellipse cx="32" cy="22" rx="29" ry="18.5" fill="var(--ballon, #fff)" stroke="currentColor" strokeWidth="2.6" />
+        {/* coutures des quatre panneaux */}
+        <path d="M3.5 22C14 12.5 50 12.5 60.5 22" fill="none" stroke="currentColor" strokeWidth="1.6" opacity=".55" />
+        <path d="M3.5 22C14 31.5 50 31.5 60.5 22" fill="none" stroke="currentColor" strokeWidth="1.6" opacity=".55" />
+        {/* bandes imprimées près des pointes */}
+        <path d="M14 7.6c-3 4.3-3 24.5 0 28.8" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" />
+        <path d="M19 5.4c-2.4 5-2.4 28.2 0 33.2" fill="none" stroke="var(--deco-accent2, #934f5e)" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M50 7.6c3 4.3 3 24.5 0 28.8" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" />
+        {/* logo central */}
+        <ellipse cx="32" cy="22" rx="6.5" ry="4.2" fill="currentColor" opacity=".9" />
+      </g>
     </svg>
   );
 }
@@ -29,7 +42,7 @@ export function Poteaux({ className, title }: P) {
   return (
     <svg viewBox="0 0 48 56" className={className} {...svg(title)}>
       <path d="M10 2v52M38 2v52M10 26h28" stroke="currentColor" strokeWidth="4" strokeLinecap="round" fill="none" />
-      <path d="M8 44h4M36 44h4" stroke="#f2b53a" strokeWidth="6" strokeLinecap="round" />
+      <path d="M8 44h4M36 44h4" stroke="var(--deco-accent, #f2b53a)" strokeWidth="6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -72,6 +85,62 @@ export function Supporter({ className, couleur = "currentColor" }: P & { couleur
       <circle cx="12" cy="7" r="5" fill={couleur} />
       <path d="M4 40V22a8 8 0 0 1 16 0v18z" fill={couleur} />
       <path d="M5 21L1 6M19 21l4-15" stroke={couleur} strokeWidth="3.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+
+export function Sifflet({ className, title }: P) {
+  return (
+    <svg viewBox="0 0 56 40" className={className} {...svg(title)}>
+      <path d="M20 12h30a4 4 0 0 1 4 4v4H34a14 14 0 1 1-14-8z" fill="currentColor" />
+      <circle cx="20" cy="26" r="6" fill="var(--deco-trait, #fff)" opacity=".5" />
+      <rect x="40" y="8" width="6" height="6" rx="1" fill="currentColor" />
+      <path d="M8 14C5 10 4 6 6 3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
+export function Podium({ className, title }: P) {
+  return (
+    <svg viewBox="0 0 56 44" className={className} {...svg(title)}>
+      <rect x="20" y="10" width="16" height="32" rx="2" fill="currentColor" />
+      <rect x="3" y="20" width="16" height="22" rx="2" fill="currentColor" opacity=".7" />
+      <rect x="37" y="26" width="16" height="16" rx="2" fill="currentColor" opacity=".5" />
+      <path d="M28 1l2 4 4.5.6-3.3 3 .8 4.4L28 11l-4 2 .8-4.4-3.3-3L26 5z" fill="#f2b53a" />
+    </svg>
+  );
+}
+
+export function Coupe({ className, title }: P) {
+  return (
+    <svg viewBox="0 0 48 52" className={className} {...svg(title)}>
+      <path d="M12 4h24v12a12 12 0 0 1-24 0z" fill="currentColor" />
+      <path d="M12 8H5a3 3 0 0 0-3 3c0 6 4 10 10 10M36 8h7a3 3 0 0 1 3 3c0 6-4 10-10 10" stroke="currentColor" strokeWidth="3" fill="none" />
+      <path d="M21 28h6v10h-6z" fill="currentColor" />
+      <rect x="13" y="38" width="22" height="7" rx="2" fill="currentColor" />
+      <path d="M17 10v6" stroke="#f2b53a" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function Maillot({ className, title, numero }: P & { numero?: number | string }) {
+  return (
+    <svg viewBox="0 0 56 52" className={className} {...svg(title)}>
+      <path d="M18 3l-14 8 5 12 7-3v29h24V20l7 3 5-12-14-8c-2 4-5 6-10 6S20 7 18 3z" fill="currentColor" />
+      <path d="M16 26h24" stroke="#f2b53a" strokeWidth="4" />
+      {numero != null && <text x="28" y="44" textAnchor="middle" fontSize="13" fontWeight="800" fill="#fff" fontFamily="var(--font-titre)">{numero}</text>}
+    </svg>
+  );
+}
+
+export function Journal({ className, title }: P) {
+  return (
+    <svg viewBox="0 0 56 44" className={className} {...svg(title)}>
+      <path d="M8 4h38v32a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z" fill="currentColor" />
+      <path d="M46 12h4a2 2 0 0 1 2 2v22a4 4 0 0 1-4 4h-6" fill="none" stroke="currentColor" strokeWidth="3" />
+      <rect x="10" y="10" width="14" height="10" rx="1" fill="#f2b53a" />
+      <path d="M28 12h12M28 18h12M10 26h30M10 32h22" stroke="var(--deco-trait, #fff)" strokeWidth="2.5" strokeLinecap="round" opacity=".7" />
     </svg>
   );
 }

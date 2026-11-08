@@ -8,6 +8,7 @@ import TeamBadge from "@/components/TeamBadge";
 import { getArticle } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import { Pinte } from "@/components/deco/Icones";
+import TerrainLecture from "@/components/deco/TerrainLecture";
 import { CATEGORIES, fmtDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,8 @@ export default async function ArticlePage({ params }: PageProps<"/actus/[slug]">
   const a = await getArticle(slug, await createClient());
   if (!a) notFound();
   return (
-    <article className="max-w-3xl">
+    <article className="max-w-3xl" id="lecture-article">
+      <TerrainLecture cible="lecture-article" />
       <p className="text-sm">
         {a.premium && <span className="mr-2 text-[11px] font-bold rounded-full bg-moutarde text-bordeaux px-2 py-0.5 align-middle">Exclusif Supporters</span>}
         <Link href={`/actus?rubrique=${a.category}`} className="text-vin font-semibold underline underline-offset-4">{CATEGORIES[a.category] ?? a.category}</Link>

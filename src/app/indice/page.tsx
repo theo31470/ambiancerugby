@@ -27,7 +27,7 @@ export default async function IndicePage({ searchParams }: PageProps<"/indice">)
   return (
     <div>
       <section className="pleine-largeur bg-bordeaux text-white -mt-6 sm:-mt-10 relative overflow-hidden">
-        <Poteaux className="absolute right-4 -bottom-8 h-72 w-auto text-white/[0.06]" />
+        <Poteaux className="absolute right-4 -bottom-8 h-72 w-auto text-white/[0.06] [--deco-accent:transparent]" />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 relative">
           <h1 className="groovy text-5xl sm:text-7xl">Indice <span className="text-moutarde">Ambiance</span></h1>
           <p className="mt-4 max-w-xl text-white/80 text-lg">

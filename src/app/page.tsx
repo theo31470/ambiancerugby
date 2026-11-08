@@ -86,7 +86,13 @@ export default async function Home() {
 
       {/* ================= EN-TÊTE ================= */}
       <section className="pleine-largeur relative overflow-hidden bg-bordeaux text-white -mt-6 sm:-mt-10" aria-labelledby="h-une">
-        <Poteaux className="absolute -right-10 -bottom-6 h-[26rem] w-auto text-white/[0.06]" />
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100" aria-hidden>
+          <g stroke="white" strokeOpacity=".07" strokeWidth="2">
+            <line x1="6" y1="0" x2="6" y2="100" vectorEffect="non-scaling-stroke" /><line x1="24" y1="0" x2="24" y2="100" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+            <line x1="50" y1="0" x2="50" y2="100" vectorEffect="non-scaling-stroke" /><line x1="76" y1="0" x2="76" y2="100" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" /><line x1="94" y1="0" x2="94" y2="100" vectorEffect="non-scaling-stroke" />
+          </g>
+        </svg>
+        <Poteaux className="absolute -right-10 -bottom-6 h-[26rem] w-auto text-white/[0.06] [--deco-accent:transparent]" />
         <Pinte className="absolute left-[46%] top-8 h-16 w-auto text-bordeaux opacity-30 -rotate-12 hidden lg:block" />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-28 sm:pt-16 sm:pb-36 grid gap-10 lg:grid-cols-[1.15fr_1fr] items-center relative">
           <div>
@@ -111,7 +117,7 @@ export default async function Home() {
           </div>
 
           {/* le match à suivre */}
-          <div className="relative">
+          <div className="relative z-10">
             <div className="absolute -inset-3 rounded-[2rem] bg-vin rotate-2" aria-hidden />
             <div className="relative rounded-[1.75rem] bg-surface text-encre p-6 sm:p-7 shadow-[0_14px_0_-6px_rgba(0,0,0,.25)]">
               {affiche ? (

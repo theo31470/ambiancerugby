@@ -1,162 +1,220 @@
-// Ambiance Rugby — synchronisation des données (Oanor + API-Sports) vers Supabase.
-// Appelée par pg_cron (jobs daily / live / teams) ou depuis l'admin (trigger_sync).
+// Ambiance Rugby — synchronisation API-Sports Rugby -> Supabase.
+// Tâches (appelées par pg_cron ou depuis l'admin via trigger_sync) :
+//   daily        compétitions, saisons, clubs + logos, calendriers/résultats, classements, confrontations
+//   competition  même chose pour une seule compétition (params.slug)
+//   live         scores du jour, toutes les 2 minutes quand un match est en cours
+//   stats        statistiques d'équipe, par lots (curseur) pour rester sous les limites
+//   history      saison précédente de chaque compétition (pour l'Indice Ambiance)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-const OANOR_BASE = "https://api.oanor.com/rugby-api/v1";
-const APISPORTS_BASE = "https://v1.rugby.api-sports.io";
-const OANOR_MONTHLY_CAP = 2800; // offre gratuite : 3000 appels / mois
-const APISPORTS_DAILY_CAP = 95; // offre gratuite : 100 appels / jour
+const BASE = "https://v1.rugby.api-sports.io";
+const DAILY_CAP = 7000; // plan PRO : 7 500 / jour, on garde une marge
+const TIME_BUDGET_MS = 120_000;
 
-type Team = {
-  id: string; slug: string; name: string; short_name: string | null; abbreviation: string | null;
-  aliases: string[]; city: string | null; oanor_id: string | null; apisports_id: number | null; logo_url: string | null;
-};
-type Competition = {
-  id: string; slug: string; name: string; current_season: string; standings_mode: string;
-  oanor_id: string | null; apisports_id: number | null; apisports_name: string | null; kind: string;
-};
+type Team = { id: string; slug: string; name: string; short_name: string | null; aliases: string[]; apisports_id: number | null; logo_url: string | null; stadium: string | null; founded: number | null; country: string | null };
+type Competition = { id: string; slug: string; name: string; kind: string; current_season: string; standings_mode: string; apisports_id: number | null; apisports_season: number | null; active: boolean; logo_url: string | null };
+type ApiSeason = { season: number; current: boolean; start: string; end: string };
 
-const norm = (s: string | null | undefined) =>
-  (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const norm = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const slugify = (s: string) => norm(s).replace(/ /g, "-");
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-class Budget {
+class Api {
   used = 0;
-  constructor(public remaining: number) {}
-  take() { if (this.remaining <= 0) throw new Error("quota atteint"); this.remaining--; this.used++; }
+  last = 0;
+  constructor(private key: string, private remaining: number) {}
+  async get(path: string) {
+    if (this.remaining - this.used <= 0) throw new Error("quota du jour atteint");
+    // ~4 requêtes / seconde maximum (limite : 300 / minute)
+    const wait = 250 - (Date.now() - this.last);
+    if (wait > 0) await sleep(wait);
+    for (let essai = 0; essai < 3; essai++) {
+      this.last = Date.now();
+      this.used++;
+      const res = await fetch(`${BASE}${path}`, { headers: { "x-apisports-key": this.key } });
+      if (res.status >= 500) { await sleep(2000); continue; }
+      const body = await res.json();
+      const errs = body.errors && (Array.isArray(body.errors) ? body.errors : Object.values(body.errors));
+      if (errs?.length) {
+        if (JSON.stringify(body.errors).includes("rateLimit") || JSON.stringify(body.errors).includes("Too many")) { await sleep(5000); continue; }
+        throw new Error(`${path} : ${errs.join(" / ")}`);
+      }
+      return body.response;
+    }
+    throw new Error(`${path} : serveur API-Sports indisponible`);
+  }
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+// ---------- saisons ----------
+function choisirSaison(seasons: ApiSeason[]): ApiSeason | null {
+  if (!seasons?.length) return null;
+  const cur = seasons.find((s) => s.current);
+  if (cur) return cur;
+  const horizon = Date.now() + 120 * 86400e3;
+  const cands = seasons.filter((s) => new Date(s.start).getTime() <= horizon).sort((a, b) => b.season - a.season);
+  return cands[0] ?? seasons.sort((a, b) => b.season - a.season)[0];
+}
+function libelleSaison(s: ApiSeason) {
+  const a = new Date(s.start), b = new Date(s.end);
+  const mois = (b.getTime() - a.getTime()) / (30.4 * 86400e3);
+  return b.getUTCFullYear() > a.getUTCFullYear() && mois < 13 && a.getUTCMonth() >= 6 ? `${a.getUTCFullYear()}-${a.getUTCFullYear() + 1}` : String(s.season);
 }
 
-// ---------- team resolution ----------
+// ---------- statuts ----------
+function statut(short: string) {
+  if (["FT", "AET", "PEN", "AW"].includes(short)) return "finished";
+  if (short === "HT" || short === "BT") return "halftime";
+  if (["1H", "2H", "ET", "PT"].includes(short)) return "live";
+  if (short === "POST" || short === "INTR" || short === "SUSP") return "postponed";
+  if (short === "CANC" || short === "ABD") return "cancelled";
+  return "scheduled";
+}
+const HORLOGE: Record<string, string> = { "1H": "1re mi-temps", "2H": "2e mi-temps", ET: "Prolongation", PT: "Tirs au but", BT: "Pause" };
+
+// ---------- clubs ----------
 class TeamIndex {
-  byOanor = new Map<string, Team>();
   byApi = new Map<number, Team>();
   byName = new Map<string, Team>();
   slugs = new Set<string>();
   constructor(private db: SupabaseClient, teams: Team[]) { teams.forEach((t) => this.add(t)); }
   add(t: Team) {
-    if (t.oanor_id) this.byOanor.set(t.oanor_id, t);
     if (t.apisports_id) this.byApi.set(t.apisports_id, t);
     this.slugs.add(t.slug);
     for (const n of [t.name, t.short_name, ...(t.aliases ?? [])]) if (n) this.byName.set(norm(n), t);
   }
-  private match(name: string): Team | undefined {
+  private match(name: string) {
     const n = norm(name);
-    if (this.byName.has(n)) return this.byName.get(n);
-    // "Stade Toulousain Rugby" / "Toulouse Rugby"… : on retire les mots génériques
-    const stripped = n.replace(/\b(rugby|club|fc|rc|us|as)\b/g, " ").replace(/\s+/g, " ").trim();
-    return this.byName.get(stripped);
+    return this.byName.get(n) ?? this.byName.get(n.replace(/\b(rugby|club|fc|rc|us|as)\b/g, " ").replace(/\s+/g, " ").trim());
   }
-  async resolve(src: "oanor" | "apisports", extId: string | number, name: string, extra: { logo?: string | null; color?: string | null; abbreviation?: string | null; national?: boolean } = {}): Promise<Team> {
-    const existing = src === "oanor" ? this.byOanor.get(String(extId)) : this.byApi.get(Number(extId));
-    if (existing) return existing;
-    const found = this.match(name);
-    if (found) {
-      const patch: Record<string, unknown> = src === "oanor" ? { oanor_id: String(extId) } : { apisports_id: Number(extId) };
-      if (!found.logo_url && extra.logo) patch.logo_url = extra.logo;
-      const { data, error } = await this.db.from("teams").update(patch).eq("id", found.id).select().single();
-      if (error) throw error;
-      this.add(data as Team);
-      return data as Team;
+  async resolve(apiId: number, name: string, extra: { logo?: string | null; national?: boolean; founded?: number | null; stadium?: string | null; country?: string | null } = {}): Promise<Team> {
+    let t = this.byApi.get(apiId) ?? this.match(name);
+    const patch: Record<string, unknown> = {};
+    if (t) {
+      if (!t.apisports_id) patch.apisports_id = apiId;
+      // logo : on garde un logo personnalisé envoyé par la rédaction
+      if (extra.logo && (!t.logo_url || t.logo_url.includes("api-sports.io")) && t.logo_url !== extra.logo) patch.logo_url = extra.logo;
+      if (!t.stadium && extra.stadium) patch.stadium = extra.stadium;
+      if (!t.founded && extra.founded) patch.founded = extra.founded;
+      if (Object.keys(patch).length) {
+        const { data, error } = await this.db.from("teams").update(patch).eq("id", t.id).select().single();
+        if (error) throw error;
+        t = data as Team;
+        this.add(t);
+      }
+      return t;
     }
-    let slug = slugify(name) || `equipe-${extId}`;
+    let slug = slugify(name) || `equipe-${apiId}`;
     let i = 2;
     while (this.slugs.has(slug)) slug = `${slugify(name)}-${i++}`;
-    const row = {
-      slug, name, short_name: name, abbreviation: extra.abbreviation ?? null, aliases: [name],
-      logo_url: extra.logo ?? null, color: extra.color ? `#${extra.color.replace("#", "")}` : null,
-      is_national: extra.national ?? false,
-      ...(src === "oanor" ? { oanor_id: String(extId) } : { apisports_id: Number(extId) }),
-    };
-    const { data, error } = await this.db.from("teams").insert(row).select().single();
+    const { data, error } = await this.db.from("teams").insert({
+      slug, name, short_name: name, aliases: [name], logo_url: extra.logo ?? null, is_national: extra.national ?? false,
+      apisports_id: apiId, founded: extra.founded ?? null, stadium: extra.stadium ?? null, country: extra.country ?? null,
+    }).select().single();
     if (error) throw error;
     this.add(data as Team);
     return data as Team;
   }
 }
 
-// ---------- Oanor ----------
-async function oanor(path: string, key: string, budget: Budget) {
-  budget.take();
-  let res = await fetch(`${OANOR_BASE}${path}`, { headers: { "x-oanor-key": key } });
-  // panne passagère chez Oanor (502/503/504) : un seul nouvel essai après 3 s
-  if (res.status >= 500) {
-    await new Promise((r) => setTimeout(r, 3000));
-    budget.take();
-    res = await fetch(`${OANOR_BASE}${path}`, { headers: { "x-oanor-key": key } });
-  }
-  if (!res.ok) throw new Error(`Oanor ${path} → HTTP ${res.status}`);
-  const body = await res.json();
-  if (body.success === false) throw new Error(`Oanor ${path} → ${body.message ?? "erreur"}`);
-  return body.data;
-}
-
-function oanorStatus(m: { status?: string; completed?: boolean }) {
-  const s = (m.status ?? "").toLowerCase();
-  if (m.completed || /final|full time|ft\b|ended/.test(s)) return "finished";
-  if (/half/.test(s)) return "halftime";
-  if (/postpon/.test(s)) return "postponed";
-  if (/cancel|abandon/.test(s)) return "cancelled";
-  if (/progress|live|1st|2nd|first|second|extra/.test(s)) return "live";
-  return "scheduled";
-}
-
-const ymd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
-
-async function oanorTeams(db: SupabaseClient, key: string, budget: Budget, comps: Competition[], idx: TeamIndex) {
+// ---------- briques ----------
+async function syncCompetitions(db: SupabaseClient, api: Api, comps: Competition[]) {
+  const leagues = await api.get("/leagues");
   for (const c of comps) {
-    const data = await oanor(`/teams?league=${c.oanor_id}`, key, budget);
-    const links = [];
-    for (const t of data.teams ?? []) {
-      const team = await idx.resolve("oanor", t.id, t.name, { logo: t.logo, color: t.color, abbreviation: t.abbreviation, national: c.kind === "international" });
-      links.push({ team_id: team.id, competition_id: c.id, season: c.current_season });
-    }
-    if (links.length) await db.from("team_competitions").upsert(links, { onConflict: "team_id,competition_id,season", ignoreDuplicates: true });
+    const l = (leagues ?? []).find((x: { id: number }) => x.id === c.apisports_id);
+    if (!l) continue;
+    const s = choisirSaison(l.seasons);
+    if (!s) continue;
+    const patch = { apisports_season: s.season, current_season: libelleSaison(s), logo_url: l.logo ?? c.logo_url };
+    await db.from("competitions").update(patch).eq("id", c.id);
+    Object.assign(c, patch);
   }
+  return leagues as { id: number; seasons: ApiSeason[] }[];
 }
 
-async function oanorMatches(db: SupabaseClient, key: string, budget: Budget, c: Competition, idx: TeamIndex, from: Date, to: Date) {
-  const data = await oanor(`/matches?league=${c.oanor_id}&dates=${ymd(from)}-${ymd(to)}`, key, budget);
-  const rows = [];
-  for (const m of data.matches ?? []) {
-    if (!m.home?.id || !m.away?.id) continue;
-    const home = await idx.resolve("oanor", m.home.id, m.home.team, { logo: m.home.logo, abbreviation: m.home.abbreviation, national: c.kind === "international" });
-    const away = await idx.resolve("oanor", m.away.id, m.away.team, { logo: m.away.logo, abbreviation: m.away.abbreviation, national: c.kind === "international" });
-    const status = oanorStatus(m);
-    const hs = m.home.score != null && m.home.score !== "" ? Number(m.home.score) : null;
-    const as = m.away.score != null && m.away.score !== "" ? Number(m.away.score) : null;
-    rows.push({
-      competition_id: c.id, season: c.current_season, kickoff_at: m.date,
-      home_team_id: home.id, away_team_id: away.id,
-      home_score: status === "scheduled" ? null : hs, away_score: status === "scheduled" ? null : as,
-      status, clock: status === "live" ? m.clock ?? null : null, venue: m.venue ?? null,
-      source: "oanor", external_id: String(m.id),
-    });
+async function syncTeams(db: SupabaseClient, api: Api, c: Competition, idx: TeamIndex, season = c.apisports_season!, label = c.current_season) {
+  const teams = await api.get(`/teams?league=${c.apisports_id}&season=${season}`);
+  const links = [];
+  for (const t of teams ?? []) {
+    const team = await idx.resolve(t.id, t.name, { logo: t.logo, national: t.national, founded: t.founded, stadium: t.arena?.name ?? null, country: t.country?.name ?? null });
+    links.push({ team_id: team.id, competition_id: c.id, season: label });
   }
-  if (rows.length) {
-    const { error } = await db.from("matches").upsert(rows, { onConflict: "source,external_id" });
+  if (links.length) await db.from("team_competitions").upsert(links, { onConflict: "team_id,competition_id,season", ignoreDuplicates: true });
+  return links.length;
+}
+
+type GameRow = Record<string, unknown> & { external_id: string };
+
+async function gameRow(g: any, c: Competition, label: string, idx: TeamIndex): Promise<GameRow> {
+  const national = c.kind === "international";
+  const home = await idx.resolve(g.teams.home.id, g.teams.home.name, { logo: g.teams.home.logo, national });
+  const away = await idx.resolve(g.teams.away.id, g.teams.away.name, { logo: g.teams.away.logo, national });
+  const st = statut(g.status?.short ?? "NS");
+  const p = g.periods ?? {};
+  const lines = [p.first, p.second, p.overtime].filter((x: any) => x && (x.home != null || x.away != null)).map((x: any) => ({ home: x.home ?? 0, away: x.away ?? 0 }));
+  return {
+    competition_id: c.id, season: label, round: g.week ? String(g.week).replace(/^Regular Season - /i, "") : null,
+    kickoff_at: g.date, home_team_id: home.id, away_team_id: away.id,
+    home_score: st === "scheduled" ? null : g.scores?.home ?? null, away_score: st === "scheduled" ? null : g.scores?.away ?? null,
+    status: st, clock: st === "live" ? HORLOGE[g.status?.short] ?? null : null,
+    linescores: lines.length ? lines : null, source: "apisports", external_id: String(g.id),
+  };
+}
+
+/** N'écrit que les matchs nouveaux ou modifiés (évite d'inonder le temps réel). */
+async function upsertGames(db: SupabaseClient, rows: GameRow[]) {
+  if (!rows.length) return { changed: 0, finished: [] as string[] };
+  const ids = rows.map((r) => r.external_id);
+  const existing = new Map<string, Record<string, unknown>>();
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await db.from("matches").select("external_id,status,home_score,away_score,kickoff_at,clock,round,home_team_id,away_team_id,season").eq("source", "apisports").in("external_id", ids.slice(i, i + 300));
+    for (const m of data ?? []) existing.set(m.external_id as string, m);
+  }
+  const keys = ["status", "home_score", "away_score", "clock", "round", "home_team_id", "away_team_id", "season"];
+  const changed = rows.filter((r) => {
+    const e = existing.get(r.external_id);
+    if (!e) return true;
+    if (new Date(e.kickoff_at as string).getTime() !== new Date(r.kickoff_at as string).getTime()) return true;
+    return keys.some((k) => (e[k] ?? null) !== (r[k] ?? null));
+  });
+  const finished = changed.filter((r) => r.status === "finished" && existing.get(r.external_id)?.status !== "finished").map((r) => r.competition_id as string);
+  for (let i = 0; i < changed.length; i += 200) {
+    const { error } = await db.from("matches").upsert(changed.slice(i, i + 200), { onConflict: "source,external_id" });
     if (error) throw error;
   }
-  return rows;
+  return { changed: changed.length, finished };
 }
 
-async function oanorStandings(db: SupabaseClient, key: string, budget: Budget, c: Competition, idx: TeamIndex) {
-  const data = await oanor(`/standings?league=${c.oanor_id}`, key, budget);
-  const table = data.table ?? [];
-  if (!table.length) return 0;
+async function syncGames(db: SupabaseClient, api: Api, c: Competition, idx: TeamIndex, season = c.apisports_season!, label = c.current_season) {
+  const games = await api.get(`/games?league=${c.apisports_id}&season=${season}`);
+  const rows: GameRow[] = [];
+  for (const g of games ?? []) rows.push(await gameRow(g, c, label, idx));
+  const r = await upsertGames(db, rows);
+  return { total: rows.length, changed: r.changed };
+}
+
+async function syncStandings(db: SupabaseClient, api: Api, c: Competition, idx: TeamIndex) {
+  if (c.standings_mode !== "api") return 0;
+  const groups = await api.get(`/standings?league=${c.apisports_id}&season=${c.apisports_season}`);
+  const flat: any[] = (groups ?? []).flat();
+  if (!flat.length) return 0;
+  const multi = new Set(flat.map((r) => r.group?.name ?? "")).size > 1;
+  const seen = new Set<string>();
   const rows = [];
-  for (const r of table) {
-    const team = await idx.resolve("oanor", r.id, r.team, { logo: r.logo, national: c.kind === "international" });
+  for (const r of flat) {
+    const team = await idx.resolve(r.team.id, r.team.name, { logo: r.team.logo, national: c.kind === "international" });
+    if (seen.has(team.id)) continue; // une équipe par compétition et saison
+    seen.add(team.id);
+    const w = r.games?.win?.total ?? 0, d = r.games?.draw?.total ?? 0;
     rows.push({
-      competition_id: c.id, season: c.current_season, team_id: team.id, rank: r.rank,
-      played: r.played ?? 0, won: r.wins ?? 0, drawn: r.draws ?? 0, lost: r.losses ?? 0,
-      points_for: r.points_for ?? 0, points_against: r.points_against ?? 0,
-      tries_for: r.tries_for ?? null, tries_against: r.tries_against ?? null,
-      bonus: r.bonus_points ?? 0, points: r.league_points ?? 0, updated_at: new Date().toISOString(),
+      competition_id: c.id, season: c.current_season, team_id: team.id, pool: multi ? (r.group?.name ?? "") : "",
+      rank: r.position, played: r.games?.played ?? 0, won: w, drawn: d, lost: r.games?.lose?.total ?? 0,
+      points_for: r.goals?.for ?? 0, points_against: r.goals?.against ?? 0, tries_for: null, tries_against: null,
+      bonus: Math.max(0, (r.points ?? 0) - (4 * w + 2 * d)), points: r.points ?? 0,
+      // forme API (W/D/L) en français (V/N/D)
+      form: r.form ? String(r.form).replace(/D/g, "N").replace(/W/g, "V").replace(/L/g, "D").slice(-5) : null,
+      updated_at: new Date().toISOString(),
     });
   }
   await db.from("standings").delete().eq("competition_id", c.id).eq("season", c.current_season);
@@ -165,169 +223,175 @@ async function oanorStandings(db: SupabaseClient, key: string, budget: Budget, c
   return rows.length;
 }
 
-// ---------- API-Sports ----------
-async function apisports(path: string, key: string, budget: Budget) {
-  budget.take();
-  const res = await fetch(`${APISPORTS_BASE}${path}`, { headers: { "x-apisports-key": key } });
-  if (!res.ok) throw new Error(`API-Sports ${path} → HTTP ${res.status}`);
-  const body = await res.json();
-  const errs = body.errors && (Array.isArray(body.errors) ? body.errors : Object.values(body.errors));
-  if (errs && errs.length) throw new Error(`API-Sports ${path} → ${errs.join(" / ")}`);
-  return body.response;
+async function syncH2H(db: SupabaseClient, api: Api, limit: number) {
+  const { data: upcoming } = await db.from("matches")
+    .select("id, home:teams!matches_home_team_id_fkey(apisports_id), away:teams!matches_away_team_id_fkey(apisports_id), h2h:match_h2h(updated_at)")
+    .eq("source", "apisports").eq("status", "scheduled")
+    .gte("kickoff_at", new Date().toISOString()).lte("kickoff_at", new Date(Date.now() + 8 * 86400e3).toISOString())
+    .order("kickoff_at").limit(120);
+  let n = 0;
+  for (const m of (upcoming ?? []) as any[]) {
+    if (n >= limit) break;
+    const fresh = m.h2h?.updated_at && Date.now() - new Date(m.h2h.updated_at).getTime() < 3 * 86400e3;
+    if (fresh || !m.home?.apisports_id || !m.away?.apisports_id) continue;
+    const games = await api.get(`/games/h2h?h2h=${m.home.apisports_id}-${m.away.apisports_id}`);
+    const list = (games ?? []).filter((g: any) => statut(g.status?.short) === "finished")
+      .sort((a: any, b: any) => b.timestamp - a.timestamp).slice(0, 8)
+      .map((g: any) => ({ date: g.date, league: g.league?.name, home: g.teams.home.name, away: g.teams.away.name, home_id: g.teams.home.id, away_id: g.teams.away.id, hs: g.scores.home, as: g.scores.away }));
+    await db.from("match_h2h").upsert({ match_id: m.id, games: list, updated_at: new Date().toISOString() });
+    n++;
+  }
+  return n;
 }
 
-function apiStatus(short: string) {
-  if (["FT", "AET", "PEN", "AW"].includes(short)) return "finished";
-  if (short === "HT" || short === "BT") return "halftime";
-  if (["1H", "2H", "ET", "PT"].includes(short)) return "live";
-  if (short === "POST" || short === "INTR") return "postponed";
-  if (short === "CANC" || short === "ABD") return "cancelled";
-  return "scheduled";
-}
-
-// API-Sports utilise l'année de début (2023 = saison 2023-2024 en Europe)
-function seasonLabel(c: Competition, year: number) {
-  return c.current_season.includes("-") ? `${year}-${year + 1}` : String(year);
-}
-
-async function apisportsImport(db: SupabaseClient, key: string, budget: Budget, c: Competition, year: number, idx: TeamIndex) {
-  let leagueId = c.apisports_id;
-  if (!leagueId) {
-    const leagues = await apisports(`/leagues?search=${encodeURIComponent(c.apisports_name ?? c.name)}`, key, budget);
-    const wanted = norm(c.apisports_name ?? c.name);
-    const hit = (leagues ?? []).find((l: { name: string }) => norm(l.name) === wanted) ?? leagues?.[0];
-    if (!hit) throw new Error(`Compétition introuvable chez API-Sports : ${c.name}`);
-    leagueId = hit.id;
-    await db.from("competitions").update({ apisports_id: leagueId }).eq("id", c.id);
-  }
-  const season = seasonLabel(c, year);
-  const games = await apisports(`/games?league=${leagueId}&season=${year}`, key, budget);
-  const rows = [];
-  const links = new Map<string, { team_id: string; competition_id: string; season: string }>();
-  for (const g of games ?? []) {
-    const home = await idx.resolve("apisports", g.teams.home.id, g.teams.home.name, { logo: g.teams.home.logo, national: c.kind === "international" });
-    const away = await idx.resolve("apisports", g.teams.away.id, g.teams.away.name, { logo: g.teams.away.logo, national: c.kind === "international" });
-    links.set(home.id, { team_id: home.id, competition_id: c.id, season });
-    links.set(away.id, { team_id: away.id, competition_id: c.id, season });
-    const status = apiStatus(g.status?.short ?? "NS");
-    rows.push({
-      competition_id: c.id, season, round: g.week ? String(g.week) : null, kickoff_at: g.date,
-      home_team_id: home.id, away_team_id: away.id,
-      home_score: g.scores?.home ?? null, away_score: g.scores?.away ?? null,
-      status, source: "apisports", external_id: String(g.id),
-    });
-  }
-  if (links.size) await db.from("team_competitions").upsert([...links.values()], { onConflict: "team_id,competition_id,season", ignoreDuplicates: true });
-  for (let i = 0; i < rows.length; i += 200) {
-    const { error } = await db.from("matches").upsert(rows.slice(i, i + 200), { onConflict: "source,external_id" });
-    if (error) throw error;
-  }
-  return { season, games: rows.length };
+async function syncCompetitionFull(db: SupabaseClient, api: Api, c: Competition, idx: TeamIndex) {
+  const t0 = Date.now();
+  const teams = await syncTeams(db, api, c, idx);
+  const games = await syncGames(db, api, c, idx);
+  const st = await syncStandings(db, api, c, idx);
+  await db.from("competitions").update({ last_synced_at: new Date().toISOString() }).eq("id", c.id);
+  return { msg: `${teams} équipes, ${games.total} matchs (${games.changed} mis à jour), ${st} au classement`, ms: Date.now() - t0 };
 }
 
 // ---------- handler ----------
 Deno.serve(async (req) => {
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const db = createClient(url, serviceKey, { auth: { persistSession: false } });
-
-  const secret = req.headers.get("x-sync-secret") ?? "";
-  const { data: ok } = await db.rpc("check_sync_secret", { s: secret });
+  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const { data: ok } = await db.rpc("check_sync_secret", { s: req.headers.get("x-sync-secret") ?? "" });
   if (!ok) return json({ error: "unauthorized" }, 401);
 
+  const t0 = Date.now();
   const { job = "daily", params = {} } = await req.json().catch(() => ({}));
-
-  const { data: comps } = await db.from("competitions").select("*");
-  const { data: teams } = await db.from("teams").select("id,slug,name,short_name,abbreviation,aliases,city,oanor_id,apisports_id,logo_url");
-  const idx = new TeamIndex(db, (teams ?? []) as Team[]);
-  const allComps = (comps ?? []) as Competition[];
-
-  // ---- API-Sports (import ponctuel, lancé depuis l'admin) ----
-  if (job === "apisports") {
-    const key = Deno.env.get("APISPORTS_KEY");
-    if (!key) return json({ error: "Clé APISPORTS_KEY manquante" }, 400);
-    const since = new Date(); since.setUTCHours(0, 0, 0, 0);
-    const { data: used } = await db.from("sync_runs").select("calls").eq("provider", "apisports").gte("created_at", since.toISOString());
-    const budget = new Budget(APISPORTS_DAILY_CAP - (used ?? []).reduce((a, r) => a + r.calls, 0));
-    const comp = allComps.find((c) => c.slug === params.competition);
-    let result: unknown = null; let okRun = true; let message = "";
-    try {
-      if (!comp) throw new Error("Compétition inconnue");
-      result = await apisportsImport(db, key, budget, comp, Number(params.year), idx);
-      message = JSON.stringify(result);
-    } catch (e) { okRun = false; message = (e as Error).message; }
-    await db.from("sync_runs").insert({ provider: "apisports", job: `import ${params.competition} ${params.year}`, calls: budget.used, ok: okRun, message });
-    return json({ ok: okRun, message, result }, okRun ? 200 : 500);
-  }
-
-  // ---- Oanor (daily / live / teams) ----
-  const key = Deno.env.get("OANOR_KEY");
+  const key = (Deno.env.get("APISPORTS_KEY") ?? "").trim();
+  const log = async (ok: boolean, message: string, calls: number, competition_id: string | null = null) => {
+    await db.from("sync_runs").insert({ provider: "apisports", job, calls, ok, message, competition_id, duration_ms: Date.now() - t0 });
+  };
   if (!key) {
-    await db.from("sync_runs").insert({ provider: "oanor", job, calls: 0, ok: false, message: "Clé OANOR_KEY manquante" });
-    return json({ error: "Clé OANOR_KEY manquante" }, 400);
+    await log(false, "Clé APISPORTS_KEY manquante", 0);
+    return json({ error: "Clé APISPORTS_KEY manquante" }, 400);
   }
-  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
-  const { data: used } = await db.from("sync_runs").select("calls").eq("provider", "oanor").gte("created_at", monthStart.toISOString());
-  const budget = new Budget(OANOR_MONTHLY_CAP - (used ?? []).reduce((a, r) => a + r.calls, 0));
-  const oanorComps = allComps.filter((c) => c.oanor_id);
-  const log: string[] = [];
+
+  const since = new Date(); since.setUTCHours(0, 0, 0, 0);
+  const { data: used } = await db.from("sync_runs").select("calls").eq("provider", "apisports").gte("created_at", since.toISOString());
+  const api = new Api(key, DAILY_CAP - (used ?? []).reduce((a, r) => a + (r.calls ?? 0), 0));
+
+  const { data: compsData } = await db.from("competitions").select("*").not("apisports_id", "is", null).order("sort_order");
+  const comps = ((compsData ?? []) as Competition[]).filter((c) => c.active);
+  const { data: teams } = await db.from("teams").select("id,slug,name,short_name,aliases,apisports_id,logo_url,stadium,founded,country");
+  const idx = new TeamIndex(db, (teams ?? []) as Team[]);
+  const lignes: string[] = [];
   let okRun = true;
 
-  // une compétition en panne ne bloque pas les autres
-  const each = async (c: Competition, fn: () => Promise<string>) => {
-    try {
-      log.push(`${c.slug}: ${await fn()}`);
-    } catch (e) {
-      okRun = false;
-      log.push(`${c.slug}: ERREUR ${(e as Error).message}`);
-      if ((e as Error).message === "quota atteint") throw e;
-    }
-  };
-
   try {
-    const { count: knownTeams } = await db.from("teams").select("id", { count: "exact", head: true }).not("oanor_id", "is", null);
-    if (job === "teams" || !knownTeams) {
-      for (const c of oanorComps) await each(c, async () => { await oanorTeams(db, key, budget, [c], idx); return "équipes"; });
-    }
-    if (job === "daily" || job === "teams") {
-      const from = new Date(Date.now() - 4 * 86400e3);
-      const to = new Date(Date.now() + 14 * 86400e3);
-      for (const c of oanorComps) {
-        await each(c, async () => {
-          const rows = await oanorMatches(db, key, budget, c, idx, from, to);
-          let st = 0;
-          if (c.standings_mode === "api") st = await oanorStandings(db, key, budget, c, idx);
-          return `${rows.length} matchs, ${st} au classement`;
-        });
+    if (job === "daily" || job === "competition") {
+      await syncCompetitions(db, api, comps);
+      const cibles = job === "competition" ? comps.filter((c) => c.slug === params.slug) : comps;
+      if (job === "competition" && !cibles.length) throw new Error("Compétition inconnue ou désactivée");
+      for (const c of cibles) {
+        try {
+          const r = await syncCompetitionFull(db, api, c, idx);
+          lignes.push(`${c.short_name ?? c.name} : ${r.msg}`);
+        } catch (e) {
+          okRun = false;
+          lignes.push(`${c.slug} : ERREUR ${(e as Error).message}`);
+          if ((e as Error).message.includes("quota")) break;
+        }
       }
+      if (job === "daily") lignes.push(`${await syncH2H(db, api, 40)} confrontations`);
+      else lignes.push(`${await syncH2H(db, api, 10)} confrontations`);
     }
+
     if (job === "live") {
-      const { data: window } = await db.from("matches")
-        .select("competition_id, status")
-        .eq("source", "oanor")
-        .gte("kickoff_at", new Date(Date.now() - 165 * 60e3).toISOString())
-        .lte("kickoff_at", new Date(Date.now() + 10 * 60e3).toISOString());
-      const compIds = [...new Set((window ?? []).filter((m) => !["finished", "postponed", "cancelled"].includes(m.status)).map((m) => m.competition_id))];
-      const today = new Date();
-      const yesterday = new Date(Date.now() - 86400e3);
-      for (const id of compIds) {
-        const c = oanorComps.find((x) => x.id === id);
-        if (!c) continue;
-        await each(c, async () => {
-          const rows = await oanorMatches(db, key, budget, c, idx, yesterday, today);
-          const justFinished = rows.some((r) => r.status === "finished") && (window ?? []).some((m) => m.competition_id === id && m.status !== "finished");
-          if (justFinished && c.standings_mode === "api") await oanorStandings(db, key, budget, c, idx);
-          return `direct ${rows.length}`;
-        });
+      // les jours (UTC) concernés par un match en cours ou imminent
+      const { data: fenetre } = await db.from("matches").select("kickoff_at,competition_id")
+        .eq("source", "apisports")
+        .or(`status.in.(live,halftime),and(status.eq.scheduled,kickoff_at.gte.${new Date(Date.now() - 3 * 3600e3).toISOString()},kickoff_at.lte.${new Date(Date.now() + 5 * 60e3).toISOString()})`);
+      const jours = [...new Set((fenetre ?? []).map((m) => (m.kickoff_at as string).slice(0, 10)))];
+      const byApi = new Map(comps.map((c) => [c.apisports_id!, c]));
+      const finis = new Set<string>();
+      let total = 0;
+      for (const d of jours) {
+        const games = await api.get(`/games?date=${d}&timezone=UTC`);
+        const rows: GameRow[] = [];
+        for (const g of games ?? []) {
+          const c = byApi.get(g.league?.id);
+          if (!c) continue;
+          // le match du jour appartient à la saison suivie de la compétition
+          if (g.league?.season && c.apisports_season && g.league.season !== c.apisports_season) continue;
+          rows.push(await gameRow(g, c, c.current_season, idx));
+        }
+        const r = await upsertGames(db, rows);
+        total += r.changed;
+        r.finished.forEach((id) => finis.add(id));
+      }
+      for (const id of finis) {
+        const c = comps.find((x) => x.id === id);
+        if (c) await syncStandings(db, api, c, idx);
+      }
+      lignes.push(`${jours.length} jour(s), ${total} match(s) mis à jour${finis.size ? `, classements rafraîchis : ${finis.size}` : ""}`);
+    }
+
+    if (job === "stats") {
+      // toutes les paires (compétition, club) de la saison en cours, traitées dans l'ordre avec un curseur
+      const { data: links } = await db.from("team_competitions").select("team_id, competition_id, season, team:teams(apisports_id)");
+      const pairs = ((links ?? []) as any[])
+        .map((l) => ({ ...l, c: comps.find((c) => c.id === l.competition_id && c.current_season === l.season && c.standings_mode !== "none") }))
+        .filter((l) => l.c && l.team?.apisports_id)
+        .sort((a, b) => (a.c.slug + a.team_id).localeCompare(b.c.slug + b.team_id));
+      const { data: cur } = await db.from("app_state").select("value").eq("key", "stats_cursor").maybeSingle();
+      let i = Number(cur?.value ?? 0);
+      let n = 0;
+      while (i < pairs.length && Date.now() - t0 < TIME_BUDGET_MS) {
+        const p = pairs[i];
+        try {
+          const s = await api.get(`/teams/statistics?league=${p.c.apisports_id}&season=${p.c.apisports_season}&team=${p.team.apisports_id}`);
+          if (s?.games) {
+            const g = s.games, pts = s.goals ?? {};
+            await db.from("team_season_stats").upsert({
+              team_id: p.team_id, competition_id: p.competition_id, season: p.season,
+              played_home: g.played?.home, played_away: g.played?.away,
+              wins_home: g.wins?.home?.total, wins_away: g.wins?.away?.total,
+              draws_home: g.draws?.home?.total, draws_away: g.draws?.away?.total,
+              losses_home: g.loses?.home?.total, losses_away: g.loses?.away?.total,
+              pf_home: pts.for?.total?.home, pf_away: pts.for?.total?.away,
+              pa_home: pts.against?.total?.home, pa_away: pts.against?.total?.away,
+              raw: s, updated_at: new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          if ((e as Error).message.includes("quota")) break;
+        }
+        i++; n++;
+      }
+      const fini = i >= pairs.length;
+      await db.from("app_state").upsert(fini ? [{ key: "stats_cursor", value: "0" }, { key: "stats_done_day", value: new Date().toISOString().slice(0, 10) }] : [{ key: "stats_cursor", value: String(i) }]);
+      lignes.push(`${n} fiches de stats (${i}/${pairs.length})${fini ? ", passe terminée" : ", suite au prochain passage"}`);
+    }
+
+    if (job === "history") {
+      const leagues = await syncCompetitions(db, api, comps);
+      for (const c of comps) {
+        if (Date.now() - t0 > TIME_BUDGET_MS) { lignes.push("temps écoulé, relancez pour finir"); break; }
+        const l = leagues.find((x) => x.id === c.apisports_id);
+        const prev = (l?.seasons ?? []).filter((s) => s.season < c.apisports_season!).sort((a, b) => b.season - a.season)[0];
+        if (!prev) continue;
+        const label = libelleSaison(prev);
+        const { count } = await db.from("matches").select("id", { count: "exact", head: true }).eq("competition_id", c.id).eq("season", label);
+        if ((count ?? 0) > 0 && !params.force) continue;
+        try {
+          await syncTeams(db, api, c, idx, prev.season, label);
+          const g = await syncGames(db, api, c, idx, prev.season, label);
+          lignes.push(`${c.short_name ?? c.name} ${label} : ${g.total} matchs`);
+        } catch (e) {
+          okRun = false;
+          lignes.push(`${c.slug} ${label} : ERREUR ${(e as Error).message}`);
+        }
       }
     }
   } catch (e) {
     okRun = false;
-    log.push(`ERREUR ${(e as Error).message}`);
+    lignes.push(`ERREUR ${(e as Error).message}`);
   }
 
-  if (budget.used > 0 || !okRun) {
-    await db.from("sync_runs").insert({ provider: "oanor", job, calls: budget.used, ok: okRun, message: log.join(" | ") });
-  }
-  return json({ ok: okRun, calls: budget.used, remaining: budget.remaining, log }, okRun ? 200 : 500);
+  if (api.used > 0 || !okRun) await log(okRun, lignes.join(" | "), api.used, job === "competition" ? comps.find((c) => c.slug === params.slug)?.id ?? null : null);
+  return json({ ok: okRun, calls: api.used, log: lignes, ms: Date.now() - t0 }, okRun ? 200 : 500);
 });

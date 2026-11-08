@@ -5,6 +5,7 @@ import TeamBadge from "@/components/TeamBadge";
 import LiveRefresh from "@/components/LiveRefresh";
 import Comments from "@/components/Comments";
 import Prono from "@/components/algo/Prono";
+import TribuneLive from "@/components/deco/TribuneLive";
 import Forme from "@/components/algo/Forme";
 import { getMatch } from "@/lib/queries";
 import { getForms, getRatings, pronostic } from "@/lib/algo";
@@ -201,6 +202,8 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           </ol>
         </section>
       )}
+
+      {m.status !== "cancelled" && <TribuneLive matchId={m.id} enDirect={live} />}
 
       <Comments matchId={m.id} path={`/matchs/${m.id}`} />
     </article>

@@ -222,3 +222,32 @@ h1, h2, h3, .titre {
   .apparait { opacity: 1; transform: none; }
   .vague path { stroke-dashoffset: 0; }
 }
+
+/* ======================================================================
+   MENU ET IMMERSION
+   ====================================================================== */
+
+/* vestiaire mobile : fond qui tombe, liens qui entrent en cascade */
+.vestiaire { animation: vestiaire .35s cubic-bezier(.2,.8,.2,1); }
+@keyframes vestiaire { from { clip-path: circle(0% at calc(100% - 2.5rem) 2.5rem); } to { clip-path: circle(150% at calc(100% - 2.5rem) 2.5rem); } }
+.entree-vestiaire { animation: entree-vestiaire .55s cubic-bezier(.2,.9,.25,1.25) both; animation-delay: calc(.08s + var(--i) * .055s); }
+@keyframes entree-vestiaire { from { opacity: 0; transform: translateX(-30px) rotate(-3deg); } to { opacity: 1; transform: none; } }
+
+/* barre de lecture façon terrain */
+.terrain-lecture { background: repeating-linear-gradient(90deg, var(--pelouse) 0 5%, color-mix(in srgb, var(--pelouse) 85%, #000) 5% 10%); }
+
+/* mini-jeu du drop */
+.drop-ballon { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vestiaire, .entree-vestiaire { animation: none; }
+}
+
+/* tribune en direct : les cris s'envolent */
+.cri-envol { animation: cri-envol 2.6s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes cri-envol {
+  0% { opacity: 0; transform: translate(-50%, 20px) scale(.6) rotate(-6deg); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.08) rotate(3deg); }
+  100% { opacity: 0; transform: translate(-50%, -220px) scale(.95) rotate(-4deg); }
+}
+@media (prefers-reduced-motion: reduce) { .cri-envol { animation: none; opacity: 0; } }

@@ -42,6 +42,7 @@ export default function Celebration() {
 
   useEffect(() => {
     if (!fete) return;
+    window.dispatchEvent(new Event("ar:essai")); // la tribune se lève (si le son est activé)
     const t = setTimeout(() => setFete(null), 2900);
     return () => clearTimeout(t);
   }, [fete]);

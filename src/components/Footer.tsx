@@ -2,6 +2,7 @@
 import Link from "next/link";
 import Defile from "./deco/Defile";
 import { Supporter } from "./deco/Icones";
+import TenteLeDrop from "./deco/TenteLeDrop";
 
 const TRIBUNE = ["#f2b53a", "#ffffff", "#c98595", "#f2b53a", "#f6e4e8", "#934f5e"];
 
@@ -9,9 +10,10 @@ export default function Footer() {
   return (
     <footer className="mt-20">
       <Defile ton="or" incline={1.5} />
-      <div className="bg-bordeaux text-white/80 -mt-3 pt-12 relative overflow-hidden">
+      <div className="bg-bordeaux text-white/80 -mt-3 pt-14 relative overflow-hidden">
+        <TenteLeDrop />
         {/* la tribune fait la ola */}
-        <div className="ola flex items-end justify-center gap-1 sm:gap-1.5 h-14 opacity-90" aria-hidden>
+        <div className="ola flex items-end justify-center gap-1 sm:gap-1.5 h-14 opacity-90 mt-6" aria-hidden>
           {Array.from({ length: 34 }, (_, i) => (
             <span key={i} style={{ ["--i" as string]: i }} className="block">
               <Supporter className="w-4 sm:w-5 h-auto" couleur={TRIBUNE[(i * 7) % TRIBUNE.length]} />

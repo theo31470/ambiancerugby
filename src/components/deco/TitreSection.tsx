@@ -6,10 +6,10 @@ import Reveal from "./Reveal";
 export default function TitreSection({ children, id, lien, lienTexte, className = "" }: { children: ReactNode; id?: string; lien?: string; lienTexte?: string; className?: string }) {
   return (
     <Reveal className={`flex items-end justify-between gap-4 mb-5 ${className}`}>
-      <h2 id={id} className="groovy text-3xl sm:text-4xl text-vin relative pb-3">
+      <h2 id={id} className="groovy text-3xl sm:text-4xl text-vin relative pb-4">
         {children}
-        <svg className="vague absolute left-0 -bottom-1 w-full h-3" viewBox="0 0 200 12" preserveAspectRatio="none" aria-hidden>
-          <path d="M2 8c20-8 30 6 50 0s30-8 50 0 30 6 50 0 30-8 46 0" stroke="var(--moutarde)" strokeWidth="4" fill="none" strokeLinecap="round" />
+        <svg className="vague absolute left-0 -bottom-2 w-full h-4 overflow-visible" viewBox="0 -4 200 20" preserveAspectRatio="none" aria-hidden>
+          <path d="M2 8c20-8 30 6 50 0s30-8 50 0 30 6 50 0 30-8 46 0" stroke="var(--moutarde)" strokeWidth="4" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </svg>
       </h2>
       {lien && (
