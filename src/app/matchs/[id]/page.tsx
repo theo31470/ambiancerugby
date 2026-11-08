@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import LiveRefresh from "@/components/LiveRefresh";
+import FilDuMatch from "@/components/FilDuMatch";
 import Comments from "@/components/Comments";
 import Confrontations from "@/components/stats/Confrontations";
 import Prono from "@/components/algo/Prono";
@@ -176,33 +177,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
         </section>
       )}
 
-      {events && events.length > 0 && (
-        <section aria-labelledby="h-faits" className="mt-10 max-w-2xl">
-          <h2 id="h-faits" className="text-xl font-bold mb-3">Faits de jeu</h2>
-          <ol className="border-l-2 border-trait ml-3">
-            {events.map((e) => {
-              const side = e.team_id === m.home_team_id ? m.home : e.team_id === m.away_team_id ? m.away : null;
-              const player = e.player as unknown as { slug: string; first_name: string; last_name: string } | null;
-              return (
-                <li key={e.id} className="relative pl-6 py-2">
-                  <span className={`absolute -left-[7px] top-3.5 w-3 h-3 rounded-full border-2 border-fond ${e.kind === "yellow" ? "bg-moutarde" : e.kind === "red" ? "bg-alerte" : "bg-vin"}`} aria-hidden />
-                  <p>
-                    <span className="titre font-bold tnum mr-2">{e.minute != null ? `${e.minute}'` : ""}</span>
-                    <span className="font-semibold">{EVENT_LABEL[e.kind] ?? e.kind}</span>
-                    {side && <span className="text-sourdine">, {side.short_name ?? side.name}</span>}
-                  </p>
-                  {player && (
-                    <Link href={`/joueurs/${player.slug}`} className="text-sm underline underline-offset-2">
-                      {player.first_name} {player.last_name}
-                    </Link>
-                  )}
-                  {e.text && <p className="text-sm text-sourdine">{e.text}</p>}
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-      )}
+      {events && events.length > 0 && <FilDuMatch events={events as never} home={m.home} away={m.away} live={live} clock={m.clock} />}
 
       <Confrontations matchId={m.id} home={m.home} away={m.away} />
 

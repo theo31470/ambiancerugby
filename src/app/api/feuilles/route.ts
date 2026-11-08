@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const maintenant = Date.now();
   const { data: candidats } = await db.from("matches").select(`${SELECT_MATCH_ESPN}, feuille_tentee_at, competition_id`)
     .eq("status", "finished")
-    .gte("kickoff_at", new Date(maintenant - 130 * 86400e3).toISOString())
+    .gte("kickoff_at", new Date(maintenant - 1900 * 86400e3).toISOString())
     .lte("kickoff_at", new Date(maintenant - 2 * 3600e3).toISOString())
     .or(`feuille_tentee_at.is.null,feuille_tentee_at.lt.${new Date(maintenant - 6 * 3600e3).toISOString()}`)
     .order("kickoff_at", { ascending: false }).limit(300);
