@@ -22,7 +22,21 @@ export type LigneIA = {
   cartons_jaunes: number;
   cartons_rouges: number;
 };
-export type ResultatIA = { lignes: LigneIA[]; remarques: string; inputTokens: number; outputTokens: number; coutUsd: number };
+export type EvenementIA = { minute: number | null; equipe: "home" | "away"; ref: string | null; nom_lu: string; type: "try" | "conversion" | "penalty" | "drop" | "penalty_try" | "yellow" | "red" };
+export type ResultatIA = { lignes: LigneIA[]; evenements: EvenementIA[]; remarques: string; inputTokens: number; outputTokens: number; coutUsd: number };
+const TYPES_EVT = ["try", "conversion", "penalty", "drop", "penalty_try", "yellow", "red"] as const;
+
+/** Nettoie le fil du match renvoyé par Claude. */
+function filPropre(brut: unknown): EvenementIA[] {
+  if (!Array.isArray(brut)) return [];
+  return brut
+    .filter((e) => e && (e.equipe === "home" || e.equipe === "away") && TYPES_EVT.includes(e.type))
+    .map((e) => ({
+      minute: Number.isInteger(e.minute) && e.minute >= 0 && e.minute <= 130 ? e.minute : null,
+      equipe: e.equipe, ref: typeof e.ref === "string" ? e.ref : null, nom_lu: String(e.nom_lu ?? "").slice(0, 80), type: e.type,
+    }))
+    .slice(0, 80);
+}
 
 const OUTIL = {
   name: "feuille_de_match",
@@ -49,9 +63,24 @@ const OUTIL = {
           required: ["equipe", "ref", "nom_lu", "essais", "transformations", "penalites", "drops", "cartons_jaunes", "cartons_rouges"],
         },
       },
+      evenements: {
+        type: "array",
+        description: "Le fil du match dans l'ordre chronologique, seulement si le document donne les minutes. Liste vide sinon.",
+        items: {
+          type: "object",
+          properties: {
+            minute: { type: ["integer", "null"], minimum: 0, maximum: 130 },
+            equipe: { type: "string", enum: ["home", "away"] },
+            ref: { type: ["string", "null"], description: "Référence du joueur (H12, A3…) ou null" },
+            nom_lu: { type: "string" },
+            type: { type: "string", enum: ["try", "conversion", "penalty", "drop", "penalty_try", "yellow", "red"], description: "try = essai, conversion = transformation, penalty = pénalité réussie, drop, penalty_try = essai de pénalité, yellow / red = cartons" },
+          },
+          required: ["minute", "equipe", "ref", "nom_lu", "type"],
+        },
+      },
       remarques: { type: "string", description: "En français, très court : essais de pénalité, incohérences avec le score, doutes sur un nom. Vide si rien à signaler." },
     },
-    required: ["lignes", "remarques"],
+    required: ["lignes", "evenements", "remarques"],
   },
 } as const;
 
@@ -75,6 +104,7 @@ export async function analyserFeuille(opts: {
     "Relie chaque joueur à sa référence dans les listes ci-dessus (attention aux accents, prénoms abrégés et surnoms). S'il n'y figure pas, mets ref à null.",
     "Un essai de pénalité ne se rattache à aucun joueur : signale-le dans les remarques. N'invente rien : seulement ce que dit le document.",
     "Vérifie que 5 × essais + 2 × transformations + 3 × (pénalités + drops) donne bien le score de chaque équipe, et signale tout écart.",
+    "Si le document donne les minutes, remplis aussi le fil du match (evenements) dans l'ordre chronologique ; sinon laisse-le vide.",
     "",
     "Document :",
     opts.texte.slice(0, MAX_TEXTE) || "(voir l'image)",
@@ -108,7 +138,7 @@ export async function analyserFeuille(opts: {
   const inputTokens = body?.usage?.input_tokens ?? 0;
   const outputTokens = body?.usage?.output_tokens ?? 0;
   const coutUsd = (inputTokens * PRIX_ENTREE + outputTokens * PRIX_SORTIE) / 1e6;
-  const brut = (outil?.input ?? {}) as { lignes?: LigneIA[]; remarques?: string };
+  const brut = (outil?.input ?? {}) as { lignes?: LigneIA[]; evenements?: unknown; remarques?: string };
   const n = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) < 30 ? (v as number) : 0);
   const lignes = (brut.lignes ?? [])
     .filter((l) => l && (l.equipe === "home" || l.equipe === "away"))
@@ -117,7 +147,7 @@ export async function analyserFeuille(opts: {
       essais: n(l.essais), transformations: n(l.transformations), penalites: n(l.penalites), drops: n(l.drops),
       cartons_jaunes: n(l.cartons_jaunes), cartons_rouges: n(l.cartons_rouges),
     }));
-  return { lignes, remarques: String(brut.remarques ?? "").slice(0, 600), inputTokens, outputTokens, coutUsd };
+  return { lignes, evenements: filPropre(brut.evenements), remarques: String(brut.remarques ?? "").slice(0, 600), inputTokens, outputTokens, coutUsd };
 }
 
 // ---------- recherche autonome sur le web ----------
@@ -140,7 +170,8 @@ export async function chercherFeuille(opts: {
     "Cherche sur le web un compte rendu de ce match dans la presse (L'Équipe, Midi Olympique, Rugbyrama, Ouest-France, presse régionale, BBC, RTE…) ou sur le site d'un des deux clubs.",
     "Relève pour chaque joueur ses essais, transformations réussies, pénalités réussies, drops réussis et cartons, puis appelle l'outil feuille_de_match.",
     "Relie chaque joueur à sa référence dans les listes ci-dessous. S'il n'y figure pas, mets ref à null. Un essai de pénalité ne se rattache à aucun joueur : signale-le dans les remarques.",
-    "Si tu ne trouves pas d'information fiable, appelle feuille_de_match avec une liste vide et explique pourquoi dans les remarques. N'invente jamais.",
+    "Si les comptes rendus donnent les minutes (essais, pénalités, cartons…), remplis aussi le fil du match (evenements) dans l'ordre chronologique ; sinon laisse-le vide.",
+    "Si tu ne trouves pas d'information fiable, appelle feuille_de_match avec des listes vides et explique pourquoi dans les remarques. N'invente jamais.",
     "",
     `Effectif ${opts.domicile} (home) :`, liste(opts.effectifDom) || "(vide)",
     "",
@@ -182,7 +213,7 @@ export async function chercherFeuille(opts: {
   // au-delà de 100 000 tokens, Haiku 5.5 est facturé au tarif « long contexte » : on compte large
   const long = inputTokens > 100_000;
   const coutUsd = (inputTokens * (long ? 0.5 : PRIX_ENTREE) + outputTokens * (long ? 2.5 : PRIX_SORTIE)) / 1e6 + recherches * PRIX_RECHERCHE;
-  const brut = ((outil?.input ?? {}) as { lignes?: LigneIA[]; remarques?: string });
+  const brut = ((outil?.input ?? {}) as { lignes?: LigneIA[]; evenements?: unknown; remarques?: string });
   const n = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) < 30 ? (v as number) : 0);
   const lignes = (brut.lignes ?? []).filter((l) => l && (l.equipe === "home" || l.equipe === "away")).map((l) => ({
     equipe: l.equipe, ref: typeof l.ref === "string" ? l.ref : null, nom_lu: String(l.nom_lu ?? "").slice(0, 80),
@@ -190,5 +221,5 @@ export async function chercherFeuille(opts: {
     cartons_jaunes: n(l.cartons_jaunes), cartons_rouges: n(l.cartons_rouges),
   }));
   const remarques = outil ? String(brut.remarques ?? "").slice(0, 600) : "Claude n'a pas trouvé de compte rendu exploitable.";
-  return { lignes, remarques, inputTokens, outputTokens, coutUsd, recherches };
+  return { lignes, evenements: filPropre(brut.evenements), remarques, inputTokens, outputTokens, coutUsd, recherches };
 }

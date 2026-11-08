@@ -16,7 +16,7 @@ export const maxDuration = 120;
 
 type Joueur = { id: string; first_name: string; last_name: string; position: string | null; team_id: string | null; in_squad: boolean };
 type Proposition = {
-  id: string; match_id: string; remarques: string | null;
+  id: string; match_id: string; remarques: string | null; evenements: unknown[];
   lignes: { cote: "home" | "away"; player_id: string; tries: number; conversions: number; penalty_goals: number; drop_goals: number; yellow: number; red: number }[];
   inconnus: { cote: "home" | "away"; nom: string; essais: number; transformations: number; penalites: number; drops: number; cj: number; cr: number }[];
 };
@@ -63,7 +63,7 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
   const joueurs = (jData ?? []) as Joueur[];
   // proposition de Claude à vérifier (après « Remplir avec Claude »)
   const [{ data: propData }, { data: depense }] = await Promise.all([
-    typeof sp.ia === "string" && /^[0-9a-f-]{36}$/.test(sp.ia) ? db.from("ia_propositions").select("id, match_id, lignes, inconnus, remarques").eq("id", sp.ia).maybeSingle() : Promise.resolve({ data: null }),
+    typeof sp.ia === "string" && /^[0-9a-f-]{36}$/.test(sp.ia) ? db.from("ia_propositions").select("id, match_id, lignes, inconnus, remarques, evenements").eq("id", sp.ia).maybeSingle() : Promise.resolve({ data: null }),
     db.rpc("ia_depense_mois"),
   ]);
   const prop = propData as Proposition | null;
@@ -162,6 +162,7 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
                   <div role="status" className="mt-4 rounded-xl bg-moutarde/20 border border-moutarde p-3 text-sm">
                     <p className="font-semibold">Proposition de Claude pré-remplie ci-dessous : vérifiez puis cliquez sur « Enregistrer ce match ».</p>
                     {prop.remarques && <p className="mt-1">{prop.remarques}</p>}
+                    {prop.evenements.length > 0 && <p className="mt-1">Fil du match : {prop.evenements.length} faits de jeu avec leur minute seront ajoutés à l&apos;enregistrement.</p>}
                     {prop.inconnus.length > 0 && (
                       <div className="mt-2">
                         <p>Joueurs non trouvés dans l&apos;effectif, à choisir à la main dans une ligne vide :</p>
@@ -181,6 +182,7 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
                 <form action={saveJournee} className="mt-4">
                   <input type="hidden" name="match_id" value={m.id} />
                   <input type="hidden" name="_back" value={`${lien(journee)}#m-${m.id}`} />
+                  {prop?.match_id === m.id && <input type="hidden" name="ia_prop" value={prop.id} />}
                   <div className="grid gap-5 lg:grid-cols-2">
                     {(["home", "away"] as const).map((cote) => {
                       const team = m[cote];

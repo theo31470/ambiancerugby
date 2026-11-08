@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { EVENT_POINTS, parisLocalToIso, slugify } from "@/lib/format";
+import { ecrireFil, filDepuisIA, type EvtPropose } from "@/lib/fil";
 
 /** Exécute une action ; en cas d'erreur, revient sur la page du formulaire avec le message. */
 async function run(form: FormData, fn: () => Promise<void>) {
@@ -446,6 +447,15 @@ export async function saveJournee(form: FormData) {
       const { error } = await db.from("player_match_stats").upsert(rows, { onConflict: "match_id,player_id" });
       fail(error, "Saisie du match");
     }
+    // proposition de Claude validée : son fil du match (minutes des essais, cartons…) part avec
+    const propId = str(form, "ia_prop");
+    if (propId) {
+      const [{ data: prop }, { data: mt }] = await Promise.all([
+        db.from("ia_propositions").select("evenements").eq("id", propId).eq("match_id", matchId).maybeSingle(),
+        db.from("matches").select("id, home_team_id, away_team_id").eq("id", matchId).single(),
+      ]);
+      if (prop && mt) await ecrireFil(db, mt, (prop.evenements ?? []) as EvtPropose[]);
+    }
     // lignes retirées
     let del = db.from("player_match_stats").delete().eq("match_id", matchId);
     if (rows.length) del = del.not("player_id", "in", `(${rows.map((r) => r.player_id).join(",")})`);
@@ -635,7 +645,7 @@ export async function analyserMatch(form: FormData) {
     const lignes = r.lignes.filter((l) => l.ref && refs.has(l.ref) && (l.ref.startsWith("H") ? l.equipe === "home" : l.equipe === "away"))
       .map((l) => ({ cote: l.equipe, player_id: refs.get(l.ref!)!, tries: l.essais, conversions: l.transformations, penalty_goals: l.penalites, drop_goals: l.drops, yellow: l.cartons_jaunes, red: l.cartons_rouges }));
     const inconnus = r.lignes.filter((l) => !l.ref || !refs.has(l.ref)).map((l) => ({ cote: l.equipe, nom: l.nom_lu, essais: l.essais, transformations: l.transformations, penalites: l.penalites, drops: l.drops, cj: l.cartons_jaunes, cr: l.cartons_rouges }));
-    const { data: prop, error } = await db.from("ia_propositions").insert({ match_id: matchId, created_by: viewer.id, lignes, inconnus, remarques: r.remarques || null }).select("id").single();
+    const { data: prop, error } = await db.from("ia_propositions").insert({ match_id: matchId, created_by: viewer.id, lignes, inconnus, evenements: filDepuisIA(r.evenements, refs), remarques: r.remarques || null }).select("id").single();
     fail(error, "Proposition de Claude");
     const [chemin, ancre] = back.split("#");
     redirect(`${chemin}${chemin.includes("?") ? "&" : "?"}ia=${prop!.id}${ancre ? `#${ancre}` : ""}`);

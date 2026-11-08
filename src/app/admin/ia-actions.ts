@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { chercherFeuille, IA_MODELE, IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { fmtDay } from "@/lib/format";
+import { ecrireFil, filDepuisIA } from "@/lib/fil";
 
 export type EtatRecherche = { matchId: string; etat: "valide" | "proposition" | "rien" | "erreur" | "deja"; message: string; propId?: string };
 
@@ -65,10 +66,11 @@ export async function chercherMatchIA(matchId: string, auto: boolean): Promise<E
       const rows = lignes.map(({ cote, ...l }) => ({ ...l, match_id: matchId, team_id: cote === "home" ? m.home_team_id : m.away_team_id }));
       const { error } = await db.from("player_match_stats").upsert(rows, { onConflict: "match_id,player_id" });
       if (error) return { matchId, etat: "erreur", message: error.message };
+      const nFil = await ecrireFil(db, m, filDepuisIA(r.evenements, refs));
       revalidatePath("/", "layout");
-      return { matchId, etat: "valide", message: `${rows.length} joueurs enregistrés, ${totalDom}–${totalExt} conforme au score.` };
+      return { matchId, etat: "valide", message: `${rows.length} joueurs enregistrés, ${totalDom}–${totalExt} conforme au score${nFil ? `, fil du match : ${nFil} faits de jeu` : ""}.` };
     }
-    const { data: prop, error } = await db.from("ia_propositions").insert({ match_id: matchId, created_by: viewer.id, lignes, inconnus, remarques: r.remarques || null }).select("id").single();
+    const { data: prop, error } = await db.from("ia_propositions").insert({ match_id: matchId, created_by: viewer.id, lignes, inconnus, evenements: filDepuisIA(r.evenements, refs), remarques: r.remarques || null }).select("id").single();
     if (error) return { matchId, etat: "erreur", message: error.message };
     const pourquoi = deja ? "déjà saisi, à comparer" : inconnus.length ? `${inconnus.length} joueur(s) non reconnu(s)` : `${totalDom}–${totalExt} relevé pour ${m.home_score}–${m.away_score} officiel`;
     return { matchId, etat: deja ? "deja" : "proposition", message: `À vérifier : ${pourquoi}.`, propId: prop.id };
