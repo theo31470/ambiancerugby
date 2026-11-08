@@ -21,13 +21,14 @@ type Totaux = { season: string; competition_id: string; games: number; starts: n
 const CLES = ["games", "starts", "minutes", "tries", "conversions", "penalty_goals", "drop_goals", "points", "yellow", "red", "tackles", "carries", "metres", "line_breaks", "turnovers_won", "motm"] as const;
 type Perf = { rating: number; tries: number; points: number; tackles: number; carries: number; metres: number; motm: boolean; match: { id: string; kickoff_at: string; home_score: number | null; away_score: number | null; home: TeamLite; away: TeamLite } };
 
-export default async function JoueurPage({ params }: PageProps<"/joueurs/[slug]">) {
+export default async function JoueurPage({ params, searchParams }: PageProps<"/joueurs/[slug]">) {
   const { slug } = await params;
+  const sp = await searchParams;
   const p = await getPlayer(slug);
   if (!p) notFound();
   const a = age(p.birth_date);
   const db = publicClient();
-  const [{ data: seasons }, { data: perfs }, viewer] = await Promise.all([
+  const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }] = await Promise.all([
     db.from("player_season_totals").select("*").eq("player_id", p.id).order("season", { ascending: false }),
     db.from("player_match_stats")
       .select(`rating,tries,points,tackles,carries,metres,motm, match:matches!inner(id,kickoff_at,home_score,away_score, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}))`)
@@ -35,19 +36,25 @@ export default async function JoueurPage({ params }: PageProps<"/joueurs/[slug]"
       .order("match(kickoff_at)", { ascending: false })
       .limit(10),
     getViewer(),
+    db.from("player_career").select("kind, ordre, equipe, periode, matchs, points").eq("player_id", p.id).order("kind").order("ordre"),
   ]);
+  const parcours = (parcoursData ?? []) as { kind: "club" | "selection"; ordre: number; equipe: string; periode: string | null; matchs: number | null; points: number | null }[];
   const { data: compsData } = await db.from("competitions").select("id,name,short_name,slug");
   const lignes = ((seasons ?? []) as Totaux[]).map((t) => ({ ...t, competition: (compsData ?? []).find((c) => c.id === t.competition_id) }));
-  const derniere = lignes[0]?.season;
-  const parComp = lignes.filter((t) => t.season === derniere);
-  const saison = parComp.length
-    ? (() => {
-        const tot = Object.fromEntries(CLES.map((k) => [k, parComp.reduce((s, t) => s + (Number(t[k]) || 0), 0)])) as Record<(typeof CLES)[number], number>;
-        const notes = parComp.filter((t) => t.rating != null);
-        const rating = notes.length ? notes.reduce((s, t) => s + Number(t.rating) * t.games_saisis, 0) / Math.max(1, notes.reduce((s, t) => s + t.games_saisis, 0)) : null;
-        return { season: derniere!, ...tot, rating };
-      })()
-    : undefined;
+  // saisons disponibles, de la plus récente à la plus ancienne, puis la carrière
+  const saisons = [...new Set(lignes.map((t) => t.season))].sort((x, y) => y.localeCompare(x));
+  const vue = typeof sp.stats === "string" && (sp.stats === "carriere" || saisons.includes(sp.stats)) ? sp.stats : (saisons[0] ?? "carriere");
+  const parComp = vue === "carriere" ? lignes : lignes.filter((t) => t.season === vue);
+  const cumul = (liste: Totaux[]) => {
+    if (!liste.length) return undefined;
+    const tot = Object.fromEntries(CLES.map((k) => [k, liste.reduce((s, t) => s + (Number(t[k]) || 0), 0)])) as Record<(typeof CLES)[number], number>;
+    const notes = liste.filter((t) => t.rating != null && t.games_saisis > 0);
+    const poids = notes.reduce((s, t) => s + t.games_saisis, 0);
+    const rating = poids ? notes.reduce((s, t) => s + Number(t.rating) * t.games_saisis, 0) / poids : null;
+    return { ...tot, rating };
+  };
+  const saison = cumul(parComp);
+  const noteSaison = saisons[0] ? cumul(lignes.filter((t) => t.season === saisons[0]))?.rating ?? null : null;
   const matchs = (perfs ?? []) as unknown as Perf[];
   const full = !!viewer?.supporter;
 
@@ -76,9 +83,9 @@ export default async function JoueurPage({ params }: PageProps<"/joueurs/[slug]"
             </div>
           )}
           {p.photo_url && p.photo_source && <p className="relative mt-2 text-[11px] text-sourdine">Photo : {p.photo_source}</p>}
-          {saison?.rating != null && (
+          {noteSaison != null && (
             <div className="absolute -bottom-5 -right-5 w-24 h-24 rounded-full bg-bordeaux text-white grid place-items-center text-center shadow-[0_6px_0_-1px_rgba(0,0,0,.25)] rotate-[-6deg]">
-              <span><span className="groovy text-3xl text-moutarde block leading-none">{Number(saison.rating).toFixed(1)}</span><span className="text-[10px] font-semibold">note Ambiance</span></span>
+              <span><span className="groovy text-3xl text-moutarde block leading-none">{Number(noteSaison).toFixed(1)}</span><span className="text-[10px] font-semibold">note Ambiance</span></span>
             </div>
           )}
         </div>
@@ -110,7 +117,18 @@ export default async function JoueurPage({ params }: PageProps<"/joueurs/[slug]"
       </div>
 
       <section aria-labelledby="h-saison" className="mt-14">
-        <h2 id="h-saison" className="groovy text-3xl text-vin mb-4">Saison {saison?.season ?? ""}</h2>
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-3 mb-4">
+          <h2 id="h-saison" className="groovy text-3xl text-vin">{vue === "carriere" ? "Carrière" : `Saison ${vue}`}</h2>
+          <nav aria-label="Période" className="flex flex-wrap gap-1">
+            {[...saisons.slice(0, 4), "carriere"].map((v) => (
+              <Link key={v} href={`/joueurs/${p.slug}?stats=${encodeURIComponent(v)}#h-saison`} scroll={false} aria-current={v === vue ? "page" : undefined}
+                className={`rounded-full px-3 py-1 text-sm font-semibold ${v === vue ? "bg-vin text-white" : "bg-teinte hover:bg-trait"}`}>
+                {v === "carriere" ? "Carrière" : v === saisons[0] ? `Cette saison (${v})` : v}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        {vue === "carriere" && <p className="-mt-2 mb-4 text-sm text-sourdine">Toutes les saisons suivies par Ambiance Rugby, puis son parcours complet.</p>}
         {saison ? (
           <>
             <dl className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -133,12 +151,14 @@ export default async function JoueurPage({ params }: PageProps<"/joueurs/[slug]"
                   <caption className="sr-only">Détail par compétition</caption>
                   <thead><tr className="text-xs text-sourdine border-b border-trait">
                     <th scope="col" className="text-left font-semibold px-4 py-2">Compétition</th>
+                    {vue === "carriere" && <th scope="col" className="font-semibold px-2">Saison</th>}
                     {["MJ", "Min", "E", "T", "P", "D", "Pts", "CJ", "CR"].map((h) => <th key={h} scope="col" className="font-semibold px-2">{h}</th>)}
                   </tr></thead>
                   <tbody>
                     {parComp.map((t) => (
-                      <tr key={t.competition_id} className="border-b border-trait last:border-0">
+                      <tr key={t.competition_id + t.season} className="border-b border-trait last:border-0">
                         <th scope="row" className="text-left font-semibold px-4 py-2">{t.competition ? <Link href={`/competitions/${t.competition.slug}`} className="hover:underline underline-offset-4">{t.competition.name}</Link> : "–"}</th>
+                        {vue === "carriere" && <td className="text-center px-2 text-sourdine">{t.season}</td>}
                         {[t.games, t.minutes, t.tries, t.conversions, t.penalty_goals, t.drop_goals, t.points, t.yellow, t.red].map((v, i) => <td key={i} className="text-center px-2">{v}</td>)}
                       </tr>
                     ))}
@@ -150,7 +170,40 @@ export default async function JoueurPage({ params }: PageProps<"/joueurs/[slug]"
         ) : (
           <div className="bg-surface border border-dashed border-trait rounded-2xl p-8 text-center">
             <Ballon className="w-14 mx-auto text-vin" />
-            <p className="mt-3 text-sourdine">Pas encore de stats cette saison. Elles arrivent après chaque journée saisie par la rédaction.</p>
+            <p className="mt-3 text-sourdine">{vue === "carriere" ? "Pas encore de stats suivies par Ambiance Rugby." : "Pas encore de stats cette saison."} Elles arrivent après chaque journée saisie par la rédaction.</p>
+          </div>
+        )}
+
+        {vue === "carriere" && parcours.length > 0 && (
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            {(["club", "selection"] as const).map((k) => {
+              const liste = parcours.filter((x) => x.kind === k);
+              if (!liste.length) return null;
+              return (
+                <div key={k} className="bg-surface border border-trait rounded-2xl overflow-x-auto">
+                  <table className="w-full text-sm tnum">
+                    <caption className="text-left titre font-bold px-4 pt-4 pb-2">{k === "club" ? "Parcours en club" : "En sélection"}</caption>
+                    <thead><tr className="text-xs text-sourdine border-b border-trait">
+                      <th scope="col" className="text-left font-semibold px-4 py-2">Période</th>
+                      <th scope="col" className="text-left font-semibold px-2">Équipe</th>
+                      <th scope="col" className="font-semibold px-2">Matchs</th>
+                      <th scope="col" className="font-semibold px-4">Points</th>
+                    </tr></thead>
+                    <tbody>
+                      {liste.map((x) => (
+                        <tr key={x.ordre + x.equipe} className="border-b border-trait last:border-0">
+                          <td className="px-4 py-2 text-sourdine whitespace-nowrap">{x.periode ?? "–"}</td>
+                          <th scope="row" className="text-left font-semibold px-2">{x.equipe}</th>
+                          <td className="text-center px-2">{x.matchs ?? "–"}</td>
+                          <td className="text-center px-4">{x.points ?? "–"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+            <p className="text-xs text-sourdine lg:col-span-2">Parcours : Wikipédia (licence CC BY-SA), matchs et points en championnat.</p>
           </div>
         )}
       </section>

@@ -1,6 +1,7 @@
 // Ambiance Rugby — effectifs automatiques.
-//   squads  lit les effectifs des clubs sur Wikipédia (licence CC BY-SA) et crée / met à jour les joueurs
-//   enrich  complète chaque joueur via TheSportsDB (clé gratuite) : photo, date de naissance, taille, poids
+//   squads    lit les effectifs des clubs sur Wikipédia (licence CC BY-SA) et crée / met à jour les joueurs
+//   enrich    complète chaque joueur via TheSportsDB (clé gratuite) : photo, date de naissance, taille, poids
+//   carriere  lit l'infobox Wikipédia de chaque joueur : parcours en club et en sélection (matchs, points)
 // Les joueurs « verrouillés » (corrigés à la main) ne sont jamais modifiés.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
@@ -42,7 +43,7 @@ function poste(titre: string): string | null {
   return null;
 }
 
-type Joueur = { nom: string; prenom: string; complet: string; pays: string | null; poste: string | null };
+type Joueur = { nom: string; prenom: string; complet: string; pays: string | null; poste: string | null; wiki: string | null };
 
 /** Lit le premier effectif « {{RU squad player|NAT|Nom}} » d'une page Wikipédia anglaise. */
 function lireEffectif(wikitext: string): Joueur[] {
@@ -68,6 +69,9 @@ function lireEffectif(wikitext: string): Joueur[] {
     if (titre) { rubrique = poste(titre[1]); continue; }
     const m = ligne.match(/\{\{\s*(?:RU|rugby union) squad player\s*\|(.*)\}\}/i);
     if (!m) continue;
+    // page Wikipédia du joueur : lien explicite, sinon le nom (le modèle crée le lien), sauf « nolink »
+    const lien = m[1].match(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/)?.[1]?.trim();
+    const sansLien = /\|\s*nolink\s*=\s*y/i.test(m[1]);
     // [[cible|texte]] -> texte, [[cible]] -> cible
     const propre = m[1].replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, "$2").replace(/\[\[([^\]]*)\]\]/g, "$1").replace(/<[^>]+>/g, "");
     const parts = propre.split("|").map((p) => p.trim());
@@ -77,7 +81,8 @@ function lireEffectif(wikitext: string): Joueur[] {
     const complet = (nommes.name ?? positionnels[1] ?? "").replace(/\s*\(.*?\)\s*/g, " ").replace(/\s+/g, " ").trim();
     if (!complet || complet.length < 3) continue;
     const mots = complet.split(" ");
-    out.push({ complet, prenom: mots.length > 1 ? mots[0] : "", nom: mots.length > 1 ? mots.slice(1).join(" ") : mots[0], pays: PAYS[code] ?? (code || null), poste: poste(nommes.pos ?? "") ?? rubrique });
+    const wiki = lien && !lien.startsWith(":") ? lien : sansLien ? null : (nommes.link ?? nommes.name ?? positionnels[1] ?? "").replace(/\[\[|\]\]/g, "").trim() || null;
+    out.push({ complet, prenom: mots.length > 1 ? mots[0] : "", nom: mots.length > 1 ? mots.slice(1).join(" ") : mots[0], pays: PAYS[code] ?? (code || null), poste: poste(nommes.pos ?? "") ?? rubrique, wiki });
   }
   // une même personne listée deux fois (ex. joueur Espoir) : on garde la première
   const vus = new Set<string>();
@@ -160,7 +165,7 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
   // tous les joueurs, par pages de 1 000 (limite de l'API Supabase)
   const existants: any[] = [];
   for (let de = 0; ; de += 1000) {
-    const { data: page, error } = await db.from("players").select("id, slug, name_key, team_id, verrou, source").order("id").range(de, de + 999);
+    const { data: page, error } = await db.from("players").select("id, slug, name_key, team_id, verrou, source, wiki_title").order("id").range(de, de + 999);
     if (error) throw new Error(error.message);
     existants.push(...(page ?? []));
     if (!page || page.length < 1000) break;
@@ -196,6 +201,7 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
           if (ex.team_id !== t.id) patch.team_id = t.id; // transfert
           if (j.poste) patch.position = j.poste;
           if (j.pays) patch.nationality = j.pays;
+          if (j.wiki && ex.wiki_title !== j.wiki) { patch.wiki_title = j.wiki; patch.career_checked_at = null; }
           await db.from("players").update(patch).eq("id", ex.id);
           ex.team_id = t.id;
           maj++;
@@ -206,8 +212,8 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
           while (slugs.has(slug)) slug = `${slugify(j.complet)}-${n++}`;
           const { data, error } = await db.from("players").insert({
             slug, first_name: j.prenom, last_name: j.nom, team_id: t.id, position: j.poste, nationality: j.pays,
-            name_key: cle, source: "wikipedia", in_squad: true, synced_at: new Date().toISOString(),
-          }).select("id, slug, name_key, team_id, verrou, source").single();
+            name_key: cle, source: "wikipedia", in_squad: true, synced_at: new Date().toISOString(), wiki_title: j.wiki,
+          }).select("id, slug, name_key, team_id, verrou, source, wiki_title").single();
           if (error) { lignes.push(`${j.complet} : ${error.message}`); continue; }
           slugs.add(slug);
           parCle.set(cle, data);
@@ -285,6 +291,89 @@ async function jobEnrich(db: SupabaseClient, t0: number) {
   return [`${vus} joueurs consultés, ${trouves} complétés (photo, naissance…), ${count ?? 0} restants`];
 }
 
+
+// ---------- carriere ----------
+/** Texte lisible d'une valeur d'infobox : sans références, modèles ni liens. */
+function propre(v: string) {
+  let s = v.replace(/<!--[\s\S]*?-->/g, "").replace(/<ref[^>]*\/>/gi, "").replace(/<ref[\s\S]*?<\/ref>/gi, "");
+  for (let i = 0; i < 4; i++) s = s.replace(/\{\{[^{}]*\}\}/g, "");
+  return s.replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, "$2").replace(/\[\[([^\]]*)\]\]/g, "$1").replace(/<[^>]+>/g, " ").replace(/'{2,}/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+const entier = (v: string | undefined) => { const m = propre(v ?? "").match(/\d[\d,.\s]*/); if (!m) return null; const n = Number(m[0].replace(/[,.\s]/g, "")); return Number.isFinite(n) && n < 5000 ? n : null; };
+
+/** Paramètres de l'infobox « rugby biography » (découpage qui respecte les modèles et liens imbriqués). */
+function infobox(texte: string): Record<string, string> | null {
+  const debut = texte.search(/\{\{\s*infobox rugby (union )?biography/i);
+  if (debut < 0) return null;
+  let prof = 0, i = debut, fin = -1;
+  for (; i < texte.length - 1; i++) {
+    const d = texte.slice(i, i + 2);
+    if (d === "{{" || d === "[[") { prof++; i++; } else if (d === "}}" || d === "]]") { prof--; i++; if (prof === 0) { fin = i; break; } }
+  }
+  if (fin < 0) return null;
+  const corps = texte.slice(debut + 2, fin - 1);
+  const params: Record<string, string> = {};
+  let p = 0, cur = "";
+  const morceaux: string[] = [];
+  for (let k = 0; k < corps.length; k++) {
+    const d = corps.slice(k, k + 2);
+    if (d === "{{" || d === "[[") { p++; cur += d; k++; continue; }
+    if (d === "}}" || d === "]]") { p--; cur += d; k++; continue; }
+    if (corps[k] === "|" && p === 0) { morceaux.push(cur); cur = ""; continue; }
+    cur += corps[k];
+  }
+  morceaux.push(cur);
+  for (const m of morceaux.slice(1)) {
+    const eq = m.indexOf("=");
+    if (eq > 0) params[m.slice(0, eq).trim().toLowerCase()] = m.slice(eq + 1).trim();
+  }
+  return params;
+}
+
+const JEUNES = /\bu-?\d{2}\b|under[- ]\d{2}|sevens|\b7s\b|\bA$|\bXV\b|barbarians|lions|development|emerging|schools|students|universit|academy|espoirs/i;
+
+async function jobCarriere(db: SupabaseClient, t0: number) {
+  const { data } = await db.from("players").select("id, wiki_title, verrou").not("wiki_title", "is", null).is("career_checked_at", null).eq("in_squad", true).limit(120);
+  const liste = (data ?? []) as { id: string; wiki_title: string; verrou: boolean }[];
+  let lus = 0, parcours = 0;
+  for (let i = 0; i < liste.length; i += 40) {
+    if (Date.now() - t0 > BUDGET_MS - 20_000) break;
+    const lot = liste.slice(i, i + 40);
+    const get = await contenus([...new Set(lot.map((p) => p.wiki_title))]);
+    for (const p of lot) {
+      lus++;
+      const page = get(p.wiki_title);
+      const ib = page ? infobox(page.texte) : null;
+      const patch: Record<string, unknown> = { career_checked_at: new Date().toISOString() };
+      if (ib && !p.verrou) {
+        const lignes: Record<string, unknown>[] = [];
+        for (let k = 1; k <= 40; k++) {
+          const club = ib[`clubs${k}`] ?? ib[`club${k}`];
+          if (club && propre(club)) lignes.push({ player_id: p.id, kind: "club", ordre: k, equipe: propre(club).slice(0, 80), periode: propre(ib[`years${k}`] ?? "").slice(0, 30) || null, matchs: entier(ib[`caps${k}`]), points: entier(ib[`points${k}`]) });
+          const nat = ib[`nationalteam${k}`];
+          if (nat && propre(nat)) lignes.push({ player_id: p.id, kind: "selection", ordre: k, equipe: propre(nat).slice(0, 80), periode: propre(ib[`nationalyears${k}`] ?? "").slice(0, 30) || null, matchs: entier(ib[`nationalcaps${k}`]), points: entier(ib[`nationalpoints${k}`]) });
+        }
+        await db.from("player_career").delete().eq("player_id", p.id).eq("source", "wikipedia");
+        if (lignes.length) {
+          await db.from("player_career").insert(lignes);
+          parcours++;
+          // sélections en équipe première (hors jeunes, VII, équipes A, Lions)
+          const senior = lignes.filter((l) => l.kind === "selection" && !JEUNES.test(String(l.equipe)));
+          const caps = senior.reduce((s, l) => s + (Number(l.matchs) || 0), 0);
+          if (senior.length) patch.caps = caps;
+          const pts = lignes.filter((l) => !JEUNES.test(String(l.equipe))).reduce((s, l) => s + (Number(l.points) || 0), 0);
+          if (pts) patch.career_points = pts;
+        }
+        if (!lignes.length && !page) patch.wiki_title = null;
+      }
+      await db.from("players").update(patch).eq("id", p.id);
+    }
+    await sleep(500);
+  }
+  const { count } = await db.from("players").select("id", { count: "exact", head: true }).not("wiki_title", "is", null).is("career_checked_at", null).eq("in_squad", true);
+  return [`${lus} pages joueurs lues, ${parcours} parcours importés, ${count ?? 0} restants`];
+}
+
 Deno.serve(async (req) => {
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
   const { data: ok } = await db.rpc("check_sync_secret", { s: req.headers.get("x-sync-secret") ?? "" });
@@ -296,14 +385,15 @@ Deno.serve(async (req) => {
   try {
     if (job === "squads") lignes = await jobSquads(db, params, t0);
     else if (job === "enrich") lignes = await jobEnrich(db, t0);
+    else if (job === "carriere") lignes = await jobCarriere(db, t0);
     else throw new Error(`tâche inconnue : ${job}`);
   } catch (e) {
     okRun = false;
     lignes.push(`ERREUR ${(e as Error).message}`);
   }
-  const silencieux = job === "enrich" && lignes[0]?.startsWith("0 joueurs");
+  const silencieux = (job === "enrich" && lignes[0]?.startsWith("0 joueurs")) || (job === "carriere" && lignes[0]?.startsWith("0 pages"));
   if (!silencieux) {
-    await db.from("sync_runs").insert({ provider: job === "squads" ? "wikipedia" : "thesportsdb", job: `effectifs-${job}`, calls: 0, ok: okRun, message: lignes.join(" | ").slice(0, 4000), duration_ms: Date.now() - t0 });
+    await db.from("sync_runs").insert({ provider: job === "enrich" ? "thesportsdb" : "wikipedia", job: `effectifs-${job}`, calls: 0, ok: okRun, message: lignes.join(" | ").slice(0, 4000), duration_ms: Date.now() - t0 });
   }
   return json({ ok: okRun, log: lignes, ms: Date.now() - t0 }, okRun ? 200 : 500);
 });
