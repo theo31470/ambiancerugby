@@ -51,8 +51,10 @@ export type PowerRow = Rating & { team: TeamLite & { is_national: boolean }; for
 export async function getPowerRanking(national = false, limit = 200): Promise<PowerRow[]> {
   const { data } = await publicClient()
     .from("team_ratings")
-    .select(`team_id,rating,rating_7d,matches,rank, team:teams!inner(${TEAM_LITE},is_national)`)
+    .select(`team_id,rating,rating_7d,matches,rank, team:teams!inner(${TEAM_LITE},is_national,categorie)`)
     .eq("team.is_national", national)
+    // équipes premières seulement (ni moins de 20 ans, ni équipes A)
+    .eq("team.categorie", "senior")
     .order("rating", { ascending: false })
     .limit(limit);
   const rows = (data ?? []) as unknown as (Rating & { team: PowerRow["team"] })[];
