@@ -49,3 +49,19 @@ export const produitPrintful = (id: number) => pf<{
 /** Abonne la boutique aux événements Printful (expédition, échec…). */
 export const brancherWebhooks = (url: string) =>
   pf("/webhooks", { method: "POST", body: JSON.stringify({ url, types: ["package_shipped", "package_returned", "order_failed", "order_canceled", "order_put_hold", "order_remove_hold", "order_updated"] }) });
+
+// ---------- catalogue Printful (modèles vierges) et création de produits ----------
+export type ModeleCatalogue = { id: number; type: string; type_name: string; title: string; brand: string | null; model: string };
+export type VarianteCatalogue = { id: number; color: string | null; color_code: string | null; size: string | null; name: string; in_stock?: boolean };
+export const catalogue = () => pf<ModeleCatalogue[]>("/products");
+export const modeleCatalogue = (id: number) => pf<{ product: ModeleCatalogue; variants: VarianteCatalogue[] }>(`/products/${id}`);
+
+/** Crée un produit dans la boutique Printful avec ses déclinaisons et le visuel à imprimer. */
+export const creerProduitPrintful = (p: { nom: string; vignette: string; variantes: { variant_id: number; prix: string; fichiers: { type: string; url: string }[] }[] }) =>
+  pf<{ id: number }>("/store/products", {
+    method: "POST",
+    body: JSON.stringify({
+      sync_product: { name: p.nom, thumbnail: p.vignette },
+      sync_variants: p.variantes.map((v) => ({ variant_id: v.variant_id, retail_price: v.prix, files: v.fichiers })),
+    }),
+  });

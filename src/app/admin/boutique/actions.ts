@@ -4,7 +4,8 @@ import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { shopDb, type Commande } from "@/lib/shop/admin";
-import { brancherWebhooks, produitPrintful } from "@/lib/shop/printful";
+import { brancherWebhooks, catalogue, creerProduitPrintful, modeleCatalogue, produitPrintful } from "@/lib/shop/printful";
+import { COLLECTION } from "@/lib/shop/collection";
 import { stripe } from "@/lib/shop/stripe";
 import { commandePayee, synchroniserPrintful } from "@/lib/shop/traitement";
 import { slugify } from "@/lib/format";
@@ -81,40 +82,86 @@ export async function noteCommande(form: FormData) {
 }
 
 // ---------- produits ----------
+/** Copie un produit de la boutique Printful (et toutes ses déclinaisons) sur le site. */
+async function importer(db: Awaited<ReturnType<typeof createClient>>, pfId: number, extra: { description?: string; category?: string; price_cents?: number } = {}) {
+  const p = await produitPrintful(pfId);
+  const prixMin = Math.min(...p.sync_variants.map((v) => Math.round(Number(v.retail_price) * 100)).filter((x) => x > 0));
+  const { data: existant } = await db.from("shop_products").select("id").eq("printful_sync_product_id", pfId).maybeSingle();
+  let productId = existant?.id as string | undefined;
+  if (!productId) {
+    const { data, error } = await db.from("shop_products").insert({
+      slug: slugify(p.sync_product.name), name: p.sync_product.name, price_cents: extra.price_cents ?? (Number.isFinite(prixMin) ? prixMin : 2900),
+      description: extra.description ?? null, category: extra.category ?? "vetements",
+      images: [p.sync_product.thumbnail_url].filter(Boolean), printful_sync_product_id: pfId, active: false,
+    }).select("id").single();
+    if (error) throw new Error(error.code === "23505" ? `Un produit s'appelle déjà « ${p.sync_product.name} » : renommez-le.` : error.message);
+    productId = data.id;
+  }
+  // déclinaisons : remplacées à chaque import
+  await db.from("shop_variants").delete().eq("product_id", productId!);
+  const lignes = p.sync_variants.map((v, i) => {
+    const [, apres] = v.name.split(" - ");
+    const morceaux = (apres ?? "").split("/").map((x) => x.trim());
+    const taille = v.size ?? morceaux.find((m) => /^(XXS|XS|S|M|L|XL|\dXL|XXL|One size|\d+ ?oz|\d.*×.*)$/i.test(m)) ?? null;
+    const couleur = v.color ?? morceaux.find((m) => m !== taille) ?? null;
+    const apercu = v.files?.find((f) => f.type === "preview")?.preview_url ?? v.product?.image ?? null;
+    return {
+      product_id: productId, label: [couleur, taille].filter(Boolean).join(" / ") || v.name, size: taille, color: couleur,
+      price_cents: Math.round(Number(v.retail_price) * 100) || null, printful_variant_id: v.variant_id, printful_sync_variant_id: v.id, image: apercu, sort_order: i,
+    };
+  });
+  const { error } = await db.from("shop_variants").insert(lignes);
+  if (error) throw new Error(error.message);
+  return productId!;
+}
+
 /** Importe (ou met à jour) un produit de la boutique Printful avec toutes ses déclinaisons. */
 export async function importerProduit(form: FormData) {
   return run(form, async () => {
     const { db } = await staff();
-    const pfId = Number(form.get("printful_id"));
-    const p = await produitPrintful(pfId);
-    const prixMin = Math.min(...p.sync_variants.map((v) => Math.round(Number(v.retail_price) * 100)).filter((x) => x > 0));
-    const { data: existant } = await db.from("shop_products").select("id").eq("printful_sync_product_id", pfId).maybeSingle();
-    let productId = existant?.id as string | undefined;
-    if (!productId) {
-      const { data, error } = await db.from("shop_products").insert({
-        slug: slugify(p.sync_product.name), name: p.sync_product.name, price_cents: Number.isFinite(prixMin) ? prixMin : 2900,
-        images: [p.sync_product.thumbnail_url].filter(Boolean), printful_sync_product_id: pfId, active: false,
-      }).select("id").single();
-      if (error) throw new Error(error.code === "23505" ? "Un produit porte déjà ce nom : renommez-le dans Printful ou ici." : error.message);
-      productId = data.id;
-    }
-    // déclinaisons : remplacées à chaque import
-    await db.from("shop_variants").delete().eq("product_id", productId!);
-    const lignes = p.sync_variants.map((v, i) => {
-      const [, apres] = v.name.split(" - ");
-      const morceaux = (apres ?? "").split("/").map((x) => x.trim());
-      const taille = v.size ?? morceaux.find((m) => /^(XXS|XS|S|M|L|XL|\dXL|XXL|One size)$/i.test(m)) ?? null;
-      const couleur = v.color ?? morceaux.find((m) => m !== taille) ?? null;
-      const apercu = v.files?.find((f) => f.type === "preview")?.preview_url ?? v.product?.image ?? null;
-      return {
-        product_id: productId, label: [couleur, taille].filter(Boolean).join(" / ") || v.name, size: taille, color: couleur,
-        price_cents: Math.round(Number(v.retail_price) * 100) || null, printful_variant_id: v.variant_id, printful_sync_variant_id: v.id, image: apercu, sort_order: i,
-      };
-    });
-    const { error } = await db.from("shop_variants").insert(lignes);
-    if (error) throw new Error(error.message);
+    const productId = await importer(db, Number(form.get("printful_id")));
     revalidatePath("/boutique", "layout");
     redirect(`/admin/boutique/produits/${productId}?ok=importe`);
+  });
+}
+
+/** Crée la première collection dans Printful (visuels du dossier /merch) puis l'importe, masquée, sur le site. */
+export async function creerCollection(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const h = await headers();
+    const site = process.env.NEXT_PUBLIC_SITE_URL ?? `https://${h.get("host")}`;
+    const modeles = await catalogue();
+    const { data: deja } = await db.from("shop_products").select("name");
+    const existants = new Set((deja ?? []).map((x) => x.name));
+    const bilan: string[] = [];
+    for (const a of COLLECTION) {
+      if (existants.has(a.nom)) { bilan.push(`${a.nom} : déjà là`); continue; }
+      try {
+        const modele = modeles.find((m) => a.modele.test(m.title) || a.modele.test(`${m.brand ?? ""} ${m.model}`));
+        if (!modele) throw new Error("modèle introuvable dans le catalogue Printful");
+        const { variants } = await modeleCatalogue(modele.id);
+        const choisies = variants.filter((v) => {
+          const visuel = a.visuels[v.color ?? ""] ?? a.visuels["*"];
+          const tailleOk = !a.tailles || a.tailles.some((t) => (v.size ?? "").replace(/\s/g, "").toLowerCase() === t.replace(/\s/g, "").toLowerCase());
+          return visuel && tailleOk && v.in_stock !== false;
+        });
+        if (!choisies.length) throw new Error("aucune couleur ou taille disponible");
+        const premier = a.visuels[choisies[0].color ?? ""] ?? a.visuels["*"];
+        const cree = await creerProduitPrintful({
+          nom: a.nom, vignette: `${site}/merch/${premier}.png`,
+          variantes: choisies.map((v) => ({ variant_id: v.id, prix: a.prix, fichiers: [{ type: a.emplacement, url: `${site}/merch/${a.visuels[v.color ?? ""] ?? a.visuels["*"]}.png` }] })),
+        });
+        await importer(db, cree.id, { description: a.description, category: a.categorie, price_cents: Math.round(Number(a.prix) * 100) });
+        bilan.push(`${a.nom} : créé (${choisies.length} déclinaisons)`);
+      } catch (e) {
+        bilan.push(`${a.nom} : ${(e as Error).message}`);
+      }
+    }
+    revalidatePath("/boutique", "layout");
+    const echecs = bilan.filter((b) => !/créé|déjà là/.test(b));
+    const back = String(form.get("_back") ?? "/admin/boutique/produits");
+    redirect(`${back}?${echecs.length ? `erreur=${encodeURIComponent(bilan.join(" · "))}` : "ok=collection"}`);
   });
 }
 

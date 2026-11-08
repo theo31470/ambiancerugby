@@ -6,6 +6,8 @@ const OK: Record<string, string> = {
   lance: "Synchronisation lancée. Le résultat apparaît dans le journal d'ici une minute.",
   saison: "Saison mise à jour.",
   role: "Rôle mis à jour.",
+  collection: "Collection créée dans Printful et importée, masquée : vérifiez chaque produit puis mettez-le en vente.",
+  importe: "Produit importé.",
 };
 
 export default function Notice({ sp }: { sp: Record<string, string | string[] | undefined> }) {

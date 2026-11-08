@@ -5,7 +5,7 @@ import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import { produitsPrintful } from "@/lib/shop/printful";
 import { euros } from "@/lib/shop/format";
-import { importerProduit } from "../actions";
+import { creerCollection, importerProduit } from "../actions";
 
 export default async function AdminProduits({ searchParams }: PageProps<"/admin/boutique/produits">) {
   const sp = await searchParams;
@@ -28,6 +28,23 @@ export default async function AdminProduits({ searchParams }: PageProps<"/admin/
           </>} />
       </div>
       <Notice sp={sp} />
+
+      <section aria-labelledby="h-collection" className="mb-10 rounded-2xl bg-bordeaux text-white p-5 grid gap-5 lg:grid-cols-[1fr_20rem] items-center">
+        <div>
+          <h2 id="h-collection" className="titre font-extrabold text-xl">Première collection Ambiance Rugby</h2>
+          <p className="mt-1 text-sm text-white/80 max-w-prose">
+            Visuels originaux créés à partir du logo : t-shirt logo, t-shirt « Troisième mi-temps », sweat « Allez les gars », mug et autocollant.
+            Un clic les crée dans votre boutique Printful avec leurs couleurs, tailles et prix, puis les importe ici, masqués, pour que vous les vérifiiez.
+          </p>
+          <form action={creerCollection} className="mt-4">
+            <input type="hidden" name="_back" value="/admin/boutique/produits" />
+            <button className="bouton-or">Créer la collection dans Printful</button>
+          </form>
+          <p className="mt-2 text-xs text-white/60">Fichiers d&apos;impression : <a href="/merch/apercu-collection.jpg" className="underline">voir la planche</a>. Les produits déjà créés sont ignorés.</p>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/merch/apercu-collection.jpg" alt="Les visuels de la collection" className="rounded-xl w-full" />
+      </section>
 
       <h2 className="font-bold text-lg mb-3">Sur le site</h2>
       {(data ?? []).length ? (
