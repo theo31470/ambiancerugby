@@ -166,7 +166,10 @@ export async function savePlayer(form: FormData) {
       career_points: num(form, "career_points"),
       career_tries: num(form, "career_tries"),
       photo_url: photo,
+      photo_source: photo ? "Ambiance Rugby" : null,
       bio: str(form, "bio"),
+      // corrigé à la main : la synchro automatique n'y touche plus
+      verrou: true,
     };
     if (id) {
       const { error } = await db.from("players").update(row).eq("id", id);
@@ -326,14 +329,11 @@ export async function runSync(form: FormData) {
     const { db } = await staff();
     const job = String(form.get("job"));
     const params: Record<string, unknown> = {};
-    if (job === "apisports") {
-      params.competition = String(form.get("competition"));
-      params.year = Number(form.get("year"));
-      if (!params.year) throw new Error("Indiquez l'année de début de la saison.");
-    }
+    if (job === "competition") params.slug = String(form.get("slug"));
+    if (job === "history" && form.get("force") === "on") params.force = true;
     const { error } = await db.rpc("trigger_sync", { p_job: job, p_params: params });
     fail(error, "Lancement de la synchronisation");
-    redirect("/admin/donnees?ok=lance");
+    redirect(`${String(form.get("_back") ?? "/admin/donnees")}?ok=lance`);
   });
 }
 
@@ -383,7 +383,7 @@ export async function setPlan(form: FormData) {
 }
 
 // ---------------- Feuille de stats des joueurs ----------------
-const STAT_FIELDS = ["minutes", "tries", "points", "tackles", "missed_tackles", "carries", "metres", "line_breaks", "offloads", "turnovers_won", "penalties_conceded", "yellow", "red"] as const;
+const STAT_FIELDS = ["minutes", "tries", "conversions", "penalty_goals", "drop_goals", "tackles", "missed_tackles", "carries", "metres", "line_breaks", "offloads", "turnovers_won", "penalties_conceded", "yellow", "red"] as const;
 
 export async function saveStats(form: FormData) {
   return run(form, async () => {
@@ -410,5 +410,171 @@ export async function saveStats(form: FormData) {
     if (remove.length) await db.from("player_match_stats").delete().eq("match_id", matchId).in("player_id", remove);
     revalidatePath("/", "layout");
     redirect(`/admin/matchs/${matchId}/stats?ok=enregistre`);
+  });
+}
+
+// ---------- saisie de journée ----------
+const SAISIE = ["tries", "conversions", "penalty_goals", "drop_goals", "yellow", "red"] as const;
+
+export async function saveJournee(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const matchId = String(form.get("match_id"));
+    const lignes = new Map<string, Record<string, unknown>>();
+    for (const cote of ["home", "away"]) {
+      const teamId = String(form.get(`${cote}.team`));
+      const n = Number(form.get(`${cote}.n`) ?? 0);
+      for (let i = 0; i < n; i++) {
+        const pid = str(form, `${cote}.${i}.p`);
+        if (!pid) continue;
+        const v: Record<string, number> = {};
+        for (const f of SAISIE) {
+          const x = num(form, `${cote}.${i}.${f}`);
+          if (x != null && (x < 0 || x > 99)) throw new Error("Valeur impossible dans la saisie (entre 0 et 99).");
+          v[f] = Math.round(x ?? 0);
+        }
+        const minutes = num(form, `${cote}.${i}.minutes`);
+        if (minutes != null && (minutes < 0 || minutes > 120)) throw new Error("Les minutes jouées vont de 0 à 120.");
+        // même joueur sur deux lignes : on additionne
+        const prev = lignes.get(pid);
+        if (prev) { for (const f of SAISIE) prev[f] = (prev[f] as number) + v[f]; if (minutes != null) prev.minutes = minutes; continue; }
+        lignes.set(pid, { match_id: matchId, player_id: pid, team_id: teamId, ...v, ...(minutes != null ? { minutes: Math.round(minutes) } : {}) });
+      }
+    }
+    const rows = [...lignes.values()];
+    if (rows.length) {
+      const { error } = await db.from("player_match_stats").upsert(rows, { onConflict: "match_id,player_id" });
+      fail(error, "Saisie du match");
+    }
+    // lignes retirées
+    let del = db.from("player_match_stats").delete().eq("match_id", matchId);
+    if (rows.length) del = del.not("player_id", "in", `(${rows.map((r) => r.player_id).join(",")})`);
+    const { error: e2 } = await del;
+    fail(e2, "Saisie du match");
+    revalidatePath("/", "layout");
+    const back = String(form.get("_back"));
+    const [chemin, ancre] = back.split("#");
+    redirect(`${chemin}${chemin.includes("?") ? "&" : "?"}ok=enregistre${ancre ? `#${ancre}` : ""}`);
+  });
+}
+
+// ---------- stats de départ de saison ----------
+const BASE = ["games", "starts", "minutes", "tries", "conversions", "penalty_goals", "drop_goals", "yellow", "red"] as const;
+
+export async function saveBase(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const competitionId = String(form.get("competition_id"));
+    const season = String(form.get("season"));
+    const ids = form.getAll("player_id").map(String);
+    const rows = [];
+    const vides: string[] = [];
+    for (const pid of ids) {
+      const v: Record<string, number> = {};
+      let total = 0;
+      for (const f of BASE) {
+        const x = num(form, `${pid}:${f}`);
+        if (x != null && x < 0) throw new Error("Les valeurs négatives ne sont pas acceptées.");
+        v[f] = Math.round(x ?? 0);
+        total += v[f];
+      }
+      if (total === 0) { vides.push(pid); continue; }
+      rows.push({ player_id: pid, competition_id: competitionId, season, ...v, updated_at: new Date().toISOString() });
+    }
+    if (rows.length) {
+      const { error } = await db.from("player_season_base").upsert(rows, { onConflict: "player_id,competition_id,season" });
+      fail(error, "Stats de départ");
+    }
+    if (vides.length) await db.from("player_season_base").delete().eq("competition_id", competitionId).eq("season", season).in("player_id", vides);
+    revalidatePath("/", "layout");
+    const back = String(form.get("_back"));
+    redirect(`${back}${back.includes("?") ? "&" : "?"}ok=enregistre`);
+  });
+}
+
+/** Collage depuis un tableur : « Nom ; MJ ; Tit ; Min ; E ; T ; P ; D ; CJ ; CR » (tabulations, points-virgules ou virgules). */
+export async function importBase(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const competitionId = String(form.get("competition_id"));
+    const season = String(form.get("season"));
+    const teamId = String(form.get("team_id"));
+    const texte = String(form.get("texte") ?? "");
+    const { data: effectif } = await db.from("players").select("id,first_name,last_name").eq("team_id", teamId);
+    const cle = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
+    const trouver = (nom: string) => {
+      const n = cle(nom);
+      const liste = effectif ?? [];
+      return liste.find((p) => cle(`${p.first_name} ${p.last_name}`) === n || cle(`${p.last_name} ${p.first_name}`) === n)
+        ?? (liste.filter((p) => n.includes(cle(p.last_name)) && n.includes(cle(p.first_name).slice(0, 1))).length === 1 ? liste.find((p) => n.includes(cle(p.last_name)) && n.includes(cle(p.first_name).slice(0, 1))) : undefined)
+        ?? (liste.filter((p) => cle(p.last_name) === n).length === 1 ? liste.find((p) => cle(p.last_name) === n) : undefined);
+    };
+    const rows = [];
+    const inconnus: string[] = [];
+    for (const brut of texte.split(/\r?\n/)) {
+      const ligne = brut.trim();
+      if (!ligne) continue;
+      const cells = ligne.split(/\t|;|,(?=\s*\d)/).map((c) => c.trim());
+      const nom = cells[0];
+      const chiffres = cells.slice(1).map((c) => Number(c.replace(/[^\d]/g, "") || 0));
+      if (!nom || !chiffres.length || /^nom|joueur/i.test(nom)) continue;
+      const p = trouver(nom);
+      if (!p) { inconnus.push(nom); continue; }
+      const v = Object.fromEntries(BASE.map((f, i) => [f, chiffres[i] ?? 0]));
+      rows.push({ player_id: p.id, competition_id: competitionId, season, ...v, updated_at: new Date().toISOString() });
+    }
+    if (rows.length) {
+      const { error } = await db.from("player_season_base").upsert(rows, { onConflict: "player_id,competition_id,season" });
+      fail(error, "Import des stats de départ");
+    }
+    revalidatePath("/", "layout");
+    const back = String(form.get("_back"));
+    const msg = inconnus.length ? `&erreur=${encodeURIComponent(`${rows.length} joueurs importés. Introuvables dans l'effectif : ${inconnus.slice(0, 12).join(", ")}${inconnus.length > 12 ? "…" : ""}`)}` : "&ok=importe";
+    redirect(`${back}${back.includes("?") ? "" : "?"}${msg}`);
+  });
+}
+
+// ---------- effectifs automatiques ----------
+export async function runEffectifs(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const job = String(form.get("job"));
+    const slug = str(form, "slug");
+    const { error } = await db.rpc("trigger_effectifs", { p_job: job, p_params: slug ? { slugs: [slug], force: true } : { force: form.get("force") === "on" } });
+    fail(error, "Mise à jour des effectifs");
+    redirect(`${String(form.get("_back") ?? "/admin/donnees")}?ok=lance`);
+  });
+}
+
+export async function setVerrou(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const { error } = await db.from("players").update({ verrou: form.get("verrou") === "1" }).eq("id", String(form.get("id")));
+    fail(error, "Verrou du joueur");
+    revalidatePath("/admin/joueurs");
+    redirect(`${String(form.get("_back"))}${String(form.get("_back")).includes("?") ? "&" : "?"}ok=enregistre`);
+  });
+}
+
+export async function toggleCompetition(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const { error } = await db.from("competitions").update({ active: form.get("active") === "1" }).eq("id", String(form.get("id")));
+    fail(error, "Compétition");
+    revalidatePath("/", "layout");
+    redirect("/admin/donnees?ok=enregistre");
+  });
+}
+
+export async function setWikiTitle(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const titre = str(form, "wiki_title");
+    const id = String(form.get("id"));
+    const { error } = await db.from("teams").update({ wiki_title: titre, squad_synced_at: null }).eq("id", id);
+    fail(error, "Page Wikipédia");
+    const { data: t } = await db.from("teams").select("slug").eq("id", id).single();
+    if (titre && t) await db.rpc("trigger_effectifs", { p_job: "squads", p_params: { slugs: [t.slug], force: true } });
+    redirect("/admin/donnees?ok=lance#effectifs");
   });
 }

@@ -103,6 +103,9 @@ export type Player = {
   caps: number | null;
   career_points: number | null;
   career_tries: number | null;
+  photo_source?: string | null;
+  source?: "manuel" | "wikipedia";
+  in_squad?: boolean;
 };
 
 export type Article = {

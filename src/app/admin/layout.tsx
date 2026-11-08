@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 const NAV = [
   { href: "/admin", label: "Tableau de bord" },
   { href: "/admin/articles", label: "Articles" },
+  { href: "/admin/journee", label: "Saisie de journée" },
+  { href: "/admin/stats-depart", label: "Stats de départ" },
   { href: "/admin/matchs", label: "Matchs et direct" },
   { href: "/admin/clubs", label: "Clubs" },
   { href: "/admin/joueurs", label: "Joueurs" },

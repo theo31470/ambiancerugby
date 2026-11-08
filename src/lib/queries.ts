@@ -97,7 +97,7 @@ export async function getTeamCompetitions(teamId: string) {
 }
 
 export async function getSquad(teamId: string): Promise<Player[]> {
-  const { data } = await publicClient().from("players").select("*").eq("team_id", teamId).order("last_name");
+  const { data } = await publicClient().from("players").select("*").eq("team_id", teamId).eq("in_squad", true).order("last_name");
   return (data ?? []) as Player[];
 }
 
@@ -107,7 +107,7 @@ export async function getPlayer(slug: string) {
 }
 
 export async function searchPlayers(q: string, position?: string, limit = 60) {
-  let query = publicClient().from("players").select(`*, team:teams(${TEAM_LITE})`).order("last_name").limit(limit);
+  let query = publicClient().from("players").select(`*, team:teams(${TEAM_LITE})`).eq("in_squad", true).order("last_name").limit(limit);
   if (q) query = query.or(`last_name.ilike.%${q.replace(/[%,()]/g, "")}%,first_name.ilike.%${q.replace(/[%,()]/g, "")}%`);
   if (position) query = query.eq("position", position);
   const { data } = await query;

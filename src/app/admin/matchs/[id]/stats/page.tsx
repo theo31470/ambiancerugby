@@ -10,7 +10,9 @@ import type { MatchFull } from "@/lib/types";
 const COLS: [string, string, string][] = [
   ["minutes", "Min", "Minutes jouées"],
   ["tries", "E", "Essais"],
-  ["points", "Pts", "Points (essais compris)"],
+  ["conversions", "T", "Transformations"],
+  ["penalty_goals", "P", "Pénalités réussies"],
+  ["drop_goals", "D", "Drops"],
   ["tackles", "Plaq", "Plaquages réussis"],
   ["missed_tackles", "Raté", "Plaquages manqués"],
   ["carries", "Crs", "Courses balle en main"],
@@ -31,7 +33,7 @@ export default async function StatsMatch({ params, searchParams }: PageProps<"/a
   if (!data) notFound();
   const m = data as unknown as MatchFull;
   const [{ data: players }, { data: stats }] = await Promise.all([
-    db.from("players").select("id,first_name,last_name,position,number,team_id").in("team_id", [m.home_team_id, m.away_team_id]).order("number", { nullsFirst: false }).order("last_name"),
+    db.from("players").select("id,first_name,last_name,position,number,team_id").in("team_id", [m.home_team_id, m.away_team_id]).eq("in_squad", true).order("number", { nullsFirst: false }).order("last_name"),
     db.from("player_match_stats").select("*").eq("match_id", id),
   ]);
   const byPlayer = new Map((stats ?? []).map((s) => [s.player_id as string, s as Record<string, number | boolean>]));
