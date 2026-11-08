@@ -3,12 +3,15 @@ import Notice from "@/components/admin/Notice";
 import TeamBadge from "@/components/TeamBadge";
 import { analyserMatch, saveJournee } from "../actions";
 import { IA_PLAFOND_MOIS_USD } from "@/lib/ia";
+import RechercheJournee, { RechercheMatch } from "@/components/admin/RechercheIA";
 import { createClient } from "@/lib/supabase/server";
 import { MATCH_SELECT } from "@/lib/queries";
 import { POSITIONS, fmtDay } from "@/lib/format";
 import type { MatchFull } from "@/lib/types";
 
 export const metadata = { title: "Saisie de journée" };
+// la recherche web de Claude peut prendre une minute par match
+export const maxDuration = 120;
 
 type Joueur = { id: string; first_name: string; last_name: string; position: string | null; team_id: string | null; in_squad: boolean };
 type Proposition = {
@@ -37,14 +40,19 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
   const comp = (comps ?? []).find((c) => c.slug === sp.comp) ?? (comps ?? [])[0];
   if (!comp) return <p>Aucune compétition active.</p>;
 
+  // saison en cours ou passées (rattrapage)
+  const { data: sData0 } = await db.from("team_competitions").select("season").eq("competition_id", comp.id);
+  const saisons = [...new Set([comp.current_season, ...(sData0 ?? []).map((x) => x.season as string)])].sort((a, b) => b.localeCompare(a));
+  const saison = typeof sp.saison === "string" && saisons.includes(sp.saison) ? sp.saison : comp.current_season;
+
   // journées de la saison, dans l'ordre chronologique
-  const { data: tous } = await db.from("matches").select("round,kickoff_at,status").eq("competition_id", comp.id).eq("season", comp.current_season).order("kickoff_at");
+  const { data: tous } = await db.from("matches").select("round,kickoff_at,status").eq("competition_id", comp.id).eq("season", saison).order("kickoff_at");
   const journees: string[] = [];
   for (const m of tous ?? []) { const r = m.round ?? fmtDay(m.kickoff_at); if (!journees.includes(r)) journees.push(r); }
   const derniereJouee = [...(tous ?? [])].reverse().find((m) => m.status === "finished");
   const journee = typeof sp.j === "string" && journees.includes(sp.j) ? sp.j : (derniereJouee ? derniereJouee.round ?? fmtDay(derniereJouee.kickoff_at) : journees[0]);
 
-  const { data: mData } = await db.from("matches").select(MATCH_SELECT).eq("competition_id", comp.id).eq("season", comp.current_season).order("kickoff_at");
+  const { data: mData } = await db.from("matches").select(MATCH_SELECT).eq("competition_id", comp.id).eq("season", saison).order("kickoff_at");
   const matchs = ((mData ?? []) as unknown as MatchFull[]).filter((m) => (m.round ?? fmtDay(m.kickoff_at)) === journee);
   const teamIds = [...new Set(matchs.flatMap((m) => [m.home_team_id, m.away_team_id]))];
   const [{ data: jData }, { data: sData }] = await Promise.all([
@@ -61,7 +69,7 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
   const depenseUsd = Number(depense ?? 0);
   const lignes = (sData ?? []) as (Ligne & { match_id: string })[];
   const idx = journees.indexOf(journee);
-  const lien = (j: string) => `/admin/journee?comp=${comp.slug}&j=${encodeURIComponent(j)}`;
+  const lien = (j: string) => `/admin/journee?comp=${comp.slug}${saison !== comp.current_season ? `&saison=${saison}` : ""}&j=${encodeURIComponent(j)}`;
 
   return (
     <div>
@@ -76,6 +84,13 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
             {(comps ?? []).map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
           </select>
         </label>
+        {saisons.length > 1 && (
+          <label className="grid gap-1 text-sm font-semibold">Saison
+            <select name="saison" defaultValue={saison} className="champ">
+              {saisons.map((x) => <option key={x} value={x}>{x}{x === comp.current_season ? " (en cours)" : ""}</option>)}
+            </select>
+          </label>
+        )}
         <button className="bouton-discret">Afficher</button>
       </form>
 
@@ -96,6 +111,9 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
 
       {matchs.length === 0 ? <p className="text-sourdine">Aucun match pour cette journée.</p> : (
         <div className="grid gap-6">
+          <RechercheJournee lien={lien(journee)} matchs={matchs.filter((m) => m.status === "finished").map((m) => ({
+            id: m.id, label: `${m.home.short_name ?? m.home.name} – ${m.away.short_name ?? m.away.name}`, saisi: lignes.some((l) => l.match_id === m.id),
+          }))} />
           {matchs.map((m) => {
             const du = lignes.filter((l) => l.match_id === m.id);
             const fini = m.status === "finished";
@@ -112,6 +130,12 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
                 </header>
                 <details className="mt-3 rounded-xl border border-dashed border-vin/40 bg-teinte/40 open:bg-teinte">
                   <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-vin">Remplir avec Claude</summary>
+                  {fini && (
+                    <div className="px-3 pb-2">
+                      <RechercheMatch matchId={m.id} lien={lien(journee)} />
+                      <p className="mt-1 text-xs text-sourdine">Claude cherche lui-même un compte rendu dans la presse. Ou collez le vôtre :</p>
+                    </div>
+                  )}
                   <form action={analyserMatch} className="px-3 pb-3 grid gap-2">
                     <input type="hidden" name="match_id" value={m.id} />
                     <input type="hidden" name="_back" value={`${lien(journee)}#m-${m.id}`} />

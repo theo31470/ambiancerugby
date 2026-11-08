@@ -119,3 +119,76 @@ export async function analyserFeuille(opts: {
     }));
   return { lignes, remarques: String(brut.remarques ?? "").slice(0, 600), inputTokens, outputTokens, coutUsd };
 }
+
+// ---------- recherche autonome sur le web ----------
+// Sites de statistiques exclus : leurs bases sont protégées (droit des bases de données, conditions d'utilisation).
+// Claude ne lit que des comptes rendus de presse et des sites de clubs.
+export const SITES_EXCLUS = ["all.rugby", "allrugby.com", "lnr.fr", "turnover-rugby.fr", "itsrugby.fr", "espnscrum.com", "statbunker.com", "rugbypass.com/stats"];
+const PRIX_RECHERCHE = 0.01; // 10 $ les 1 000 recherches
+
+export async function chercherFeuille(opts: {
+  domicile: string; exterieur: string; competition: string; date: string; scoreDom: number | null; scoreExt: number | null;
+  effectifDom: JoueurRef[]; effectifExt: JoueurRef[];
+}): Promise<ResultatIA & { recherches: number }> {
+  const cle = process.env.ANTHROPIC_API_KEY;
+  if (!cle) throw new Error("La clé ANTHROPIC_API_KEY n'est pas encore configurée sur Vercel.");
+  const liste = (l: JoueurRef[]) => l.map((j) => `${j.ref} : ${j.nom}${j.poste ? ` (${j.poste})` : ""}`).join("\n");
+  const consigne = [
+    `Match de ${opts.competition} du ${opts.date} : ${opts.domicile} (home) contre ${opts.exterieur} (away).`,
+    opts.scoreDom != null && opts.scoreExt != null ? `Score final officiel : ${opts.scoreDom} – ${opts.scoreExt}.` : "",
+    "",
+    "Cherche sur le web un compte rendu de ce match dans la presse (L'Équipe, Midi Olympique, Rugbyrama, Ouest-France, presse régionale, BBC, RTE…) ou sur le site d'un des deux clubs.",
+    "Relève pour chaque joueur ses essais, transformations réussies, pénalités réussies, drops réussis et cartons, puis appelle l'outil feuille_de_match.",
+    "Relie chaque joueur à sa référence dans les listes ci-dessous. S'il n'y figure pas, mets ref à null. Un essai de pénalité ne se rattache à aucun joueur : signale-le dans les remarques.",
+    "Si tu ne trouves pas d'information fiable, appelle feuille_de_match avec une liste vide et explique pourquoi dans les remarques. N'invente jamais.",
+    "",
+    `Effectif ${opts.domicile} (home) :`, liste(opts.effectifDom) || "(vide)",
+    "",
+    `Effectif ${opts.exterieur} (away) :`, liste(opts.effectifExt) || "(vide)",
+  ].join("\n");
+
+  const outils = [
+    { type: "web_search_20250305", name: "web_search", max_uses: 4, blocked_domains: SITES_EXCLUS },
+    OUTIL,
+  ];
+  const messages: { role: "user" | "assistant"; content: unknown }[] = [{ role: "user", content: consigne }];
+  let inputTokens = 0, outputTokens = 0, recherches = 0;
+  let outil: { input?: unknown } | undefined;
+  // la recherche peut demander plusieurs allers-retours (« pause_turn ») : trois au maximum
+  for (let tour = 0; tour < 3 && !outil; tour++) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": cle, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({
+        model: IA_MODELE, max_tokens: 2500,
+        system: "Tu es secrétaire de rédaction d'un média rugby. Tu relèves les marqueurs et les cartons avec une exactitude absolue, à partir de sources de presse.",
+        tools: outils, messages,
+      }),
+      signal: AbortSignal.timeout(90_000),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      if (res.status === 401) throw new Error("Clé Claude refusée : vérifiez ANTHROPIC_API_KEY sur Vercel.");
+      if (res.status === 429 || res.status === 529) throw new Error("Claude est très sollicité, réessayez dans une minute.");
+      throw new Error(`Claude : ${body?.error?.message ?? `HTTP ${res.status}`}`);
+    }
+    inputTokens += body?.usage?.input_tokens ?? 0;
+    outputTokens += body?.usage?.output_tokens ?? 0;
+    recherches += body?.usage?.server_tool_use?.web_search_requests ?? 0;
+    outil = (body?.content ?? []).find((c: { type: string; name?: string }) => c.type === "tool_use" && c.name === OUTIL.name);
+    if (outil || body?.stop_reason !== "pause_turn") break;
+    messages.push({ role: "assistant", content: body.content });
+  }
+  // au-delà de 100 000 tokens, Haiku 5.5 est facturé au tarif « long contexte » : on compte large
+  const long = inputTokens > 100_000;
+  const coutUsd = (inputTokens * (long ? 0.5 : PRIX_ENTREE) + outputTokens * (long ? 2.5 : PRIX_SORTIE)) / 1e6 + recherches * PRIX_RECHERCHE;
+  const brut = ((outil?.input ?? {}) as { lignes?: LigneIA[]; remarques?: string });
+  const n = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) < 30 ? (v as number) : 0);
+  const lignes = (brut.lignes ?? []).filter((l) => l && (l.equipe === "home" || l.equipe === "away")).map((l) => ({
+    equipe: l.equipe, ref: typeof l.ref === "string" ? l.ref : null, nom_lu: String(l.nom_lu ?? "").slice(0, 80),
+    essais: n(l.essais), transformations: n(l.transformations), penalites: n(l.penalites), drops: n(l.drops),
+    cartons_jaunes: n(l.cartons_jaunes), cartons_rouges: n(l.cartons_rouges),
+  }));
+  const remarques = outil ? String(brut.remarques ?? "").slice(0, 600) : "Claude n'a pas trouvé de compte rendu exploitable.";
+  return { lignes, remarques, inputTokens, outputTokens, coutUsd, recherches };
+}
