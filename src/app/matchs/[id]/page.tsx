@@ -144,7 +144,17 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
       {notes.length > 0 && (
         <section aria-labelledby="h-notes" className="mt-10">
           <h2 id="h-notes" className="groovy text-2xl text-vin mb-3">Les notes du match</h2>
-          <div className="bg-surface border border-trait rounded-2xl overflow-x-auto">
+          <div className="flex flex-wrap gap-2 mb-3">
+            {notes.slice(0, 3).map((s) => (
+              <Link key={s.player_id} href={`/joueurs/${s.player.slug}`} className="inline-flex items-center gap-2 rounded-full bg-surface border border-trait pl-1 pr-3 py-1 text-sm font-semibold hover:border-vin">
+                <span className="rounded-full bg-moutarde text-bordeaux titre font-extrabold px-2 py-0.5 tnum">{Number(s.rating).toFixed(1)}</span>
+                {s.player.first_name.slice(0, 1)}. {s.player.last_name}{s.motm && " ⭐"}
+              </Link>
+            ))}
+          </div>
+          <details className="group">
+          <summary className="cursor-pointer text-sm font-semibold text-vin underline underline-offset-4 mb-3">Voir toutes les notes ({notes.length})</summary>
+          <div className="bg-surface border border-trait rounded-2xl overflow-x-auto max-h-[28rem] overflow-y-auto">
             <table className="w-full text-sm tnum">
               <thead>
                 <tr className="text-xs text-sourdine border-b border-trait">
@@ -174,6 +184,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
               </p>
             )}
           </div>
+          </details>
         </section>
       )}
 
