@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import PageHeader from "@/components/admin/PageHeader";
 import ArticleForm from "@/components/admin/ArticleForm";
 import Notice from "@/components/admin/Notice";
 import { createClient, publicClient } from "@/lib/supabase/server";
@@ -18,7 +19,7 @@ export default async function EditArticle({ params, searchParams }: PageProps<"/
   ]);
   return (
     <div>
-      <h1 className="text-3xl font-extrabold mb-6">Modifier l&apos;article</h1>
+      <PageHeader titre="Modifier l'article" />
       <Notice sp={sp} />
       <ArticleForm article={article as Article} competitions={comps ?? []} teams={teams ?? []} back={`/admin/articles/${id}`} />
     </div>

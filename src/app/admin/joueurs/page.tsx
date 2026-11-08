@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import { publicClient } from "@/lib/supabase/server";
 import Notice from "@/components/admin/Notice";
 import { POSITIONS } from "@/lib/format";
@@ -15,10 +16,8 @@ export default async function AdminJoueurs({ searchParams }: PageProps<"/admin/j
   const { data: players } = await query;
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <h1 className="text-3xl font-extrabold mr-auto">Joueurs</h1>
-        <Link href={`/admin/joueurs/nouveau${club ? `?club=${club}` : ""}`} className="bouton">Ajouter un joueur</Link>
-      </div>
+      <PageHeader titre="Joueurs" description="Créés automatiquement depuis Wikipédia, complétés par TheSportsDB. Corrigez une fiche puis verrouillez-la pour que la synchro n'y touche plus."
+        actions={<Link href={`/admin/joueurs/nouveau${club ? `?club=${club}` : ""}`} className="bouton-discret">Ajouter un joueur</Link>} />
       <Notice sp={sp} />
       <form className="flex flex-wrap gap-2 mb-5" role="search">
         <label htmlFor="club" className="sr-only">Club</label>

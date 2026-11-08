@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import TeamBadge from "@/components/TeamBadge";
 import { analyserMatch, saveJournee } from "../actions";
@@ -73,8 +74,14 @@ export default async function SaisieJournee({ searchParams }: PageProps<"/admin/
 
   return (
     <div>
-      <h1 className="text-3xl font-extrabold">Saisie de journée</h1>
-      <p className="mt-1 text-sourdine max-w-prose">Tapez les marqueurs et les cartons de chaque match. Points, stats de saison, classements des buteurs et notes se mettent à jour tout seuls. Le contrôle compare vos points au score officiel.</p>
+      <PageHeader titre="Saisie de journée"
+        description="Les marqueurs et les cartons de chaque match. Points, stats de saison, classements des buteurs et notes se mettent à jour tout seuls."
+        aide={<>
+          <p><strong>Le plus rapide :</strong> « Chercher les matchs » en haut de la journée. Claude trouve les comptes rendus dans la presse et enregistre seul les matchs dont le total colle au score officiel.</p>
+          <p><strong>Pour un match :</strong> ouvrez « Remplir avec Claude », puis « Chercher sur le web », ou collez un compte rendu ou une photo de la feuille de match.</p>
+          <p><strong>À la main :</strong> choisissez le joueur, tapez les chiffres, « Enregistrer ce match ». La pastille verte confirme que le total colle au score.</p>
+          <p>Pour rattraper une saison passée, changez la saison en haut.</p>
+        </>} />
       <p className="mt-2 text-xs text-sourdine tnum">Saisie assistée par Claude ce mois-ci : {depenseUsd.toLocaleString("fr-FR", { style: "currency", currency: "USD", maximumFractionDigits: 2 })} sur un plafond de {IA_PLAFOND_MOIS_USD} $ (environ {Math.round(IA_PLAFOND_MOIS_USD * 0.93)} €).</p>
       <div className="mt-5"><Notice sp={sp} /></div>
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import { notFound } from "next/navigation";
 import Notice from "@/components/admin/Notice";
 import { saveStats } from "../../../actions";
@@ -43,8 +44,10 @@ export default async function StatsMatch({ params, searchParams }: PageProps<"/a
   return (
     <div>
       <Link href={`/admin/matchs/${id}`} className="text-sm text-sourdine underline underline-offset-4">Retour au match</Link>
-      <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold">Feuille de stats : {m.home.short_name ?? m.home.name} – {m.away.short_name ?? m.away.name}</h1>
-      <p className="mt-1 text-sourdine text-sm max-w-prose">Cochez les joueurs qui ont joué et remplissez ce que vous avez. La note Ambiance sur 10 se calcule automatiquement à l&apos;enregistrement.</p>
+      <div className="mt-2">
+        <PageHeader titre={`Feuille de stats : ${m.home.short_name ?? m.home.name} – ${m.away.short_name ?? m.away.name}`}
+          description="Le détail complet (minutes, plaquages, courses…). Cochez les joueurs qui ont joué et remplissez ce que vous avez ; la note sur 10 se calcule à l'enregistrement." />
+      </div>
       <div className="mt-6"><Notice sp={sp} /></div>
 
       <form action={saveStats} className="grid gap-8">

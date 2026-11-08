@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import PageHeader from "@/components/admin/PageHeader";
 import { runEffectifs, runSync, setWikiTitle, toggleCompetition } from "../actions";
 import Notice from "@/components/admin/Notice";
 import { fmtRelative } from "@/lib/format";
@@ -27,13 +28,13 @@ export default async function DonneesPage({ searchParams }: PageProps<"/admin/do
 
   return (
     <div className="grid gap-10">
-      <div>
-        <h1 className="text-3xl font-extrabold">Données</h1>
-        <p className="mt-2 text-sourdine max-w-prose">
-          Matchs, scores, classements, clubs et logos arrivent tout seuls d&apos;API-Sports : chaque nuit, toutes les 2 minutes pendant les matchs, et un rattrapage toutes les 3 heures.
-          Les effectifs viennent de Wikipédia (chaque lundi), les photos de TheSportsDB.
-        </p>
-      </div>
+      <PageHeader titre="Données et synchros"
+        description="Tout ce qui arrive tout seul : matchs, scores et classements (API-Sports), effectifs et parcours (Wikipédia), photos (TheSportsDB)."
+        aide={<>
+          <p>Matchs et classements : chaque nuit, toutes les 2 minutes pendant les matchs, et un rattrapage toutes les 3 heures.</p>
+          <p>Effectifs : relus chaque lundi. Photos, dates de naissance et parcours : complétés en continu, par petits lots.</p>
+          <p>Vous n&apos;avez normalement rien à faire ici. Les boutons servent à forcer une mise à jour.</p>
+        </>} />
       <Notice sp={sp} />
 
       <section aria-labelledby="h-api" className="bg-surface border border-trait rounded-2xl p-5">

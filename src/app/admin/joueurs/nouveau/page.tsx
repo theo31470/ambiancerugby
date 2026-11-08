@@ -1,4 +1,5 @@
 import PlayerForm from "@/components/admin/PlayerForm";
+import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import { publicClient } from "@/lib/supabase/server";
 
@@ -8,7 +9,7 @@ export default async function NouveauJoueur({ searchParams }: PageProps<"/admin/
   const club = typeof sp.club === "string" ? sp.club : undefined;
   return (
     <div>
-      <h1 className="text-3xl font-extrabold mb-6">Nouveau joueur</h1>
+      <PageHeader titre="Nouveau joueur" description="Les effectifs se remplissent seuls depuis Wikipédia ; ajoutez ici un joueur manquant." />
       <Notice sp={sp} />
       <PlayerForm teams={teams ?? []} defaultTeam={club} back={`/admin/joueurs/nouveau${club ? `?club=${club}` : ""}`} />
     </div>

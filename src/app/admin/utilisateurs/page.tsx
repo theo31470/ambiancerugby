@@ -1,4 +1,5 @@
 import { createClient, getViewer, hasBadge } from "@/lib/supabase/server";
+import PageHeader from "@/components/admin/PageHeader";
 import { setRole, setPlan } from "../actions";
 import Notice from "@/components/admin/Notice";
 import { fmtDate } from "@/lib/format";
@@ -19,8 +20,7 @@ export default async function Utilisateurs({ searchParams }: PageProps<"/admin/u
 
   return (
     <div>
-      <h1 className="text-3xl font-extrabold mb-2">Utilisateurs</h1>
-      <p className="text-sourdine mb-2">Un rédacteur écrit les articles et saisit matchs, clubs et joueurs. Un administrateur gère en plus les rôles et les abonnements.</p>
+      <PageHeader titre="Membres" description="Un rédacteur écrit les articles et saisit matchs, clubs et joueurs. Un administrateur gère en plus les rôles et les abonnements." />
       <p className="mb-6 text-sm tnum">
         <span className="font-semibold">{(data ?? []).length}</span> inscrits, <span className="font-semibold">{supporters}</span> Supporters,{" "}
         <span className="font-semibold">{attente.size}</span> en attente de l&apos;ouverture du paiement.

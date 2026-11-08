@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import { notFound } from "next/navigation";
 import MatchForm from "@/components/admin/MatchForm";
 import Notice from "@/components/admin/Notice";
@@ -37,9 +38,11 @@ export default async function AdminMatch({ params, searchParams }: PageProps<"/a
     <div className="grid gap-10">
       <div>
         <Link href="/admin/matchs" className="text-sm text-sourdine underline underline-offset-4">Tous les matchs</Link>
-        <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold">{m.home.name} – {m.away.name}</h1>
-        <p className="text-sourdine">{m.competition.name}{m.source !== "manual" && ", mis à jour automatiquement"}</p>
-        <Link href={`/admin/matchs/${m.id}/stats`} className="bouton-discret mt-3">Feuille de stats des joueurs</Link>
+        <div className="mt-2">
+          <PageHeader titre={`${m.home.name} – ${m.away.name}`}
+            description={`${m.competition.name}${m.source !== "manual" ? ", mis à jour automatiquement" : ""}`}
+            actions={<Link href={`/admin/matchs/${m.id}/stats`} className="bouton-discret">Feuille de stats des joueurs</Link>} />
+        </div>
       </div>
       <Notice sp={sp} />
 

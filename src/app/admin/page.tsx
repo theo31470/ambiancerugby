@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getViewer } from "@/lib/supabase/server";
+import PageHeader from "@/components/admin/PageHeader";
+import { IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { MATCH_SELECT } from "@/lib/queries";
 import { fmtRelative, isoFromNow } from "@/lib/format";
 import { deleteComment } from "@/app/actions";
@@ -39,6 +41,25 @@ export default async function AdminHome() {
     db.from("sync_runs").select("id, created_at, provider, job, ok, message").order("created_at", { ascending: false }).limit(6),
   ]);
 
+  // à faire : matchs récents de Top 14 / Pro D2 sans feuille, clubs sans effectif, dépense Claude
+  const [viewer, { data: recents }, { count: sansEffectif }, { data: depenseIA }] = await Promise.all([
+    getViewer(),
+    db.from("matches").select("id, round, competition:competitions!inner(slug, name)").eq("status", "finished")
+      .gte("kickoff_at", isoFromNow(-10 * 86400e3)).in("competition.slug", ["top-14", "pro-d2"]),
+    db.from("teams").select("id", { count: "exact", head: true }).eq("is_national", false).not("squad_synced_at", "is", null).lt("squad_count", 12),
+    db.rpc("ia_depense_mois"),
+  ]);
+  const idsRecents = (recents ?? []).map((m) => m.id);
+  const { data: saisis } = idsRecents.length ? await db.from("player_match_stats").select("match_id").in("match_id", idsRecents) : { data: [] };
+  const faits = new Set((saisis ?? []).map((x) => x.match_id));
+  const aSaisir = new Map<string, { nom: string; n: number; journee: string | null }>();
+  for (const m of (recents ?? []) as unknown as { id: string; round: string | null; competition: { slug: string; name: string } }[]) {
+    if (faits.has(m.id)) continue;
+    const e = aSaisir.get(m.competition.slug) ?? { nom: m.competition.name, n: 0, journee: m.round };
+    e.n++;
+    aSaisir.set(m.competition.slug, e);
+  }
+
   const quota = (appels.data ?? []).reduce((a, r) => a + (r.calls ?? 0), 0);
   const pctQuota = Math.min(100, Math.round((quota / QUOTA_JOUR) * 100));
   // inscriptions des 30 derniers jours, jour par jour
@@ -59,11 +80,46 @@ export default async function AdminHome() {
 
   return (
     <div className="grid gap-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="groovy text-4xl text-vin mr-auto">Le vestiaire de la rédaction</h1>
-        <Link href="/admin/journee" className="bouton">Saisir une journée</Link>
-        <Link href="/admin/articles/nouveau" className="bouton-discret">Écrire un article</Link>
-      </div>
+      <PageHeader titre={`Salut ${(viewer?.display_name ?? "").split(" ")[0] || "la rédaction"}`}
+        description={new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris" }) + ". Voici ce qui t'attend et l'état du site."}
+        actions={<>
+          <Link href="/admin/journee" className="bouton">Saisir une journée</Link>
+          <Link href="/admin/articles/nouveau" className="bouton-discret">Écrire un article</Link>
+        </>} />
+
+      <section aria-labelledby="h-afaire">
+        <h2 id="h-afaire" className="text-xl font-bold mb-3">À faire</h2>
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[...aSaisir.entries()].map(([slug, e]) => (
+            <li key={slug}>
+              <Link href={`/admin/journee?comp=${slug}${e.journee ? `&j=${encodeURIComponent(e.journee)}` : ""}`} className="flex items-start gap-3 bg-surface border-2 border-moutarde rounded-2xl p-4 hover:border-vin carte-vie h-full">
+                <span className="groovy text-3xl text-vin leading-none">{e.n}</span>
+                <span><span className="font-semibold block">match{e.n > 1 ? "s" : ""} de {e.nom} à saisir</span><span className="text-sm text-sourdine">Claude peut les chercher pour toi</span></span>
+              </Link>
+            </li>
+          ))}
+          {brouillons > 0 && (
+            <li>
+              <Link href="/admin/articles" className="flex items-start gap-3 bg-surface border border-trait rounded-2xl p-4 hover:border-vin carte-vie h-full">
+                <span className="groovy text-3xl text-vin leading-none">{brouillons}</span>
+                <span><span className="font-semibold block">brouillon{brouillons > 1 ? "s" : ""} à finir</span><span className="text-sm text-sourdine">Articles en attente de publication</span></span>
+              </Link>
+            </li>
+          )}
+          {(sansEffectif ?? 0) > 0 && (
+            <li>
+              <Link href="/admin/donnees#effectifs" className="flex items-start gap-3 bg-surface border border-trait rounded-2xl p-4 hover:border-vin carte-vie h-full">
+                <span className="groovy text-3xl text-vin leading-none">{sansEffectif}</span>
+                <span><span className="font-semibold block">club{(sansEffectif ?? 0) > 1 ? "s" : ""} sans effectif</span><span className="text-sm text-sourdine">Indiquer leur page Wikipédia ou ajouter les joueurs</span></span>
+              </Link>
+            </li>
+          )}
+          {!aSaisir.size && !brouillons && !sansEffectif && (
+            <li className="bg-surface border border-trait rounded-2xl p-4 text-sourdine">Rien en attente. Tout est à jour.</li>
+          )}
+        </ul>
+        <p className="mt-3 text-xs text-sourdine tnum">Claude ce mois-ci : {Number(depenseIA ?? 0).toLocaleString("fr-FR", { style: "currency", currency: "USD" })} sur {IA_PLAFOND_MOIS_USD} $ de plafond.</p>
+      </section>
 
       <dl className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {kpis.map((k) => (

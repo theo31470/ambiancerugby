@@ -1,4 +1,5 @@
 import MatchForm from "@/components/admin/MatchForm";
+import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import { publicClient } from "@/lib/supabase/server";
 
@@ -11,7 +12,7 @@ export default async function NouveauMatch({ searchParams }: PageProps<"/admin/m
   ]);
   return (
     <div>
-      <h1 className="text-3xl font-extrabold mb-6">Nouveau match</h1>
+      <PageHeader titre="Nouveau match" description="Pour un match que l'API ne couvre pas (amical, compétition non suivie)." />
       <Notice sp={sp} />
       <MatchForm competitions={comps ?? []} teams={teams ?? []} back="/admin/matchs/nouveau" defaultCompetition={typeof sp.c === "string" ? sp.c : undefined} />
     </div>

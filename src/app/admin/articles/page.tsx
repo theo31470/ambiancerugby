@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/admin/Notice";
 import { CATEGORIES, fmtRelative } from "@/lib/format";
@@ -9,10 +10,8 @@ export default async function AdminArticles({ searchParams }: PageProps<"/admin/
   const { data } = await db.from("articles").select("id,slug,title,status,category,published_at,updated_at").order("updated_at", { ascending: false }).limit(200);
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-3xl font-extrabold mr-auto">Articles</h1>
-        <Link href="/admin/articles/nouveau" className="bouton">Écrire un article</Link>
-      </div>
+      <PageHeader titre="Articles" description="Les actus du site. Un article « Exclusif » n'est lisible en entier que par les Supporters."
+        actions={<Link href="/admin/articles/nouveau" className="bouton">Écrire un article</Link>} />
       <Notice sp={sp} />
       {(data ?? []).length === 0 ? <p className="text-sourdine">Aucun article. Écrivez le premier.</p> : (
         <ul className="bg-surface border border-trait rounded-lg divide-y divide-trait">

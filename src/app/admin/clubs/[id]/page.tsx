@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import { notFound } from "next/navigation";
 import TeamForm from "@/components/admin/TeamForm";
 import Notice from "@/components/admin/Notice";
@@ -19,11 +20,11 @@ export default async function EditClub({ params, searchParams }: PageProps<"/adm
   const inComps = (comps ?? []).filter((c) => (links ?? []).some((l) => l.competition_id === c.id && l.season === c.current_season)).map((c) => c.id);
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <h1 className="text-3xl font-extrabold mr-auto">{(team as Team).name}</h1>
-        <Link href={`/admin/joueurs?club=${id}`} className="bouton-discret">Effectif ({count ?? 0})</Link>
-        <Link href={`/clubs/${(team as Team).slug}`} className="bouton-discret">Voir la fiche</Link>
-      </div>
+      <PageHeader titre={(team as Team).name}
+        actions={<>
+          <Link href={`/admin/joueurs?club=${id}`} className="bouton-discret">Effectif ({count ?? 0})</Link>
+          <Link href={`/clubs/${(team as Team).slug}`} className="bouton-discret">Voir la fiche</Link>
+        </>} />
       <Notice sp={sp} />
       <TeamForm team={team as Team} competitions={comps ?? []} inComps={inComps} back={`/admin/clubs/${id}`} />
     </div>

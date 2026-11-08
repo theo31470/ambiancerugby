@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import { notFound } from "next/navigation";
 import PlayerForm from "@/components/admin/PlayerForm";
 import Notice from "@/components/admin/Notice";
@@ -17,10 +18,7 @@ export default async function EditJoueur({ params, searchParams }: PageProps<"/a
   const p = player as Player;
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-3xl font-extrabold mr-auto">{p.first_name} {p.last_name}</h1>
-        <Link href={`/joueurs/${p.slug}`} className="bouton-discret">Voir la fiche</Link>
-      </div>
+      <PageHeader titre={`${p.first_name} ${p.last_name}`} actions={<Link href={`/joueurs/${p.slug}`} className="bouton-discret">Voir la fiche</Link>} />
       <Notice sp={sp} />
       <PlayerForm player={p} teams={teams ?? []} back={`/admin/joueurs/${id}`} />
     </div>

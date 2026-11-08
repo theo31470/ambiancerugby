@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import { isoFromNow } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/admin/Notice";
@@ -31,10 +32,9 @@ export default async function AdminMatchs({ searchParams }: PageProps<"/admin/ma
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-3xl font-extrabold mr-auto">Matchs et direct</h1>
-        <Link href={`/admin/matchs/nouveau${comp ? `?c=${comp.id}` : ""}`} className="bouton">Ajouter un match</Link>
-      </div>
+      <PageHeader titre="Matchs et direct"
+        description="Tous les matchs se mettent à jour seuls depuis API-Sports. Ouvrez un match pour corriger un score, ajouter des faits de jeu ou remplir la feuille détaillée."
+        actions={<Link href={`/admin/matchs/nouveau${comp ? `?c=${comp.id}` : ""}`} className="bouton-discret">Ajouter un match à la main</Link>} />
       <Notice sp={sp} />
       <div className="flex flex-wrap gap-2 mb-4">
         <Link href={href({ vue: "a-venir" })} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${vue === "a-venir" ? "bg-encre text-fond" : "hover:bg-teinte"}`}>À venir</Link>

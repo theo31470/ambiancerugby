@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/admin/Notice";
 import TeamBadge from "@/components/TeamBadge";
@@ -14,14 +15,14 @@ export default async function AdminClubs({ searchParams }: PageProps<"/admin/clu
   const teams = (data ?? []) as Team[];
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <h1 className="text-3xl font-extrabold mr-auto">Clubs et sélections</h1>
-        <form role="search" className="flex gap-2">
-          <label htmlFor="q" className="sr-only">Chercher un club</label>
-          <input id="q" name="q" defaultValue={q} placeholder="Chercher" className="champ w-40" />
-        </form>
-        <Link href="/admin/clubs/nouveau" className="bouton">Ajouter une équipe</Link>
-      </div>
+      <PageHeader titre="Clubs et sélections" description="Noms, logos, couleurs et descriptions. Les logos viennent d'API-Sports ; un logo envoyé ici n'est jamais remplacé."
+        actions={<>
+          <form role="search" className="flex gap-2">
+            <label htmlFor="q" className="sr-only">Chercher un club</label>
+            <input id="q" name="q" defaultValue={q} placeholder="Chercher un club" className="champ w-44" />
+          </form>
+          <Link href="/admin/clubs/nouveau" className="bouton-discret">Ajouter une équipe</Link>
+        </>} />
       <Notice sp={sp} />
       <ul className="grid gap-2 sm:grid-cols-2">
         {teams.map((t) => (

@@ -1,4 +1,5 @@
 import ArticleForm from "@/components/admin/ArticleForm";
+import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import { publicClient } from "@/lib/supabase/server";
 
@@ -11,7 +12,7 @@ export default async function NouvelArticle({ searchParams }: PageProps<"/admin/
   ]);
   return (
     <div>
-      <h1 className="text-3xl font-extrabold mb-6">Nouvel article</h1>
+      <PageHeader titre="Nouvel article" description="Écrivez, choisissez une image et rattachez l'article à un club ou une compétition pour qu'il apparaisse sur leurs pages." />
       <Notice sp={sp} />
       <ArticleForm competitions={comps ?? []} teams={teams ?? []} back="/admin/articles/nouveau" />
     </div>

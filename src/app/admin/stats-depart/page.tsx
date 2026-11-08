@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import { importBase, saveBase } from "../actions";
 import { createClient } from "@/lib/supabase/server";
@@ -41,11 +42,13 @@ export default async function StatsDepart({ searchParams }: PageProps<"/admin/st
 
   return (
     <div>
-      <h1 className="text-3xl font-extrabold">Stats de départ</h1>
-      <p className="mt-1 text-sourdine max-w-prose">
-        Les totaux des matchs joués avant que vous saisissiez les journées sur le site. Les journées saisies s&apos;ajoutent ensuite automatiquement à ces chiffres.
-        Laissez une ligne vide si le joueur n&apos;a pas joué.
-      </p>
+      <PageHeader titre="Stats de départ"
+        description="Les totaux déjà joués avant de saisir les journées sur le site, club par club. Les journées saisies s'ajoutent ensuite automatiquement."
+        aide={<>
+          <p>Choisissez la compétition et le club, puis remplissez seulement les joueurs qui ont marqué ou pris un carton ; une ligne vide = rien à compter.</p>
+          <p>Vous pouvez coller un tableau depuis un tableur : une ligne par joueur, le nom puis les chiffres.</p>
+          <p>Astuce : plutôt que des totaux, la « Saisie de journée » avec Claude reconstitue la saison match par match, ce qui donne aussi les notes et le détail.</p>
+        </>} />
       <div className="mt-5"><Notice sp={sp} /></div>
 
       <form method="get" className="flex flex-wrap items-end gap-2 mb-6">
