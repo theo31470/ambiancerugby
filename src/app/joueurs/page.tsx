@@ -30,7 +30,7 @@ export default async function JoueursPage({ searchParams }: PageProps<"/joueurs"
 
       {players.length === 0 ? (
         <p className="mt-8 bg-surface border border-trait rounded-2xl p-5 text-sourdine">
-          {q || poste ? "Aucun joueur ne correspond. Essayez un autre nom ou un autre poste." : "Les fiches joueurs sont ajoutées par la rédaction et apparaîtront ici."}
+          {q || poste ? "Aucun joueur ne correspond. Essayez un autre nom ou un autre poste." : "Les effectifs se remplissent automatiquement, revenez dans quelques minutes."}
         </p>
       ) : (
         <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -38,7 +38,7 @@ export default async function JoueursPage({ searchParams }: PageProps<"/joueurs"
             <li key={p.id}>
               <Link href={`/joueurs/${p.slug}`} className="flex items-center gap-3 bg-surface border border-trait rounded-2xl p-3 hover:border-vin carte-vie">
                 {p.photo_url ? (
-                  <img src={p.photo_url} alt="" className="w-12 h-12 rounded-full object-cover" loading="lazy" />
+                  <img src={p.photo_url} alt="" className="w-12 h-12 rounded-full object-cover object-top bg-teinte" loading="lazy" />
                 ) : (
                   <span className="w-12 h-12 rounded-full bg-teinte grid place-items-center titre font-bold text-vin text-lg">{p.last_name.slice(0, 1)}</span>
                 )}

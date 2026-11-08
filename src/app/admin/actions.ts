@@ -540,7 +540,12 @@ export async function runEffectifs(form: FormData) {
     const { db } = await staff();
     const job = String(form.get("job"));
     const slug = str(form, "slug");
-    const { error } = await db.rpc("trigger_effectifs", { p_job: job, p_params: slug ? { slugs: [slug], force: true } : { force: form.get("force") === "on" } });
+    // relecture complète : tous les clubs repassent dans la file, traités par petits lots toutes les 3 minutes
+    if (job === "squads" && !slug && form.get("force") === "on") {
+      const { error: e } = await db.from("teams").update({ squad_synced_at: null }).eq("is_national", false).not("squad_synced_at", "is", null);
+      fail(e, "Relecture des effectifs");
+    }
+    const { error } = await db.rpc("trigger_effectifs", { p_job: job, p_params: slug ? { slugs: [slug], force: true } : {} });
     fail(error, "Mise à jour des effectifs");
     redirect(`${String(form.get("_back") ?? "/admin/donnees")}?ok=lance`);
   });

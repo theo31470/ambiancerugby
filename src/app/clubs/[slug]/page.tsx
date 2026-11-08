@@ -136,7 +136,7 @@ export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
       <section aria-labelledby="h-effectif" className="mt-10">
         <h2 id="h-effectif" className="text-xl font-bold mb-3">Effectif</h2>
         {squad.length === 0 ? (
-          <p className="text-sourdine">L&apos;effectif n&apos;a pas encore été saisi par la rédaction.</p>
+          <p className="text-sourdine">L&apos;effectif arrive : il se remplit automatiquement dans les prochaines minutes.</p>
         ) : (
           <div className="grid gap-6">
             {[...POSITION_GROUPS, { label: "Poste non renseigné", positions: [""] }].map((g) => {
@@ -150,7 +150,7 @@ export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
                       <li key={p.id}>
                         <Link href={`/joueurs/${p.slug}`} className="flex items-center gap-3 bg-surface border border-trait rounded-2xl p-2.5 hover:border-vin carte-vie">
                           {p.photo_url ? (
-                            <img src={p.photo_url} alt="" className="w-10 h-10 rounded-full object-cover" loading="lazy" />
+                            <img src={p.photo_url} alt="" className="w-10 h-10 rounded-full object-cover object-top bg-teinte" loading="lazy" />
                           ) : (
                             <span className="w-10 h-10 rounded-full bg-teinte grid place-items-center titre font-bold text-vin">{p.last_name.slice(0, 1)}</span>
                           )}
@@ -165,6 +165,9 @@ export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
                 </div>
               );
             })}
+            {squad.some((p) => p.source === "wikipedia") && (
+              <p className="text-xs text-sourdine">Effectif : Wikipédia (licence CC BY-SA). Photos : TheSportsDB.</p>
+            )}
           </div>
         )}
       </section>

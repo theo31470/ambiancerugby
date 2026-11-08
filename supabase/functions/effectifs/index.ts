@@ -9,6 +9,7 @@ const UA = "AmbianceRugby/1.0 (https://ambiancerugby.vercel.app; effectifs)";
 const WIKI = "https://en.wikipedia.org/w/api.php";
 const TSDB = "https://www.thesportsdb.com/api/v1/json/123";
 const BUDGET_MS = 110_000;
+const CLUBS_PAR_PASSE = 6; // limite CPU des fonctions (offre gratuite)
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -104,21 +105,29 @@ async function contenus(titres: string[]) {
 
 const estClub = (texte: string) => /squad player/i.test(texte) && !/\{\{\s*infobox national rugby union team/i.test(texte);
 
+/** Parmi des titres, ceux dont la page utilise le modèle d'effectif (requête légère, sans le contenu). */
+async function avecEffectif(titres: string[]) {
+  const d = await wikiGet({ action: "query", prop: "templates", tltemplates: "Template:RU squad player|Template:Rugby union squad player", tllimit: "max", redirects: "1", titles: titres.join("|") });
+  const redir = new Map<string, string>();
+  for (const r of d.query?.normalized ?? []) redir.set(r.from, r.to);
+  for (const r of d.query?.redirects ?? []) redir.set(r.from, r.to);
+  for (const [k, v] of redir) if (redir.has(v)) redir.set(k, redir.get(v)!);
+  const ok = new Set((d.query?.pages ?? []).filter((p: { templates?: unknown[] }) => p.templates?.length).map((p: { title: string }) => p.title));
+  return titres.map((t) => redir.get(t) ?? t).filter((t, i, arr) => ok.has(t) && arr.indexOf(t) === i);
+}
+
 /** Trouve la page Wikipédia d'un club : nom exact, variantes, puis recherche. */
 async function trouverPage(team: { name: string; short_name: string | null; aliases: string[] | null }) {
   const noms = [...new Set([team.name, team.short_name, ...(team.aliases ?? [])].filter(Boolean) as string[])];
-  const candidats = [...new Set(noms.flatMap((n) => [n, `${n} (rugby union)`, `${n} Rugby`]))].slice(0, 12);
-  const get = await contenus(candidats);
-  for (const c of candidats) {
-    const p = get(c);
-    if (p && estClub(p.texte)) return p;
+  const candidats = [...new Set(noms.flatMap((n) => [n, `${n} (rugby union)`, `${n} Rugby`]))].slice(0, 30);
+  let titres = await avecEffectif(candidats);
+  if (!titres.length) {
+    const s = await wikiGet({ action: "query", list: "search", srsearch: `${team.name} rugby union club squad`, srlimit: "5" });
+    const trouves = (s.query?.search ?? []).map((x: { title: string }) => x.title);
+    titres = trouves.length ? await avecEffectif(trouves) : [];
   }
-  const s = await wikiGet({ action: "query", list: "search", srsearch: `${team.name} rugby union club squad`, srlimit: "4" });
-  const titres = (s.query?.search ?? []).map((x: { title: string }) => x.title);
-  if (!titres.length) return null;
-  const get2 = await contenus(titres);
-  for (const t of titres) {
-    const p = get2(t);
+  for (const t of titres.slice(0, 2)) {
+    const p = (await contenus([t]))(t);
     if (p && estClub(p.texte)) return p;
   }
   return null;
@@ -142,7 +151,7 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
   const semaine = Date.now() - 6 * 86400e3;
   const cibles = ((equipes ?? []) as any[])
     .filter((t) => params.slugs?.length || prio.has(t.id))
-    .filter((t) => params.force || !t.squad_synced_at || new Date(t.squad_synced_at).getTime() < semaine)
+    .filter((t) => (params.force && params.slugs?.length) || !t.squad_synced_at || new Date(t.squad_synced_at).getTime() < semaine)
     .sort((a, b) => (prio.get(b.id) ?? 0) - (prio.get(a.id) ?? 0) || (a.squad_synced_at ?? "").localeCompare(b.squad_synced_at ?? ""));
 
   const { data: existants } = await db.from("players").select("id, slug, name_key, team_id, verrou, source");
@@ -151,7 +160,7 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
   const lignes: string[] = [];
   let crees = 0, maj = 0, sansPage = 0, clubs = 0;
 
-  for (const t of cibles) {
+  for (const t of cibles.slice(0, CLUBS_PAR_PASSE)) {
     if (Date.now() - t0 > BUDGET_MS) { lignes.push("temps écoulé, la suite au prochain passage"); break; }
     try {
       let page: { titre: string; texte: string } | null | undefined = null;
@@ -227,14 +236,12 @@ async function jobEnrich(db: SupabaseClient, t0: number) {
     .select("id, first_name, last_name, birth_date, height_cm, weight_kg, photo_url, photo_source, verrou, team:teams(name, short_name, aliases)")
     .is("tsdb_checked_at", null).eq("in_squad", true).limit(60);
   let trouves = 0, vus = 0;
-  for (const p of (data ?? []) as any[]) {
-    if (Date.now() - t0 > BUDGET_MS - 5000) break;
-    vus++;
+  const un = async (p: any) => {
     const nom = `${p.first_name} ${p.last_name}`.trim();
     const patch: Record<string, unknown> = { tsdb_checked_at: new Date().toISOString() };
     try {
-      const r = await fetch(`${TSDB}/searchplayers.php?p=${encodeURIComponent(nom)}`, { headers: { "User-Agent": UA } });
-      if (r.status === 429) { await sleep(60_000); break; }
+      const r = await fetch(`${TSDB}/searchplayers.php?p=${encodeURIComponent(nom)}`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(20_000) });
+      if (r.status === 429) return "limite";
       const d = await r.json().catch(() => ({}));
       const rugby = ((d.player ?? []) as any[]).filter((x) => x.strSport === "Rugby" && norm(x.strPlayer) === norm(nom));
       const noms = [p.team?.name, p.team?.short_name, ...(p.team?.aliases ?? [])].map(norm);
@@ -249,9 +256,19 @@ async function jobEnrich(db: SupabaseClient, t0: number) {
         if (!p.weight_kg) patch.weight_kg = poids(x.strWeight);
         for (const k of ["height_cm", "weight_kg"]) if (patch[k] == null) delete patch[k];
       }
-    } catch { /* on réessaiera plus tard */ delete patch.tsdb_checked_at; }
+    } catch { return "erreur"; /* on réessaiera plus tard */ }
     await db.from("players").update(patch).eq("id", p.id);
-    await sleep(2100); // 30 requêtes / minute maximum sur la clé gratuite
+    return "ok";
+  };
+  // 3 recherches en parallèle toutes les 6 s = 30 / minute, la limite de la clé gratuite
+  const liste = (data ?? []) as any[];
+  for (let i = 0; i < liste.length; i += 3) {
+    if (Date.now() - t0 > BUDGET_MS - 25_000) break;
+    const debut = Date.now();
+    const res = await Promise.all(liste.slice(i, i + 3).map(un));
+    vus += res.length;
+    if (res.includes("limite")) { await sleep(30_000); break; }
+    await sleep(Math.max(0, 6200 - (Date.now() - debut)));
   }
   const { count } = await db.from("players").select("id", { count: "exact", head: true }).is("tsdb_checked_at", null).eq("in_squad", true);
   return [`${vus} joueurs consultés, ${trouves} complétés (photo, naissance…), ${count ?? 0} restants`];
