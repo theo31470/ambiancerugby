@@ -28,17 +28,28 @@ export async function getMatchesOfDay(day: string, competitionId?: string): Prom
 }
 
 /** Bandeau : matchs en direct + autour de maintenant (derniers résultats et prochains). */
+/**
+ * Bandeau des scores : les matchs en direct, puis ceux qui commencent dans les 24 h, puis les derniers résultats,
+ * puis les prochaines affiches. Hors direct, seules les grandes compétitions (et la Pro D2) y figurent.
+ */
 export async function getTickerMatches(): Promise<MatchFull[]> {
   const db = publicClient();
   const now = Date.now();
+  const sel = MATCH_SELECT.replace("competition:competitions(", "competition:competitions(niveau,");
   const [live, recent, next] = await Promise.all([
     db.from("matches").select(MATCH_SELECT).in("status", ["live", "halftime"]).order("kickoff_at"),
-    db.from("matches").select(MATCH_SELECT).eq("status", "finished").gte("kickoff_at", new Date(now - 4 * 86400e3).toISOString()).order("kickoff_at", { ascending: false }).limit(10),
-    db.from("matches").select(MATCH_SELECT).eq("status", "scheduled").gte("kickoff_at", new Date(now - 3 * 3600e3).toISOString()).order("kickoff_at").limit(10),
+    db.from("matches").select(sel).eq("status", "finished").gte("kickoff_at", new Date(now - 3 * 86400e3).toISOString()).order("kickoff_at", { ascending: false }).limit(80),
+    db.from("matches").select(sel).eq("status", "scheduled").gte("kickoff_at", new Date(now - 3 * 3600e3).toISOString()).lte("kickoff_at", new Date(now + 6 * 86400e3).toISOString()).order("kickoff_at").limit(80),
   ]);
-  const list = [...(live.data ?? []), ...(next.data ?? []), ...(recent.data ?? [])] as unknown as MatchFull[];
+  // hors direct : compétitions élite, Pro D2 et Challenge Cup
+  const grande = (m: MatchFull) => { const c = m.competition as MatchFull["competition"] & { niveau?: number }; return (c.niveau ?? 0) >= 1500 || ["pro-d2", "challenge-cup"].includes(c.slug); };
+  const prochains = ((next.data ?? []) as unknown as MatchFull[]).filter(grande);
+  const bientot = prochains.filter((m) => new Date(m.kickoff_at).getTime() < now + 86400e3);
+  const plusTard = prochains.filter((m) => new Date(m.kickoff_at).getTime() >= now + 86400e3).slice(0, 10);
+  const resultats = ((recent.data ?? []) as unknown as MatchFull[]).filter(grande).slice(0, 12);
+  const list = [...((live.data ?? []) as unknown as MatchFull[]), ...bientot, ...resultats, ...plusTard];
   const seen = new Set<string>();
-  return list.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true))).slice(0, 18);
+  return list.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true))).slice(0, 22);
 }
 
 export async function getMatch(id: string): Promise<MatchFull | null> {
