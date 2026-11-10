@@ -12,7 +12,7 @@ import type { MatchLocal } from "./espn";
 const UA = "Mozilla/5.0 (compatible; AmbianceRugby/1.0; +https://ambiancerugby.vercel.app)";
 const norm = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-const VIDES = new Set(["stade", "rugby", "club", "union", "section", "olympique", "racing", "provence", "pays", "sporting", "hérault", "herault", "us", "usa", "ca", "su", "rc", "as", "asm", "fc", "cs", "lou", "paris"]);
+const VIDES = new Set(["stade", "rugby", "club", "union", "section", "olympique", "racing", "pays", "sporting", "hérault", "herault", "us", "usa", "ca", "su", "rc", "as", "asm", "fc", "cs", "lou", "paris"]);
 
 async function page(url: string) {
   const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20_000), headers: { "user-agent": UA, accept: "text/html" } });
@@ -108,21 +108,34 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   });
   const teamId = (s: "home" | "away") => (s === "home" ? m.home_team_id : m.away_team_id);
 
-  // numéros de maillot (compositions)
+  // numéros de maillot et noms complets (compositions)
   const numeros = new Map<string, number>();
   for (const x of compos.matchAll(/href="[^"]*\/joueur\/([^"/]+)"[\s\S]{0,600}?player-pitch__number">\s*(\d+)\s*</g)) numeros.set(x[1], Number(x[2]));
+  const nomsCompos = new Map<string, { firstName: string; lastName: string }>();
+  for (const x of compos.matchAll(/\/joueur\/([^"/]+)"[\s\S]{0,800}?__first-name">([^<]*)<\/span>[\s\S]{0,200}?__last-name">([^<]*)</g)) {
+    const [first, last] = [decode(x[2]).trim(), decode(x[3]).trim()];
+    if (first && last) nomsCompos.set(x[1], { firstName: first, lastName: last });
+  }
+  // le classement des stats abrège parfois (« R. NACIKA ») : on complète avec les compositions et le fil
+  const complet = (id: string, j: JoueurLnr): JoueurLnr => {
+    if (j.firstName && j.lastName && !/^\p{L}\.$/u.test(j.firstName)) return j;
+    const c = nomsCompos.get(id);
+    if (c) return { ...j, ...c };
+    const m = (j.name ?? "").match(/^(\p{L})\.\s+(.+)$/u);
+    return m ? { ...j, firstName: `${m[1]}.`, lastName: m[2] } : j;
+  };
 
   // tous les joueurs cités, avec leur côté
   const joueurs = new Map<string, { j: JoueurLnr; side: "home" | "away" }>();
-  for (const e of equipes) for (const l of e.lignes) { const id = idLnr(l.player); if (id) joueurs.set(id, { j: l.player, side: e.side }); }
-  for (const [id, side] of cote) if (!joueurs.has(id)) {
-    const src = [...rempl.flatMap((r) => [r.in, r.out]), ...faits.flatMap((f) => [f.player, f.conversionPlayer])].find((j) => idLnr(j) === id);
-    if (src) joueurs.set(id, { j: src, side });
-  }
+  // noms complets du fil (remplacements, buteurs) en priorité sur le classement abrégé
+  const duFil = new Map<string, JoueurLnr>();
+  for (const j of [...rempl.flatMap((r) => [r.in, r.out]), ...faits.flatMap((f) => [f.player, f.conversionPlayer])]) { const id = idLnr(j); if (id && j?.firstName) duFil.set(id, j); }
+  for (const e of equipes) for (const l of e.lignes) { const id = idLnr(l.player); if (id) joueurs.set(id, { j: complet(id, { ...l.player, ...(duFil.get(id) ?? {}) }), side: e.side }); }
+  for (const [id, side] of cote) if (!joueurs.has(id) && duFil.has(id)) joueurs.set(id, { j: complet(id, duFil.get(id)!), side });
 
   // correspondance avec nos joueurs : identifiant LNR, puis nom dans le club, puis nom n'importe où ; sinon création
   const ids = [...joueurs.keys()];
-  const { data: parId } = ids.length ? await db.from("players").select("id, lnr_id, photo_source, verrou").in("lnr_id", ids) : { data: [] };
+  const { data: parId } = ids.length ? await db.from("players").select("id, lnr_id, photo_source, verrou, source, first_name").in("lnr_id", ids) : { data: [] };
   const { data: duClub } = await db.from("players").select("id, first_name, last_name, name_key, team_id, lnr_id, photo_source, verrou").in("team_id", [m.home_team_id, m.away_team_id]);
   const cles = ids.map((id) => norm(nomComplet(joueurs.get(id)!.j)));
   const { data: parCle } = await db.from("players").select("id, name_key, lnr_id, photo_source, verrou").in("name_key", cles.filter(Boolean));
@@ -136,9 +149,12 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     let p: { id: string; photo_source?: string | null; verrou?: boolean; lnr_id?: string | null } | undefined = parId?.find((x) => x.lnr_id === id);
     if (!p) p = (duClub ?? []).find((x) => x.team_id === team && !x.lnr_id && (x.name_key === cle || norm(`${x.first_name} ${x.last_name}`) === cle));
     if (!p) {
+      // même nom de famille dans le club : même initiale, ou seul joueur de ce nom
       const famille = norm(j.lastName);
-      const memes = (duClub ?? []).filter((x) => x.team_id === team && !x.lnr_id && famille && norm(x.last_name) === famille && norm(x.first_name).slice(0, 1) === norm(j.firstName).slice(0, 1));
-      if (memes.length === 1) p = memes[0];
+      const memeNom = (duClub ?? []).filter((x) => x.team_id === team && !x.lnr_id && famille && norm(x.last_name) === famille);
+      const memeInitiale = memeNom.filter((x) => norm(x.first_name).slice(0, 1) === norm(j.firstName).slice(0, 1));
+      if (memeInitiale.length === 1) p = memeInitiale[0];
+      else if (memeNom.length === 1) p = memeNom[0];
     }
     if (!p) p = parCle?.find((x) => x.name_key === cle && !x.lnr_id);
     if (!p && nom) {
@@ -158,6 +174,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     const photo = j.photo?.original ?? j.image?.original;
     const patch: Record<string, unknown> = {};
     if (!p.lnr_id) patch.lnr_id = id;
+    if ((p as { source?: string }).source === "lnr" && j.firstName && !/^\p{L}\.$/u.test(j.firstName) && /^\p{L}\.$/u.test((p as { first_name?: string }).first_name ?? "")) patch.first_name = joli(j.firstName);
     if (photo && !p.verrou && (!p.photo_source || p.photo_source === "TheSportsDB")) { patch.photo_url = photo; patch.photo_source = "LNR"; }
     if (!p.verrou && Date.now() - new Date(m.kickoff_at).getTime() < 45 * 86400e3) { patch.team_id = team; patch.in_squad = true; }
     if (Object.keys(patch).length) await db.from("players").update(patch).eq("id", p.id);
