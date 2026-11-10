@@ -17,9 +17,9 @@ export async function generateMetadata({ params }: PageProps<"/joueurs/[slug]">)
   return p ? { title: `${p.first_name} ${p.last_name} : stats et notes` } : {};
 }
 
-type Totaux = { season: string; competition_id: string; games: number; starts: number; minutes: number; tries: number; conversions: number; penalty_goals: number; drop_goals: number; points: number; yellow: number; red: number; tackles: number; carries: number; metres: number; line_breaks: number; turnovers_won: number; motm: number; rating: number | null; games_saisis: number; competition?: { name: string; short_name: string | null; slug: string } };
-const CLES = ["games", "starts", "minutes", "tries", "conversions", "penalty_goals", "drop_goals", "points", "yellow", "red", "tackles", "carries", "metres", "line_breaks", "turnovers_won", "motm"] as const;
-type Perf = { rating: number; tries: number; points: number; tackles: number; carries: number; metres: number; motm: boolean; match: { id: string; kickoff_at: string; home_score: number | null; away_score: number | null; home: TeamLite; away: TeamLite } };
+type Totaux = { season: string; competition_id: string; games: number; starts: number; minutes: number; tries: number; conversions: number; penalty_goals: number; drop_goals: number; points: number; yellow: number; red: number; tackles: number; carries: number; metres: number; line_breaks: number; offloads: number; turnovers_won: number; motm: number; rating: number | null; games_saisis: number; competition?: { name: string; short_name: string | null; slug: string } };
+const CLES = ["games", "starts", "minutes", "tries", "conversions", "penalty_goals", "drop_goals", "points", "yellow", "red", "tackles", "carries", "metres", "line_breaks", "offloads", "turnovers_won", "motm"] as const;
+type Perf = { rating: number; minutes: number | null; starter: boolean | null; tries: number; points: number; tackles: number; line_breaks: number; turnovers_won: number; carries: number; metres: number; motm: boolean; match: { id: string; kickoff_at: string; home_score: number | null; away_score: number | null; home: TeamLite; away: TeamLite } };
 
 export default async function JoueurPage({ params, searchParams }: PageProps<"/joueurs/[slug]">) {
   const { slug } = await params;
@@ -31,7 +31,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
   const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }] = await Promise.all([
     db.from("player_season_totals").select("*").eq("player_id", p.id).order("season", { ascending: false }),
     db.from("player_match_stats")
-      .select(`rating,tries,points,tackles,carries,metres,motm, match:matches!inner(id,kickoff_at,home_score,away_score, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}))`)
+      .select(`rating,minutes,starter,tries,points,tackles,line_breaks,turnovers_won,carries,metres,motm, match:matches!inner(id,kickoff_at,home_score,away_score, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}))`)
       .eq("player_id", p.id)
       .order("match(kickoff_at)", { ascending: false })
       .limit(10),
@@ -132,12 +132,17 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
         {saison ? (
           <>
             <dl className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+              {saison.rating != null && (
+                <div className="bg-bordeaux text-white rounded-2xl p-4">
+                  <dt className="text-xs text-white/70">Note moyenne</dt>
+                  <dd className="groovy text-4xl text-moutarde tnum leading-tight">{Number(saison.rating).toFixed(1)}</dd>
+                </div>
+              )}
               {([
                 ["Matchs", saison.games], ["Titulaire", saison.starts], ["Minutes", saison.minutes], ["Essais", saison.tries], ["Points", saison.points],
                 ["Transformations", saison.conversions], ["Pénalités", saison.penalty_goals], ["Drops", saison.drop_goals],
-                ["Cartons jaunes", saison.yellow], ["Cartons rouges", saison.red],
-                ...(saison.tackles ? [["Plaquages", saison.tackles], ["Mètres", saison.metres], ["Ballons grattés", saison.turnovers_won], ["Franchissements", saison.line_breaks]] : []),
-                ...(saison.motm ? [["Homme du match", saison.motm]] : []),
+                ["Plaquages", saison.tackles], ["Franchissements", saison.line_breaks], ["Passes après contact", saison.offloads], ["Ballons grattés", saison.turnovers_won],
+                ["Mètres", saison.metres], ["Cartons jaunes", saison.yellow], ["Cartons rouges", saison.red], ["Homme du match", saison.motm],
               ] as [string, number][]).filter(([k, v]) => v || ["Matchs", "Essais", "Points"].includes(k)).map(([k, v]) => (
                 <div key={k} className="carte-vie bg-surface border border-trait rounded-2xl p-4">
                   <dt className="text-xs text-sourdine">{k}</dt>
@@ -145,6 +150,15 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
                 </div>
               ))}
             </dl>
+            {saison.minutes >= 80 && (saison.tackles > 0 || saison.line_breaks > 0) && (
+              <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                <span className="text-sourdine">Sur 80 minutes :</span>
+                {([["plaquages", saison.tackles], ["franchissements", saison.line_breaks], ["ballons grattés", saison.turnovers_won], ["passes après contact", saison.offloads], ["points", saison.points]] as [string, number][])
+                  .filter(([, v]) => v > 0).map(([k, v]) => (
+                    <span key={k} className="rounded-full bg-teinte px-3 py-0.5 font-semibold tnum">{((v * 80) / saison.minutes).toFixed(1).replace(".", ",")} {k}</span>
+                  ))}
+              </div>
+            )}
             {parComp.length > 1 && (
               <div className="mt-5 bg-surface border border-trait rounded-2xl overflow-x-auto">
                 <table className="w-full text-sm tnum">
@@ -152,14 +166,15 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
                   <thead><tr className="text-xs text-sourdine border-b border-trait">
                     <th scope="col" className="text-left font-semibold px-4 py-2">Compétition</th>
                     {vue === "carriere" && <th scope="col" className="font-semibold px-2">Saison</th>}
-                    {["MJ", "Min", "E", "T", "P", "D", "Pts", "CJ", "CR"].map((h) => <th key={h} scope="col" className="font-semibold px-2">{h}</th>)}
+                    {[["MJ", "Matchs joués"], ["Min", "Minutes"], ["E", "Essais"], ["Pts", "Points"], ["Plaq.", "Plaquages"], ["Fr.", "Franchissements"], ["BG", "Ballons grattés"], ["CJ", "Cartons jaunes"], ["CR", "Cartons rouges"], ["Note", "Note moyenne"]].map(([h, t]) => <th key={h} scope="col" title={t} className="font-semibold px-2"><abbr title={t} className="no-underline">{h}</abbr></th>)}
                   </tr></thead>
                   <tbody>
                     {parComp.map((t) => (
                       <tr key={t.competition_id + t.season} className="border-b border-trait last:border-0">
                         <th scope="row" className="text-left font-semibold px-4 py-2">{t.competition ? <Link href={`/competitions/${t.competition.slug}`} className="hover:underline underline-offset-4">{t.competition.name}</Link> : "–"}</th>
                         {vue === "carriere" && <td className="text-center px-2 text-sourdine">{t.season}</td>}
-                        {[t.games, t.minutes, t.tries, t.conversions, t.penalty_goals, t.drop_goals, t.points, t.yellow, t.red].map((v, i) => <td key={i} className="text-center px-2">{v}</td>)}
+                        {[t.games, t.minutes, t.tries, t.points, t.tackles || "–", t.line_breaks || "–", t.turnovers_won || "–", t.yellow, t.red].map((v, i) => <td key={i} className="text-center px-2">{v}</td>)}
+                        <td className="text-center px-2 font-bold">{t.rating != null ? Number(t.rating).toFixed(1) : "–"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -170,7 +185,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
         ) : (
           <div className="bg-surface border border-dashed border-trait rounded-2xl p-8 text-center">
             <Ballon className="w-14 mx-auto text-vin" />
-            <p className="mt-3 text-sourdine">{vue === "carriere" ? "Pas encore de stats suivies par Ambiance Rugby." : "Pas encore de stats cette saison."} Elles arrivent après chaque journée saisie par la rédaction.</p>
+            <p className="mt-3 text-sourdine">{vue === "carriere" ? "Pas encore de stats suivies par Ambiance Rugby." : "Pas encore de stats cette saison."} Elles arrivent automatiquement après chaque match.</p>
           </div>
         )}
 
@@ -217,7 +232,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
                 <Link href={`/matchs/${x.match.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-teinte">
                   <span className="text-sm text-sourdine w-24">{fmtDay(x.match.kickoff_at, { day: "numeric", month: "short", year: "2-digit" })}</span>
                   <span className="flex-1 min-w-48 font-semibold">{x.match.home.short_name ?? x.match.home.name} {x.match.home_score}–{x.match.away_score} {x.match.away.short_name ?? x.match.away.name}</span>
-                  {full && <span className="text-sm text-sourdine tnum">{x.points} pts, {x.tries} essai{x.tries > 1 ? "s" : ""}{x.tackles ? `, ${x.tackles} plaquages` : ""}</span>}
+                  {full && <span className="text-sm text-sourdine tnum">{[x.minutes ? `${x.minutes} min${x.starter === false ? " (remplaçant)" : ""}` : null, x.tries ? `${x.tries} essai${x.tries > 1 ? "s" : ""}` : null, x.points ? `${x.points} pts` : null, x.tackles ? `${x.tackles} plaquages` : null, x.line_breaks ? `${x.line_breaks} franchissement${x.line_breaks > 1 ? "s" : ""}` : null, x.turnovers_won ? `${x.turnovers_won} ballon${x.turnovers_won > 1 ? "s" : ""} gratté${x.turnovers_won > 1 ? "s" : ""}` : null].filter(Boolean).join(", ")}</span>}
                   {x.motm && <span className="text-[10px] font-bold rounded-full bg-moutarde text-bordeaux px-1.5 py-0.5">Homme du match</span>}
                   <span className={`min-w-12 text-center rounded-full px-2 py-0.5 titre font-extrabold ${x.rating >= 8 ? "bg-moutarde text-bordeaux" : x.rating >= 6.5 ? "bg-teinte" : "bg-alerte/10 text-alerte"}`}>{Number(x.rating).toFixed(1)}</span>
                 </Link>

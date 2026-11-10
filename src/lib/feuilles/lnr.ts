@@ -263,6 +263,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
       if (error) throw new Error(error.message);
     }
   }
+  if (rows.length) await db.rpc("noter_matchs", { p_matchs: [m.id] });
   const nFil = fil.length ? await ecrireFil(db, m, fil, "lnr") : 0;
   await db.from("matches").update({
     ...chrono, lnr_url: url, home_tries: essais("home"), away_tries: essais("away"),

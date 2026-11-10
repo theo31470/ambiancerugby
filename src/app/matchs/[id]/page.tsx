@@ -47,11 +47,17 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     getForms(ids),
     getViewer(),
     publicClient().from("rating_history").select("team_id,delta,rating").eq("match_id", m.id),
-    publicClient().from("player_match_stats").select("*, player:players(slug,first_name,last_name,position)").eq("match_id", m.id).order("rating", { ascending: false }),
+    publicClient().from("player_match_stats").select("*, player:players(slug,first_name,last_name,position)").eq("match_id", m.id).order("rating", { ascending: false, nullsFirst: false }),
   ]);
   const prono = m.status === "finished" ? null : pronostic(ratings.get(m.home_team_id)?.rating, ratings.get(m.away_team_id)?.rating);
   const deltaOf = (teamId: string) => (hist ?? []).find((h) => h.team_id === teamId)?.delta as number | undefined;
   const notes = (stats ?? []) as unknown as (Record<string, number | boolean | string> & { player_id: string; team_id: string; rating: number; motm: boolean; player: { slug: string; first_name: string; last_name: string; position: string | null } })[];
+  // colonnes du détail : seulement les stats présentes dans ce match (la feuille LNR en donne bien plus qu'ESPN)
+  const colonnes = ([
+    ["minutes", "Min", "Minutes jouées"], ["tries", "E", "Essais"], ["points", "Pts", "Points"], ["tackles", "Plaq.", "Plaquages réussis"],
+    ["line_breaks", "Fr.", "Franchissements"], ["offloads", "PAC", "Passes après contact"], ["turnovers_won", "BG", "Ballons grattés"],
+    ["carries", "Courses", "Courses"], ["metres", "Mètres", "Mètres gagnés"], ["cartons", "Cartons", "Cartons"],
+  ] as [string, string, string][]).filter(([k]) => k === "cartons" ? notes.some((x) => Number(x.yellow) || Number(x.red)) : notes.some((x) => Number(x[k]) > 0));
   const full = !!viewer?.supporter;
   const hn = m.home.short_name ?? m.home.name;
   const an = m.away.short_name ?? m.away.name;
@@ -148,7 +154,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           <div className="flex flex-wrap gap-2 mb-3">
             {notes.slice(0, 3).map((s) => (
               <Link key={s.player_id} href={`/joueurs/${s.player.slug}`} className="inline-flex items-center gap-2 rounded-full bg-surface border border-trait pl-1 pr-3 py-1 text-sm font-semibold hover:border-vin">
-                <span className="rounded-full bg-moutarde text-bordeaux titre font-extrabold px-2 py-0.5 tnum">{Number(s.rating).toFixed(1)}</span>
+                <span className="rounded-full bg-moutarde text-bordeaux titre font-extrabold px-2 py-0.5 tnum">{s.rating == null ? "…" : Number(s.rating).toFixed(1)}</span>
                 {s.player.first_name.slice(0, 1)}. {s.player.last_name}{s.motm && " ⭐"}
               </Link>
             ))}
@@ -161,7 +167,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
                 <tr className="text-xs text-sourdine border-b border-trait">
                   <th scope="col" className="text-left font-semibold py-2.5 pl-4">Joueur</th>
                   <th scope="col" className="font-semibold px-2">Note</th>
-                  {full && <><th scope="col" className="font-semibold px-2" title="Essais">E</th><th scope="col" className="font-semibold px-2" title="Points">Pts</th><th scope="col" className="font-semibold px-2" title="Plaquages">Plaq.</th><th scope="col" className="font-semibold px-2" title="Courses">Courses</th><th scope="col" className="font-semibold px-2" title="Mètres gagnés">Mètres</th><th scope="col" className="font-semibold px-2" title="Ballons grattés">Grattés</th></>}
+                  {full && colonnes.map(([, court, long]) => <th key={court} scope="col" className="font-semibold px-2"><abbr title={long} className="no-underline">{court}</abbr></th>)}
                 </tr>
               </thead>
               <tbody>
@@ -172,8 +178,8 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
                       <span className="text-sourdine"> {s.team_id === m.home_team_id ? hn : an}</span>
                       {s.motm && <span className="ml-2 text-[10px] font-bold rounded-full bg-moutarde text-bordeaux px-1.5 py-0.5">Homme du match</span>}
                     </th>
-                    <td className="px-2 text-center"><span className={`inline-block min-w-10 rounded-full px-2 py-0.5 titre font-extrabold ${s.rating >= 8 ? "bg-moutarde text-bordeaux" : s.rating >= 6.5 ? "bg-teinte" : "bg-alerte/10 text-alerte"}`}>{Number(s.rating).toFixed(1)}</span></td>
-                    {full && <><td className="px-2 text-center">{s.tries as number}</td><td className="px-2 text-center">{s.points as number}</td><td className="px-2 text-center">{s.tackles as number}</td><td className="px-2 text-center">{s.carries as number}</td><td className="px-2 text-center">{s.metres as number}</td><td className="px-2 text-center">{s.turnovers_won as number}</td></>}
+                    <td className="px-2 text-center">{s.rating == null ? <span className="text-sourdine">…</span> : <span className={`inline-block min-w-10 rounded-full px-2 py-0.5 titre font-extrabold ${s.rating >= 8 ? "bg-moutarde text-bordeaux" : s.rating >= 6.5 ? "bg-teinte" : "bg-alerte/10 text-alerte"}`}>{Number(s.rating).toFixed(1)}</span>}</td>
+                    {full && colonnes.map(([cle]) => <td key={cle} className="px-2 text-center">{cle === "cartons" ? `${"🟨".repeat(Number(s.yellow) || 0)}${"🟥".repeat(Number(s.red) || 0)}` || "–" : Number(s[cle]) || "–"}</td>)}
                   </tr>
                 ))}
               </tbody>

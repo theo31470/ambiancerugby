@@ -230,6 +230,7 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
     const { error } = await db.from("player_match_stats").upsert(rows.slice(i, i + 100), { onConflict: "match_id,player_id" });
     if (error) throw new Error(error.message);
   }
+  await db.rpc("noter_matchs", { p_matchs: [m.id] });
   const nFil = await ecrireFil(db, m, fil, "espn");
   // nombre d'essais (essais de pénalité compris) : sert au bonus offensif du classement
   const essais = (cote: "home" | "away") => fil.filter((e) => (e.type === "try" || e.type === "penalty_try") && e.cote === cote).length;
