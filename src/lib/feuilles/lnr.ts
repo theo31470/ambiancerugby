@@ -187,7 +187,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   const ligne = (id: string, side: "home" | "away") => {
     const pid = notreId.get(id);
     if (!pid) return null;
-    if (!lignes.has(pid)) lignes.set(pid, { match_id: m.id, player_id: pid, team_id: teamId(side), numero: numeros.get(id) ?? null, starter: !entrants.has(id), minutes: 0, tries: 0, conversions: 0, penalty_goals: 0, drop_goals: 0, yellow: 0, red: 0, source: "lnr" });
+    if (!lignes.has(pid)) lignes.set(pid, { match_id: m.id, player_id: pid, team_id: teamId(side), numero: numeros.get(id) ?? null, starter: !entrants.has(id), minutes: 0, tries: 0, conversions: 0, penalty_goals: 0, drop_goals: 0, yellow: 0, red: 0, tackles: 0, line_breaks: 0, offloads: 0, turnovers_won: 0, source: "lnr" });
     return lignes.get(pid)!;
   };
   for (const e of equipes) for (const l of e.lignes) {
