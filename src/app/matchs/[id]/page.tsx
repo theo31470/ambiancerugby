@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import LiveRefresh from "@/components/LiveRefresh";
 import FilDuMatch from "@/components/FilDuMatch";
-import ChronoLive from "@/components/ChronoLive";
+import ChronoLive, { type Periodes } from "@/components/ChronoLive";
 import Comments from "@/components/Comments";
 import Confrontations from "@/components/stats/Confrontations";
 import Prono from "@/components/algo/Prono";
@@ -77,7 +77,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
             )}
             <p className="mt-3 text-sm font-semibold inline-flex items-center gap-2">
               {live && <span className="pastille" aria-hidden />}
-              {live ? <>En direct, <ChronoLive kickoff={m.kickoff_at} clock={m.clock} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} /></> : STATUS_LABEL[m.status]}
+              {live ? <>En direct, <ChronoLive kickoff={m.kickoff_at} clock={m.clock} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} /></> : STATUS_LABEL[m.status]}
             </p>
           </div>
           <TeamSide team={m.away} align="start" />
@@ -189,7 +189,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
         </section>
       )}
 
-      {events && events.length > 0 && <FilDuMatch events={events as never} home={m.home} away={m.away} live={live} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} />}
+      {events && events.length > 0 && <FilDuMatch events={events as never} home={m.home} away={m.away} live={live} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} />}
 
       <Confrontations matchId={m.id} home={m.home} away={m.away} />
 

@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
  * Chrono du direct qui tourne à la seconde. Part de la dernière minute connue (feuille ESPN) ;
  * à défaut, l'estime depuis le coup d'envoi (mi-temps de 15 minutes environ).
  */
-export default function ChronoLive({ kickoff, clock, updatedAt, status }: { kickoff: string; clock: string | null; updatedAt: string | null; status: string }) {
+export type Periodes = { periode1_debut?: string | null; periode1_fin?: string | null; periode2_debut?: string | null; periode2_fin?: string | null };
+
+export default function ChronoLive({ kickoff, clock, updatedAt, status, periodes }: { kickoff: string; clock: string | null; updatedAt: string | null; status: string; periodes?: Periodes }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     const tick = () => setNow(Date.now());
@@ -13,8 +15,20 @@ export default function ChronoLive({ kickoff, clock, updatedAt, status }: { kick
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, []);
-  if (status === "halftime") return <>Mi-temps</>;
+  const p = periodes ?? {};
+  // heures exactes de la feuille LNR : début et fin de chaque mi-temps
+  if (p.periode2_fin) return <>Terminé</>;
+  if (p.periode1_fin && !p.periode2_debut) return <>Mi-temps</>;
+  if (status === "halftime" && !p.periode1_debut) return <>Mi-temps</>;
   if (now == null) return <>{clock ?? "En direct"}</>;
+  if (p.periode1_debut) {
+    const depuis = (d: string) => Math.max(0, (now - new Date(d).getTime()) / 1000);
+    const enSeconde = !!p.periode2_debut;
+    const s = enSeconde ? 40 * 60 + depuis(p.periode2_debut!) : depuis(p.periode1_debut);
+    const plafond = enSeconde ? 80 * 60 : 40 * 60;
+    if (s >= plafond) return <span className="tnum">{plafond / 60}&apos;+{Math.floor((s - plafond) / 60)}</span>;
+    return <span className="tnum">{Math.floor(s / 60)}:{String(Math.floor(s % 60)).padStart(2, "0")}</span>;
+  }
   const minuteConnue = clock?.match(/^(\d+)/)?.[1];
   const deuxieme = /2e|2nd|second/i.test(clock ?? "");
   let s: number;

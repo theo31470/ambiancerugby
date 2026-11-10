@@ -4,7 +4,8 @@ import { createClient, getViewer } from "@/lib/supabase/server";
 import { analyserFeuille, chercherFeuille, IA_MODELE, IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { fmtDay } from "@/lib/format";
 import { ecrireFil, filDepuisIA } from "@/lib/fil";
-import { importerFeuilleEspn, SELECT_MATCH_ESPN, type MatchLocal } from "@/lib/feuilles/espn";
+import { importerFeuilleEspn, type MatchLocal } from "@/lib/feuilles/espn";
+import { importerFeuilleLnr, SELECT_MATCH_FEUILLE } from "@/lib/feuilles/lnr";
 
 export type EtatRecherche = { matchId: string; etat: "valide" | "proposition" | "rien" | "erreur" | "deja"; message: string; propId?: string };
 
@@ -39,9 +40,29 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
     if (!viewer || viewer.role === "user") return { matchId, etat: "erreur", message: "Accès réservé à la rédaction." };
     const db = await createClient();
 
-    // 1. feuille de match ESPN
-    const { data: me } = await db.from("matches").select(SELECT_MATCH_ESPN).eq("id", matchId).single();
+    // 1. feuille officielle de la LNR (Top 14, Pro D2) : compositions, minutes, points, cartons, plaquages, franchissements
+    const { data: me } = await db.from("matches").select(SELECT_MATCH_FEUILLE).eq("id", matchId).single();
     let raisonEspn = "";
+    const ml = me as unknown as (MatchLocal & { status: string; round: string | null; season: string | null; lnr_url: string | null; competition: { lnr_site: string | null; espn_league: string | null } }) | null;
+    if (ml && ml.status === "finished" && ml.competition?.lnr_site) {
+      try {
+        const r = await importerFeuilleLnr(db, ml, { remplacer });
+        await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: r.ok ? `lnr ${r.dom}-${r.ext}` : r.raison }).eq("id", matchId);
+        if (r.ok) {
+          revalidatePath("/", "layout");
+          const detail = `${r.joueurs} joueurs (minutes, points, plaquages, cartons)${r.crees ? `, ${r.crees} nouveaux joueurs créés` : ""}${r.fil ? `, ${r.fil} faits de jeu` : ""}`;
+          return r.conforme
+            ? { matchId, etat: "valide", message: `Feuille LNR : ${detail}. ${r.dom}–${r.ext}, conforme au score.` }
+            : { matchId, etat: "proposition", message: `Feuille LNR enregistrée : ${detail}. Score officiel LNR ${r.dom}–${r.ext}, différent du ${ml.home_score}–${ml.away_score} affiché : vérifiez.` };
+        }
+        if (r.raison === "déjà saisi à la main") return { matchId, etat: "deja", message: "Déjà saisi à la main : cochez « Remplacer les matchs déjà saisis » pour reprendre la feuille LNR." };
+        raisonEspn = `LNR : ${r.raison}`;
+      } catch (e) {
+        raisonEspn = `LNR : ${(e as Error).message}`;
+      }
+    }
+
+    // 2. feuille de match ESPN
     if (me && (me as { status: string }).status === "finished" && (me as unknown as MatchLocal).competition?.espn_league) {
       try {
         const r = await importerFeuilleEspn(db, me as unknown as MatchLocal, { remplacer });
@@ -54,9 +75,9 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
             : { matchId, etat: "proposition", message: `Feuille ESPN enregistrée : ${detail}. Points relevés ${r.dom}–${r.ext} pour ${(me as { home_score: number }).home_score}–${(me as { away_score: number }).away_score} affiché : vérifiez le score ou les buteurs.` };
         }
         if (r.raison === "déjà saisi à la main") return { matchId, etat: "deja", message: "Déjà saisi à la main : cochez « Remplacer les matchs déjà saisis » pour reprendre la feuille ESPN." };
-        raisonEspn = r.raison;
+        raisonEspn = [raisonEspn, `ESPN : ${r.raison}`].filter(Boolean).join(". ");
       } catch (e) {
-        raisonEspn = (e as Error).message;
+        raisonEspn = [raisonEspn, `ESPN : ${(e as Error).message}`].filter(Boolean).join(". ");
       }
     }
 
@@ -107,7 +128,7 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
     const lignes = r.lignes.filter((l) => l.ref && refs.has(l.ref) && (l.ref.startsWith("H") ? l.equipe === "home" : l.equipe === "away"))
       .map((l) => ({ cote: l.equipe, player_id: refs.get(l.ref!)!, tries: l.essais, conversions: l.transformations, penalty_goals: l.penalites, drop_goals: l.drops, yellow: l.cartons_jaunes, red: l.cartons_rouges }));
     const inconnus = r.lignes.filter((l) => !l.ref || !refs.has(l.ref)).map((l) => ({ cote: l.equipe, nom: l.nom_lu, essais: l.essais, transformations: l.transformations, penalites: l.penalites, drops: l.drops, cj: l.cartons_jaunes, cr: l.cartons_rouges }));
-    if (!lignes.length && !inconnus.length) return { matchId, etat: "rien", message: `${raisonEspn ? `ESPN : ${raisonEspn}. ` : ""}Claude : ${r.remarques || "aucun compte rendu trouvé."}` };
+    if (!lignes.length && !inconnus.length) return { matchId, etat: "rien", message: `${raisonEspn ? `${raisonEspn}. ` : ""}Claude : ${r.remarques || "aucun compte rendu trouvé."}` };
 
     const totalDom = lignes.filter((l) => l.cote === "home").reduce((s, l) => s + pts(l), 0);
     const totalExt = lignes.filter((l) => l.cote === "away").reduce((s, l) => s + pts(l), 0);

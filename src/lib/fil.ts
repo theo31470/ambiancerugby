@@ -7,11 +7,11 @@ export type EvtPropose = { minute: number | null; cote: "home" | "away"; player_
  * Écrit le fil du match lu automatiquement. Ne touche jamais à un fil saisi à la main :
  * s'il en existe un, on ne fait rien. Les faits d'une lecture automatique précédente sont remplacés.
  */
-export async function ecrireFil(db: SupabaseClient, m: { id: string; home_team_id: string; away_team_id: string }, evts: EvtPropose[], source: "claude" | "espn" = "claude") {
+export async function ecrireFil(db: SupabaseClient, m: { id: string; home_team_id: string; away_team_id: string }, evts: EvtPropose[], source: "claude" | "espn" | "lnr" = "claude") {
   if (!evts.length) return 0;
   const { count: manuels } = await db.from("match_events").select("id", { count: "exact", head: true }).eq("match_id", m.id).eq("source", "manuel");
   if (manuels) return 0;
-  await db.from("match_events").delete().eq("match_id", m.id).in("source", ["claude", "espn"]);
+  await db.from("match_events").delete().eq("match_id", m.id).in("source", ["claude", "espn", "lnr"]);
   const rows = evts.map((e) => ({
     match_id: m.id, kind: e.type, minute: e.minute, team_id: e.cote === "home" ? m.home_team_id : m.away_team_id,
     player_id: e.player_id, text: e.type === "sub" ? e.nom || null : e.player_id ? null : e.nom || null, source,
