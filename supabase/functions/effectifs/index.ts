@@ -384,16 +384,13 @@ async function jobCarriere(db: SupabaseClient, t0: number) {
   return [`${lus} pages joueurs lues, ${parcours} parcours importés, ${count ?? 0} restants`];
 }
 
-Deno.serve(async (req) => {
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const { data: ok } = await db.rpc("check_sync_secret", { s: req.headers.get("x-sync-secret") ?? "" });
-  if (!ok) return json({ error: "unauthorized" }, 401);
-  const t0 = Date.now();
-  const { job = "squads", params = {} } = await req.json().catch(() => ({}));
+declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
+
+async function executer(db: SupabaseClient, job: string, params: Record<string, unknown>, t0: number) {
   let lignes: string[] = [];
   let okRun = true;
   try {
-    if (job === "squads") lignes = await jobSquads(db, params, t0);
+    if (job === "squads") lignes = await jobSquads(db, params as { slugs?: string[]; force?: boolean }, t0);
     else if (job === "enrich") lignes = await jobEnrich(db, t0);
     else if (job === "carriere") lignes = await jobCarriere(db, t0);
     else throw new Error(`tâche inconnue : ${job}`);
@@ -405,5 +402,15 @@ Deno.serve(async (req) => {
   if (!silencieux) {
     await db.from("sync_runs").insert({ provider: job === "enrich" ? "thesportsdb" : "wikipedia", job: `effectifs-${job}`, calls: 0, ok: okRun, message: lignes.join(" | ").slice(0, 4000), duration_ms: Date.now() - t0 });
   }
-  return json({ ok: okRun, log: lignes, ms: Date.now() - t0 }, okRun ? 200 : 500);
+}
+
+Deno.serve(async (req) => {
+  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const { data: ok } = await db.rpc("check_sync_secret", { s: req.headers.get("x-sync-secret") ?? "" });
+  if (!ok) return json({ error: "unauthorized" }, 401);
+  const t0 = Date.now();
+  const { job = "squads", params = {} } = await req.json().catch(() => ({}));
+  // réponse immédiate : la file d'appels de la base n'attend pas la fin du travail
+  EdgeRuntime.waitUntil(executer(db, job, params, t0));
+  return json({ ok: true, lance: job });
 });
