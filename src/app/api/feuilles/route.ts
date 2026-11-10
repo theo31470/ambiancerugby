@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { shopDb } from "@/lib/shop/admin";
 import { importerFeuilleEspn, SELECT_MATCH_ESPN, type MatchLocal } from "@/lib/feuilles/espn";
 
@@ -23,20 +24,23 @@ export async function GET(req: Request) {
     .map((m) => ({ ...m, live: m.status === "live" || m.status === "halftime" }))
     .sort((a, b) => Number(b.live) - Number(a.live));
 
-  const bilan: string[] = [];
-  const debut = Date.now();
-  for (const m of aFaire) {
-    if (Date.now() - debut > 90_000) break;
-    let resultat: string;
-    try {
-      const r = await importerFeuilleEspn(db, m);
-      resultat = r.ok ? `${m.live ? "direct" : "espn"} ${r.dom}-${r.ext}${r.conforme || m.live ? "" : " (écart)"}` : r.raison;
-    } catch (e) {
-      resultat = `erreur : ${(e as Error).message}`.slice(0, 200);
+  // on répond tout de suite (la file d'appels de la base n'attend pas), le travail continue ensuite
+  after(async () => {
+    const bilan: string[] = [];
+    const debut = Date.now();
+    for (const m of aFaire) {
+      if (Date.now() - debut > 100_000) break;
+      let resultat: string;
+      try {
+        const r = await importerFeuilleEspn(db, m);
+        resultat = r.ok ? `${m.live ? "direct" : "espn"} ${r.dom}-${r.ext}${r.conforme || m.live ? "" : " (écart)"}` : r.raison;
+      } catch (e) {
+        resultat = `erreur : ${(e as Error).message}`.slice(0, 200);
+      }
+      await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: resultat }).eq("id", m.id);
+      bilan.push(resultat);
     }
-    await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: resultat }).eq("id", m.id);
-    bilan.push(`${m.id} ${resultat}`);
-  }
-  if (bilan.some((b) => / (espn|direct) /.test(b))) revalidatePath("/", "layout");
-  return Response.json({ traites: bilan.length, bilan });
+    if (bilan.some((b) => /^(espn|direct) /.test(b))) revalidatePath("/", "layout");
+  });
+  return Response.json({ lances: aFaire.length });
 }
