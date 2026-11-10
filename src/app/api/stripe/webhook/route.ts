@@ -2,8 +2,9 @@ import type Stripe from "stripe";
 import { shopDb, type Commande } from "@/lib/shop/admin";
 import { stripe } from "@/lib/shop/stripe";
 import { commandePayee } from "@/lib/shop/traitement";
+import { enregistrerFacture, synchroniser } from "@/lib/abonnement";
 
-/** Événements Stripe : paiement réussi, paiement différé réussi, remboursement. Signature vérifiée. */
+/** Événements Stripe : boutique (paiement, remboursement) et abonnement Supporter (échéances, changements). Signature vérifiée. */
 export async function POST(req: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) return new Response("webhook non configuré", { status: 500 });
@@ -28,6 +29,18 @@ export async function POST(req: Request) {
     const ch = event.data.object as Stripe.Charge;
     const orderId = ch.metadata?.order_id;
     if (orderId && ch.refunded) await db.rpc("shop_maj_commande", { p_secret: null, p_id: orderId, p_patch: { statut: "remboursee", message: "Commande remboursée." } });
+  }
+  // abonnement Supporter : chaque échéance payée prolonge l'accès et produit une facture du site
+  if (event.type === "invoice.paid") {
+    const inv = event.data.object as Stripe.Invoice;
+    const subId = inv.parent?.subscription_details?.subscription;
+    if (subId) {
+      await synchroniser(await stripe().subscriptions.retrieve(typeof subId === "string" ? subId : subId.id));
+      await enregistrerFacture(inv);
+    }
+  }
+  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+    await synchroniser(event.data.object as Stripe.Subscription);
   }
   return Response.json({ recu: true });
 }

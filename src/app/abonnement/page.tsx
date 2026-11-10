@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Ballon, Beret, Echarpe, Pinte, Poteaux, Trompette } from "@/components/deco/Icones";
-import { createClient, getViewer, hasBadge } from "@/lib/supabase/server";
+import { getViewer, hasBadge } from "@/lib/supabase/server";
 import { fmtDate } from "@/lib/format";
-import { rejoindreListe } from "../actions";
+import DevenirSupporter from "@/components/abonnement/DevenirSupporter";
 
-export const metadata: Metadata = { title: "Devenir Supporter", description: "L'abonnement Ambiance Rugby : stats et algorithme complets, alertes de match, contenus exclusifs et badge Supporter, pour 2,99 € par mois." };
+export const metadata: Metadata = { title: "Devenir Supporter", description: "L'abonnement Ambiance Rugby : stats et algorithme complets, alertes de match, contenus exclusifs et badge Supporter, pour 2,99 € par mois ou 29 € par an." };
 export const dynamic = "force-dynamic";
 
 const AVANTAGES = [
@@ -15,16 +15,9 @@ const AVANTAGES = [
   { Icone: Echarpe, titre: "Badge Supporter", texte: "Votre badge doré sur votre profil et sous chacun de vos commentaires." },
 ];
 
-export default async function AbonnementPage({ searchParams }: PageProps<"/abonnement">) {
-  const sp = await searchParams;
+export default async function AbonnementPage() {
   const viewer = await getViewer();
   const actif = hasBadge(viewer);
-  let inscrit = false;
-  if (viewer && !actif) {
-    const supabase = await createClient();
-    const { count } = await supabase.from("subscription_interest").select("*", { count: "exact", head: true }).eq("user_id", viewer.id);
-    inscrit = (count ?? 0) > 0;
-  }
 
   return (
     <div>
@@ -34,26 +27,21 @@ export default async function AbonnementPage({ searchParams }: PageProps<"/abonn
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20 relative text-center">
           <h1 className="groovy text-5xl sm:text-7xl">Passez en <span className="text-moutarde">tribune d&apos;honneur</span></h1>
           <p className="mt-5 text-lg text-white/80 max-w-xl mx-auto">Ambiance Rugby est un média indépendant. L&apos;abonnement Supporter le fait vivre et vous donne le meilleur du site.</p>
-          <div className="mt-10 inline-block relative">
+          <div className="mt-10 inline-block relative max-w-full">
             <div className="absolute inset-0 rounded-[2rem] bg-moutarde rotate-2" aria-hidden />
-            <div className="relative rounded-[2rem] bg-surface text-encre px-10 py-8">
+            <div className="relative rounded-[2rem] bg-surface text-encre px-5 sm:px-10 py-8 flex flex-col items-center">
               <p className="text-sm font-semibold text-vin">Supporter</p>
-              <p className="mt-1"><span className="groovy text-6xl">2,99 €</span><span className="text-sourdine"> / mois</span></p>
-              <p className="text-sm text-sourdine mt-1">Sans engagement</p>
-              <div className="mt-6">
-                {actif ? (
-                  <p className="font-semibold text-ok">Vous êtes Supporter{viewer?.plan_until ? ` jusqu'au ${fmtDate(viewer.plan_until)}` : ""}. Merci !</p>
-                ) : !viewer ? (
-                  <Link href="/inscription" className="bouton-or"><Ballon className="tourne w-6" />Créer mon compte d&apos;abord</Link>
-                ) : inscrit || sp.ok ? (
-                  <p className="font-semibold text-vin max-w-xs">C&apos;est noté ! On vous prévient dès que l&apos;abonnement ouvre.</p>
-                ) : (
-                  <form action={rejoindreListe}>
-                    <button className="bouton-or"><Ballon className="tourne w-6" />Me prévenir à l&apos;ouverture</button>
-                  </form>
-                )}
-              </div>
-              {!actif && <p className="mt-4 text-xs text-sourdine max-w-xs mx-auto">Le paiement en ligne arrive très bientôt. Inscrivez-vous pour être prévenu en premier.</p>}
+              {actif ? (
+                <>
+                  <p className="mt-2 font-semibold text-ok">Vous êtes Supporter{viewer?.plan_until ? ` jusqu'au ${fmtDate(viewer.plan_until)}` : ""}. Merci !</p>
+                  <Link href="/compte/abonnement" className="bouton-discret mt-4">Gérer mon abonnement</Link>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 mb-6 text-sourdine">2,99 € par mois ou 29 € par an</p>
+                  <DevenirSupporter connecte={!!viewer} />
+                </>
+              )}
             </div>
           </div>
         </div>
