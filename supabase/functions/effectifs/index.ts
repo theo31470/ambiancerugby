@@ -262,7 +262,10 @@ async function jobEnrich(db: SupabaseClient, t0: number) {
       const d = await r.json().catch(() => ({}));
       const rugby = ((d.player ?? []) as any[]).filter((x) => x.strSport === "Rugby" && norm(x.strPlayer) === norm(nom));
       const noms = [p.team?.name, p.team?.short_name, ...(p.team?.aliases ?? [])].map(norm);
-      const x = rugby.find((c) => noms.includes(norm(c.strTeam))) ?? (rugby.length === 1 ? rugby[0] : null);
+      // même club, ou même date de naissance ; un homonyme seul ne suffit plus (photos d'autres joueurs)
+      const memeNaissance = (c: any) => !!p.birth_date && c.dateBorn === p.birth_date;
+      const x = rugby.find((c) => noms.includes(norm(c.strTeam)) && (!p.birth_date || !c.dateBorn || memeNaissance(c))) ?? rugby.find(memeNaissance) ?? null;
+      if (!x && p.photo_source === "TheSportsDB" && !p.verrou) { patch.photo_url = null; patch.photo_source = null; }
       if (x && !p.verrou) {
         trouves++;
         patch.tsdb_id = x.idPlayer;
@@ -333,8 +336,8 @@ function infobox(texte: string): Record<string, string> | null {
 const JEUNES = /\bu-?\d{2}\b|under[- ]\d{2}|sevens|\b7s\b|\bA$|\bXV\b|barbarians|lions|development|emerging|schools|students|universit|academy|espoirs/i;
 
 async function jobCarriere(db: SupabaseClient, t0: number) {
-  const { data } = await db.from("players").select("id, wiki_title, verrou").not("wiki_title", "is", null).is("career_checked_at", null).eq("in_squad", true).limit(120);
-  const liste = (data ?? []) as { id: string; wiki_title: string; verrou: boolean }[];
+  const { data } = await db.from("players").select("id, wiki_title, verrou, photo_source").not("wiki_title", "is", null).is("career_checked_at", null).eq("in_squad", true).limit(120);
+  const liste = (data ?? []) as { id: string; wiki_title: string; verrou: boolean; photo_source: string | null }[];
   let lus = 0, parcours = 0;
   for (let i = 0; i < liste.length; i += 40) {
     if (Date.now() - t0 > BUDGET_MS - 20_000) break;
@@ -366,6 +369,12 @@ async function jobCarriere(db: SupabaseClient, t0: number) {
           if (pts) patch.career_points = pts;
         }
         if (!lignes.length && !page) patch.wiki_title = null;
+      }
+      // photo de l'infobox (Wikimedia Commons) : c'est la bonne personne, elle passe devant TheSportsDB
+      const fichier = ib ? propre(ib.image ?? "").replace(/^(file|image|fichier)\s*:/i, "").trim() : "";
+      if (fichier && /\.(jpe?g|png|webp)$/i.test(fichier) && !p.verrou && p.photo_source !== "Ambiance Rugby") {
+        patch.photo_url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fichier.replace(/ /g, "_"))}?width=480`;
+        patch.photo_source = "Wikimedia Commons";
       }
       await db.from("players").update(patch).eq("id", p.id);
     }
