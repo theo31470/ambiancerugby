@@ -69,9 +69,9 @@ export function simuler(equipes: EquipeSim[], matchs: MatchSim[], forces: Record
     for (const m of jouables) {
       const h = idx.get(m.dom)!, a = idx.get(m.ext)!;
       const f = forces[m.id];
-      // écart attendu : 1 point de marge pour 10 points d'Indice, dispersion d'un match de rugby
-      const mu = (rating[h] + AVANTAGE - rating[a]) / 10;
-      let marge = Math.round(mu + normale(r) * 13);
+      // écart attendu : environ 1 point de marge pour 22 points d'Indice (plafonné), dispersion réelle d'un match de rugby
+      const mu = Math.max(-25, Math.min(25, (rating[h] + AVANTAGE - rating[a]) / 22));
+      let marge = Math.round(mu + normale(r) * 15);
       if (f === "dom") marge = Math.max(1, Math.abs(marge));
       else if (f === "ext") marge = -Math.max(1, Math.abs(marge));
       else if (f === "nul") marge = 0;
