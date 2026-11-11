@@ -7,11 +7,10 @@ import NavBureau from "./nav/NavBureau";
 import MenuVestiaire from "./nav/MenuVestiaire";
 import SonStade from "./deco/SonStade";
 import BoutonPanier from "./shop/BoutonPanier";
-import { Ballon, Journal } from "./deco/Icones";
+import { Ballon } from "./deco/Icones";
 
 export default async function Header() {
   const viewer = await getViewer();
-  const staff = !!viewer && (viewer.role === "admin" || viewer.role === "editor");
   const badge = hasBadge(viewer);
   let unread = 0;
   if (viewer) {
@@ -30,12 +29,6 @@ export default async function Header() {
         </div>
         <div className="ml-auto flex items-center gap-1 sm:gap-1.5 text-sm font-semibold">
           <span className="hidden sm:block"><SonStade /></span>
-          {staff && (
-            <Link href="/admin" title="Espace rédaction" className="hidden xl:grid place-items-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20">
-              <Journal className="h-5 w-auto text-moutarde [--deco-trait:var(--vin)]" />
-              <span className="sr-only">Espace rédaction</span>
-            </Link>
-          )}
           {viewer && !badge && (
             <Link href="/abonnement" className="hidden xl:inline-flex items-center gap-1.5 whitespace-nowrap pl-2 pr-3.5 py-1.5 rounded-full bg-moutarde text-bordeaux hover:brightness-105">
               <Ballon className="w-6 text-bordeaux" />
@@ -57,7 +50,7 @@ export default async function Header() {
               <Link href="/inscription" className="hidden sm:inline-flex px-3.5 py-1.5 rounded-full bg-white text-vin hover:bg-white/90">Rejoindre</Link>
             </>
           )}
-          <span className="xl:hidden"><MenuVestiaire connecte={!!viewer} supporter={!!viewer?.supporter} staff={staff} /></span>
+          <span className="xl:hidden"><MenuVestiaire connecte={!!viewer} supporter={!!viewer?.supporter} /></span>
         </div>
       </div>
     </EnteteCollant>

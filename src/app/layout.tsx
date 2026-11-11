@@ -1,13 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import Scoreboard from "@/components/Scoreboard";
-import Celebration from "@/components/deco/Celebration";
 import { getViewer } from "@/lib/supabase/server";
 import type { Prefs } from "@/lib/membres";
-import { getTickerMatches } from "@/lib/queries";
 
 // polices hébergées avec le site : Shrikhand (grands titres groovy), Bricolage Grotesque (titres, scores), Instrument Sans (texte)
 const groovy = localFont({ variable: "--font-groovy", src: "./fonts/shrikhand.woff2", weight: "400", display: "swap" });
@@ -35,24 +30,14 @@ export const viewport: Viewport = {
   ],
 };
 
+/** Cadre commun (polices, thème) : le site public et le studio d'administration ont chacun leur propre habillage. */
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const [ticker, viewer] = await Promise.all([getTickerMatches(), getViewer()]);
+  const viewer = await getViewer();
   const prefs = (viewer?.prefs ?? {}) as Prefs;
   const theme = prefs.theme === "sombre" ? "dark" : prefs.theme === "clair" ? "light" : undefined;
   return (
     <html lang="fr" data-theme={theme} className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
-        <a href="#contenu" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:bg-surface focus:p-2">
-          Aller au contenu
-        </a>
-        <Scoreboard initial={ticker} />
-        <Header />
-        <main id="contenu" className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-          {children}
-        </main>
-        <Footer />
-        {prefs.celebrations !== false && <Celebration />}
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

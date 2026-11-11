@@ -6,19 +6,19 @@ import { browserClient } from "@/lib/supabase/client";
 type Resultat = { href: string; titre: string; detail: string };
 
 const PAGES: Resultat[] = [
-  { href: "/admin", titre: "Aujourd'hui", detail: "Tableau de bord" },
-  { href: "/admin/articles/nouveau", titre: "Écrire un article", detail: "Rédaction" },
-  { href: "/admin/articles", titre: "Articles", detail: "Rédaction" },
-  { href: "/admin/journee", titre: "Saisie de journée", detail: "Matchs et stats" },
-  { href: "/admin/matchs", titre: "Matchs et direct", detail: "Matchs et stats" },
-  { href: "/admin/stats-depart", titre: "Stats de départ", detail: "Matchs et stats" },
-  { href: "/admin/commentaires", titre: "Commentaires", detail: "Rédaction" },
-  { href: "/admin/competitions", titre: "Compétitions", detail: "Compétitions, clubs, joueurs" },
-  { href: "/admin/site", titre: "Contenu du site", detail: "Réglages" },
-  { href: "/admin/clubs", titre: "Clubs", detail: "Clubs et joueurs" },
-  { href: "/admin/joueurs", titre: "Joueurs", detail: "Clubs et joueurs" },
-  { href: "/admin/donnees", titre: "Données et synchros", detail: "Réglages" },
-  { href: "/admin/utilisateurs", titre: "Membres", detail: "Réglages" },
+  { href: "/studio", titre: "Aujourd'hui", detail: "Tableau de bord" },
+  { href: "/studio/articles/nouveau", titre: "Écrire un article", detail: "Rédaction" },
+  { href: "/studio/articles", titre: "Articles", detail: "Rédaction" },
+  { href: "/studio/journee", titre: "Saisie de journée", detail: "Matchs et stats" },
+  { href: "/studio/matchs", titre: "Matchs et direct", detail: "Matchs et stats" },
+  { href: "/studio/stats-depart", titre: "Stats de départ", detail: "Matchs et stats" },
+  { href: "/studio/commentaires", titre: "Commentaires", detail: "Rédaction" },
+  { href: "/studio/competitions", titre: "Compétitions", detail: "Compétitions, clubs, joueurs" },
+  { href: "/studio/site", titre: "Contenu du site", detail: "Réglages" },
+  { href: "/studio/clubs", titre: "Clubs", detail: "Clubs et joueurs" },
+  { href: "/studio/joueurs", titre: "Joueurs", detail: "Clubs et joueurs" },
+  { href: "/studio/donnees", titre: "Données et synchros", detail: "Réglages" },
+  { href: "/studio/utilisateurs", titre: "Membres", detail: "Réglages" },
 ];
 
 /** Recherche rapide (Ctrl+K) : pages de l'admin, clubs, joueurs et articles. */
@@ -52,9 +52,9 @@ export default function RechercheRapide() {
         db.from("articles").select("id,title").ilike("title", `%${t}%`).limit(5),
       ]);
       setTrouves([
-        ...((clubs.data ?? []) as { id: string; name: string }[]).map((c) => ({ href: `/admin/clubs/${c.id}`, titre: c.name, detail: "Club" })),
-        ...((joueurs.data ?? []) as { id: string; first_name: string; last_name: string; team: unknown }[]).map((j) => ({ href: `/admin/joueurs/${j.id}`, titre: `${j.first_name} ${j.last_name}`, detail: `Joueur, ${(j.team as unknown as { name: string } | null)?.name ?? "sans club"}` })),
-        ...((articles.data ?? []) as { id: string; title: string }[]).map((a) => ({ href: `/admin/articles/${a.id}`, titre: a.title, detail: "Article" })),
+        ...((clubs.data ?? []) as { id: string; name: string }[]).map((c) => ({ href: `/studio/clubs/${c.id}`, titre: c.name, detail: "Club" })),
+        ...((joueurs.data ?? []) as { id: string; first_name: string; last_name: string; team: unknown }[]).map((j) => ({ href: `/studio/joueurs/${j.id}`, titre: `${j.first_name} ${j.last_name}`, detail: `Joueur, ${(j.team as unknown as { name: string } | null)?.name ?? "sans club"}` })),
+        ...((articles.data ?? []) as { id: string; title: string }[]).map((a) => ({ href: `/studio/articles/${a.id}`, titre: a.title, detail: "Article" })),
       ]);
       setSel(0);
     }, 200);

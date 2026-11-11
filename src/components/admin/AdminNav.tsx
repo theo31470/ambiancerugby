@@ -11,44 +11,44 @@ type Groupe = { titre: string; liens: Lien[] };
 export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0, aTraiter = 0 }: { brouillons: number; aSaisir: number; admin: boolean; commentaires?: number; aTraiter?: number }) {
   const path = usePathname();
   const groupes: Groupe[] = [
-    { titre: "", liens: [{ href: "/admin", label: "Aujourd'hui", Icone: Ballon, exact: true }] },
+    { titre: "", liens: [{ href: "/studio", label: "Aujourd'hui", Icone: Ballon, exact: true }] },
     {
       titre: "Rédaction",
       liens: [
-        { href: "/admin/articles", label: "Articles", Icone: Journal, badge: brouillons },
-        { href: "/admin/commentaires", label: "Commentaires", Icone: Trompette, badge: commentaires },
+        { href: "/studio/articles", label: "Articles", Icone: Journal, badge: brouillons },
+        { href: "/studio/commentaires", label: "Commentaires", Icone: Trompette, badge: commentaires },
       ],
     },
     {
       titre: "Matchs et stats",
       liens: [
-        { href: "/admin/journee", label: "Saisie de journée", Icone: Sifflet, badge: aSaisir },
-        { href: "/admin/matchs", label: "Matchs et direct", Icone: Coupe },
-        { href: "/admin/stats-depart", label: "Stats de départ", Icone: Podium },
+        { href: "/studio/journee", label: "Saisie de journée", Icone: Sifflet, badge: aSaisir },
+        { href: "/studio/matchs", label: "Matchs et direct", Icone: Coupe },
+        { href: "/studio/stats-depart", label: "Stats de départ", Icone: Podium },
       ],
     },
     {
       titre: "Boutique",
       liens: [
-        { href: "/admin/boutique", label: "Commandes", Icone: Pinte, badge: aTraiter, exact: true },
-        { href: "/admin/boutique/produits", label: "Produits", Icone: Maillot },
-        { href: "/admin/boutique/reglages", label: "Réglages boutique", Icone: Beret },
+        { href: "/studio/boutique", label: "Commandes", Icone: Pinte, badge: aTraiter, exact: true },
+        { href: "/studio/boutique/produits", label: "Produits", Icone: Maillot },
+        { href: "/studio/boutique/reglages", label: "Réglages boutique", Icone: Beret },
       ],
     },
     {
       titre: "Compétitions, clubs, joueurs",
       liens: [
-        { href: "/admin/competitions", label: "Compétitions", Icone: Coupe },
-        { href: "/admin/clubs", label: "Clubs", Icone: Poteaux },
-        { href: "/admin/joueurs", label: "Joueurs", Icone: Maillot },
+        { href: "/studio/competitions", label: "Compétitions", Icone: Coupe },
+        { href: "/studio/clubs", label: "Clubs", Icone: Poteaux },
+        { href: "/studio/joueurs", label: "Joueurs", Icone: Maillot },
       ],
     },
     {
       titre: "Réglages",
       liens: [
-        ...(admin ? [{ href: "/admin/utilisateurs", label: "Membres", Icone: Supporter }] : []),
-        ...(admin ? [{ href: "/admin/site", label: "Contenu du site", Icone: Echarpe }] : []),
-        { href: "/admin/donnees", label: "Données et synchros", Icone: Ballon },
+        ...(admin ? [{ href: "/studio/utilisateurs", label: "Membres", Icone: Supporter }] : []),
+        ...(admin ? [{ href: "/studio/site", label: "Contenu du site", Icone: Echarpe }] : []),
+        { href: "/studio/donnees", label: "Données et synchros", Icone: Ballon },
       ],
     },
   ];

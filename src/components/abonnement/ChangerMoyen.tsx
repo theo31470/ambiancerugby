@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadStripe, type StripeElementsOptions } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { appliquerNouveauMoyen, preparerNouveauMoyen } from "@/app/abonnement/actions";
+import { appliquerNouveauMoyen, preparerNouveauMoyen } from "@/app/(site)/abonnement/actions";
 
 const cle = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromesse = cle ? loadStripe(cle, { locale: "fr" }) : null;

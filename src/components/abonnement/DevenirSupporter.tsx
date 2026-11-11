@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { loadStripe, type Appearance, type StripeElementsOptions } from "@stripe/stripe-js";
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { demarrerAbonnement, verifierAbonnement } from "@/app/abonnement/actions";
+import { demarrerAbonnement, verifierAbonnement } from "@/app/(site)/abonnement/actions";
 import { Ballon } from "@/components/deco/Icones";
 
 const cle = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;

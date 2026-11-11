@@ -1,4 +1,4 @@
-import { saveMatch, deleteMatch } from "@/app/admin/actions";
+import { saveMatch, deleteMatch } from "@/app/studio/(app)/actions";
 import { Field, Select } from "./Field";
 import { STATUS_LABEL, isoToParisLocal } from "@/lib/format";
 import type { Match } from "@/lib/types";

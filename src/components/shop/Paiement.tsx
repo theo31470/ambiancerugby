@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { usePanier } from "@/lib/shop/panier";
-import { detaillerPanier, estimerLivraison, preparerPaiement, type Adresse, type LigneDetaillee } from "@/app/boutique/actions";
+import { detaillerPanier, estimerLivraison, preparerPaiement, type Adresse, type LigneDetaillee } from "@/app/(site)/boutique/actions";
 import { euros, PAYS } from "@/lib/shop/format";
 
 const cle = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;

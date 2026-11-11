@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { saveArticle, deleteArticle } from "@/app/admin/actions";
+import { saveArticle, deleteArticle } from "@/app/studio/(app)/actions";
 import { Area, Field, Select } from "./Field";
 import { CATEGORIES, isoToParisLocal } from "@/lib/format";
 import type { Article } from "@/lib/types";

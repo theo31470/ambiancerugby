@@ -1,4 +1,4 @@
-import { saveTeam } from "@/app/admin/actions";
+import { saveTeam } from "@/app/studio/(app)/actions";
 import { Area, Field } from "./Field";
 import TeamBadge from "@/components/TeamBadge";
 import type { Team } from "@/lib/types";

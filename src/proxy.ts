@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Rafraîchit la session Supabase à chaque requête et protège /admin et /compte.
+// Rafraîchit la session Supabase à chaque requête et protège /compte et le studio (connexion + code à 6 chiffres).
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -24,12 +24,25 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getClaims();
   const path = request.nextUrl.pathname;
-  if (!data?.claims && (path.startsWith("/admin") || path.startsWith("/compte"))) {
+  const vers = (chemin: string, suite: string) => {
     const url = request.nextUrl.clone();
-    url.pathname = "/connexion";
-    url.searchParams.set("suite", path);
+    url.pathname = chemin;
+    url.search = "";
+    url.searchParams.set("suite", suite);
     return NextResponse.redirect(url);
+  };
+
+  if (path.startsWith("/studio")) {
+    // studio : jamais indexé ni mis en cache
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    response.headers.set("Cache-Control", "no-store");
+    const acces = path === "/studio/connexion" || path === "/studio/securite";
+    if (!acces && !data?.claims) return vers("/studio/connexion", path);
+    // le second facteur (code à 6 chiffres) est obligatoire pour tout le studio
+    if (!acces && data?.claims && data.claims.aal !== "aal2") return vers("/studio/securite", path);
+    return response;
   }
+  if (!data?.claims && path.startsWith("/compte")) return vers("/connexion", path);
   return response;
 }
 

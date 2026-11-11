@@ -8,7 +8,7 @@ import SonStade from "../deco/SonStade";
 import { Ballon } from "../deco/Icones";
 
 /** Menu mobile plein écran : le vestiaire, sur fond de lignes de terrain. */
-export default function MenuVestiaire({ connecte, supporter, staff }: { connecte: boolean; supporter: boolean; staff: boolean }) {
+export default function MenuVestiaire({ connecte, supporter }: { connecte: boolean; supporter: boolean }) {
   const [ouvert, setOuvert] = useState(false);
   const path = usePathname();
   const premier = useRef<HTMLAnchorElement>(null);
@@ -98,7 +98,6 @@ export default function MenuVestiaire({ connecte, supporter, staff }: { connecte
                   <span><span className="font-semibold block">Devenir Supporter</span><span className="text-sm text-white/70">Stats complètes, alertes, exclusivités. 2,99 €/mois</span></span>
                 </Link>
               )}
-              {staff && <Link href="/admin" onClick={fermer} className="text-white/80 underline underline-offset-4">Espace rédaction</Link>}
               <div className="mt-2"><SonStade variante="menu" /></div>
             </div>
 

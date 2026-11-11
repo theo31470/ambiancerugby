@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { useActionState, useState } from "react";
-import { changerEmail, changerMotDePasse, enregistrerPreferences, enregistrerProfil, supprimerCompte } from "@/app/compte/actions";
+import { changerEmail, changerMotDePasse, enregistrerPreferences, enregistrerProfil, supprimerCompte } from "@/app/(site)/compte/actions";
 import { JE_SUIS, PREFS_DEFAUT, type Prefs } from "@/lib/membres";
 import type { FormState } from "@/app/actions";
 

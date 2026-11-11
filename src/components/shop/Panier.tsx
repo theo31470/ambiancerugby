@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { panier, usePanier } from "@/lib/shop/panier";
-import { detaillerPanier, type LigneDetaillee } from "@/app/boutique/actions";
+import { detaillerPanier, type LigneDetaillee } from "@/app/(site)/boutique/actions";
 import { euros } from "@/lib/shop/format";
 
 /** Contenu du panier, recalculé par le serveur à chaque changement. */

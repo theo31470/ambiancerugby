@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { savePlayer, deletePlayer } from "@/app/admin/actions";
+import { savePlayer, deletePlayer } from "@/app/studio/(app)/actions";
 import { Area, Field, Select } from "./Field";
 import { POSITIONS } from "@/lib/format";
 import type { Player } from "@/lib/types";

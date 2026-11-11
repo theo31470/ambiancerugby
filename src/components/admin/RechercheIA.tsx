@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { chercherMatchIA, type EtatRecherche } from "@/app/admin/ia-actions";
+import { chercherMatchIA, type EtatRecherche } from "@/app/studio/(app)/ia-actions";
 
 type MatchCible = { id: string; label: string; saisi: boolean };
 
