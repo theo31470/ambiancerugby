@@ -5,6 +5,9 @@ import TeamBadge from "@/components/TeamBadge";
 import LiveRefresh from "@/components/LiveRefresh";
 import FilDuMatch from "@/components/FilDuMatch";
 import CourbeAscendant from "@/components/CourbeAscendant";
+import Pronostic from "@/components/pronos/Pronostic";
+import AvantMatch from "@/components/AvantMatch";
+import { createClient } from "@/lib/supabase/server";
 import ChronoLive, { type Periodes } from "@/components/ChronoLive";
 import Comments from "@/components/Comments";
 import Confrontations from "@/components/stats/Confrontations";
@@ -62,6 +65,9 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     ["carries", "Courses", "Courses"], ["metres", "Mètres", "Mètres gagnés"], ["cartons", "Cartons", "Cartons"],
   ] as [string, string, string][]).filter(([k]) => k === "cartons" ? notes.some((x) => Number(x.yellow) || Number(x.red)) : notes.some((x) => Number(x[k]) > 0));
   const full = !!viewer?.supporter;
+  const monProno = viewer && m.status === "scheduled"
+    ? await (await createClient()).from("pronos").select("home_score,away_score").eq("user_id", viewer.id).eq("match_id", m.id).maybeSingle().then(({ data }) => (data ? { h: data.home_score, a: data.away_score } : null))
+    : null;
   const hn = m.home.short_name ?? m.home.name;
   const an = m.away.short_name ?? m.away.name;
 
@@ -198,6 +204,16 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
         </section>
       )}
 
+      {m.status === "scheduled" && new Date(m.kickoff_at) > new Date() && (
+        <section aria-labelledby="h-prono" className="mt-10 max-w-3xl bg-surface border border-trait rounded-2xl p-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex-1 min-w-[12rem]">
+            <h2 id="h-prono" className="groovy text-2xl text-vin">Votre prono</h2>
+            <p className="text-sm text-sourdine">{m.home.short_name ?? m.home.name} – {m.away.short_name ?? m.away.name}, jusqu&apos;au coup d&apos;envoi. <Link href="/pronos" className="underline underline-offset-4 hover:text-vin">Tous les pronos</Link></p>
+          </div>
+          <Pronostic matchId={m.id} initial={monProno} ferme={false} connecte={!!viewer} />
+        </section>
+      )}
+      {m.status === "scheduled" && <AvantMatch home={m.home} away={m.away} full={full} />}
       {events && events.length > 1 && (live || m.status === "finished") && (
         <CourbeAscendant events={events as never} home={m.home} away={m.away}
           minuteActuelle={m.status === "finished" ? 80 : m.status === "halftime" ? 40 : Math.min(80, Math.max(0, ...events.map((e) => e.minute ?? 0), m.clock && /^\d+/.test(m.clock) ? parseInt(m.clock, 10) : 0))} />

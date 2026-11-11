@@ -1,7 +1,8 @@
-import { Coupe, Echarpe, Journal, Maillot, Podium, Sifflet } from "../deco/Icones";
+import { Ballon, Coupe, Echarpe, Journal, Maillot, Podium, Sifflet } from "../deco/Icones";
 
 export const LIENS = [
   { href: "/matchs", label: "Matchs", detail: "Scores en direct et calendrier", Icone: Sifflet },
+  { href: "/pronos", label: "Pronos", detail: "Pronostics, ligues entre potes et XV de la semaine", Icone: Ballon },
   { href: "/indice", label: "Indice Ambiance", court: "Indice", detail: "Notre classement de puissance", Icone: Podium },
   { href: "/competitions", label: "Compétitions", detail: "Classements et résultats", Icone: Coupe },
   { href: "/clubs", label: "Clubs", detail: "Fiches, forme et effectifs", Icone: Echarpe },
