@@ -3,6 +3,7 @@ import Link from "next/link";
 import { publicClient } from "@/lib/supabase/server";
 import { shopDb } from "@/lib/shop/admin";
 import { lireCompositionLnr, trouverMatchLnr, type JoueurCompo } from "@/lib/feuilles/lnr";
+import { lireCompositionEspn, SELECT_MATCH_ESPN, type MatchLocal } from "@/lib/feuilles/espn";
 import type { TeamLite } from "@/lib/types";
 
 const POSTES: Record<number, string> = {
@@ -52,12 +53,28 @@ async function profil(teamId: string) {
 
 type MatchAvant = { id: string; kickoff_at: string; lnr_url?: string | null; round?: string | null; season?: string | null; competition_id: string };
 
-/** La composition officielle LNR, si elle est publiée (dans les 4 jours avant le match). */
-async function compositionOfficielle(m: MatchAvant, home: TeamLite, away: TeamLite) {
+type Compo = { source: "LNR" | "ESPN"; dom: Map<number, Titulaire>; ext: Map<number, Titulaire> };
+
+/** Composition officielle : feuille LNR (Top 14, Pro D2), sinon ESPN (autres compétitions), dans les 4 jours avant le match. */
+async function compositionOfficielle(m: MatchAvant, home: TeamLite, away: TeamLite, notes: { h: Map<string, number>; a: Map<string, number> }): Promise<Compo | null> {
   if (new Date(m.kickoff_at).getTime() - Date.now() > 4 * 86400e3) return null;
   const db = shopDb();
-  const { data: c } = await db.from("competitions").select("lnr_site").eq("id", m.competition_id).maybeSingle();
-  if (!c?.lnr_site) return null;
+  const { data: c } = await db.from("competitions").select("lnr_site, espn_league").eq("id", m.competition_id).maybeSingle();
+  if (!c?.lnr_site) {
+    if (!c?.espn_league) return null;
+    const { data: ml } = await db.from("matches").select(SELECT_MATCH_ESPN).eq("id", m.id).maybeSingle();
+    if (!ml) return null;
+    const e = await lireCompositionEspn(db, ml as unknown as MatchLocal).catch(() => null);
+    if (!e) return null;
+    const { data } = await publicClient().from("players").select("id,slug,first_name,last_name,photo_url,espn_id").in("espn_id", [...e.dom, ...e.ext].map((j) => j.espnId));
+    const parEspn = new Map((data ?? []).map((p) => [p.espn_id as string, p]));
+    const vers = (l: typeof e.dom, n: Map<string, number>) => new Map(l.filter((j) => j.numero <= 15).map((j) => {
+      const p = parEspn.get(j.espnId);
+      const joueur: Joueur = p ? { id: p.id, slug: p.slug, first_name: p.first_name, last_name: p.last_name, photo_url: p.photo_url } : { id: j.espnId, slug: null, first_name: j.prenom, last_name: j.nom, photo_url: null };
+      return [j.numero, { joueur, note: p ? n.get(p.id) ?? null : null, matchs: 0 }];
+    }));
+    return { source: "ESPN", dom: vers(e.dom, notes.h), ext: vers(e.ext, notes.a) };
+  }
   let url = m.lnr_url ?? null;
   if (!url) {
     const { data: ts } = await db.from("teams").select("id,name,short_name,aliases").in("id", [home.id, away.id]);
@@ -67,7 +84,8 @@ async function compositionOfficielle(m: MatchAvant, home: TeamLite, away: TeamLi
     if (url) await db.from("matches").update({ lnr_url: url }).eq("id", m.id);
   }
   if (!url) return null;
-  return lireCompositionLnr(url);
+  const l = await lireCompositionLnr(url);
+  return l ? { source: "LNR", dom: await versTitulaires(l.dom, notes.h), ext: await versTitulaires(l.ext, notes.a) } : null;
 }
 
 async function versTitulaires(liste: JoueurCompo[], notes: Map<string, number>) {
@@ -87,11 +105,9 @@ const court = (j: Joueur) => `${j.first_name.slice(0, 1)}. ${j.last_name}`;
 
 /** L'avant-match complet : duels poste par poste et buteurs en forme. Les Supporters voient tout. */
 export default async function AvantMatch({ match, home, away, full }: { match: MatchAvant; home: TeamLite; away: TeamLite; full: boolean }) {
-  const [h, a, compo] = await Promise.all([profil(home.id), profil(away.id), compositionOfficielle(match, home, away).catch(() => null)]);
-  if (compo) {
-    h.titulaires = await versTitulaires(compo.dom, h.notes);
-    a.titulaires = await versTitulaires(compo.ext, a.notes);
-  }
+  const [h, a] = await Promise.all([profil(home.id), profil(away.id)]);
+  const compo = await compositionOfficielle(match, home, away, { h: h.notes, a: a.notes }).catch(() => null);
+  if (compo) { h.titulaires = compo.dom; a.titulaires = compo.ext; }
   const numeros = Array.from({ length: 15 }, (_, i) => i + 1).filter((n) => h.titulaires.has(n) || a.titulaires.has(n));
   if (numeros.length < 8) return null;
   const visibles = full ? numeros : numeros.slice(0, 3);
@@ -106,7 +122,7 @@ export default async function AvantMatch({ match, home, away, full }: { match: M
     <section aria-labelledby="h-avant" className="mt-10 max-w-3xl">
       <div className="flex flex-wrap items-end justify-between gap-2 mb-3">
         <h2 id="h-avant" className="groovy text-2xl text-vin">L&apos;avant-match</h2>
-        <p className="text-sm text-sourdine">{compo ? <><b className="text-ok">Composition officielle</b> publiée par la LNR, note moyenne sur les 5 derniers matchs</> : "Titulaires habituels sur les 5 derniers matchs (la composition officielle s'affiche dès sa publication), note moyenne sur 10"}</p>
+        <p className="text-sm text-sourdine">{compo ? <><b className="text-ok">Composition officielle</b> ({compo.source === "LNR" ? "feuille de match LNR" : "ESPN"}), note moyenne sur les 5 derniers matchs</> : "Titulaires habituels sur les 5 derniers matchs (la composition officielle s'affiche dès sa publication), note moyenne sur 10"}</p>
       </div>
       <div className="bg-surface border border-trait rounded-2xl overflow-hidden">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-2 text-xs font-bold text-sourdine border-b border-trait">

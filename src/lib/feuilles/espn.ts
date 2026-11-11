@@ -253,3 +253,30 @@ export async function importerFeuilleEspn(db: SupabaseClient, m: MatchLocal, opt
 
 /** Sélection Supabase d'un match prêt pour importerFeuilleEspn. */
 export const SELECT_MATCH_ESPN = "id, competition_id, kickoff_at, home_score, away_score, home_team_id, away_team_id, espn_event_id, status, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,is_national), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,is_national), competition:competitions(name, espn_league)";
+
+export type JoueurCompoEspn = { espnId: string; numero: number; prenom: string; nom: string };
+
+/**
+ * Composition annoncée sur ESPN avant le match (compétitions hors LNR) : numéros 1 à 23 de chaque équipe.
+ * Mise en cache 30 minutes. Null tant qu'ESPN n'a pas publié les feuilles.
+ */
+export async function lireCompositionEspn(db: SupabaseClient, m: MatchLocal): Promise<{ dom: JoueurCompoEspn[]; ext: JoueurCompoEspn[] } | null> {
+  const ligue = m.competition.espn_league;
+  if (!ligue) return null;
+  const cible = await trouverMatchEspn({ ...m, live: true });
+  if (!cible) return null;
+  if (!m.espn_event_id) await db.from("matches").update({ espn_event_id: cible.eventId }).eq("id", m.id);
+  const r = await fetch(`${BASE}/${ligue}/summary?event=${cible.eventId}`, { next: { revalidate: 1800 }, signal: AbortSignal.timeout(15_000), headers: { "user-agent": "AmbianceRugby/1.0" } }).catch(() => null);
+  if (!r?.ok) return null;
+  const s = (await r.json()) as { rosters?: Roster[] };
+  const liste = (equipeEspn: string) => (s.rosters ?? []).find((x) => x.team.id === equipeEspn)?.roster
+    ?.map((p) => {
+      const nomEntier = p.athlete.displayName ?? p.athlete.fullName ?? "";
+      const prenom = p.athlete.firstName ?? nomEntier.split(" ")[0] ?? "";
+      const nom = p.athlete.lastName ?? nomEntier.split(" ").slice(1).join(" ");
+      return { espnId: p.athlete.id, numero: p.jersey ? parseInt(p.jersey, 10) : NaN, prenom, nom };
+    })
+    .filter((p) => Number.isFinite(p.numero)) ?? [];
+  const dom = liste(cible.homeEspn), ext = liste(cible.awayEspn);
+  return dom.filter((p) => p.numero <= 15).length >= 15 && ext.filter((p) => p.numero <= 15).length >= 15 ? { dom, ext } : null;
+}
