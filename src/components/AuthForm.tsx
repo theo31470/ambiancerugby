@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useActionState } from "react";
 import { signIn, signUp } from "@/app/actions";
 
@@ -25,6 +26,7 @@ export default function AuthForm({ mode, suite }: { mode: "signin" | "signup"; s
         <input id="password" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined}
           autoComplete={mode === "signup" ? "new-password" : "current-password"} className="champ" />
         {mode === "signup" && <p className="text-xs text-sourdine mt-1">8 caractères minimum.</p>}
+        {mode === "signin" && <Link href="/mot-de-passe-oublie" className="inline-block text-xs text-vin underline underline-offset-4 mt-1.5">Mot de passe oublié ?</Link>}
       </div>
       {state?.error && <p role="alert" className="text-sm text-alerte">{state.error}</p>}
       <button className="bouton" disabled={pending}>

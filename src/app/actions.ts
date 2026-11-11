@@ -150,3 +150,25 @@ export async function viderAlertes() {
   await supabase.from("notifications").delete().eq("user_id", uid);
   revalidatePath("/", "layout");
 }
+
+/** Mot de passe oublié : Supabase envoie (via notre hook) un lien qui ouvre la page du nouveau mot de passe. Même réponse que l'adresse existe ou non. */
+export async function demanderReinitialisation(_: FormState, form: FormData): Promise<FormState> {
+  const email = String(form.get("email") ?? "").trim();
+  if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "Saisissez une adresse e-mail valide." };
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${await origin()}/auth/callback?suite=/compte/nouveau-mot-de-passe` });
+  if (error && /rate|seconds/i.test(error.message)) return { error: "Un e-mail vient déjà de partir. Patientez une minute avant de recommencer." };
+  return { ok: "Si un compte existe avec cette adresse, un e-mail vient de partir. Ouvrez le lien qu'il contient (valable 1 heure)." };
+}
+
+/** Nouveau mot de passe, une fois connecté par le lien reçu. */
+export async function definirMotDePasse(_: FormState, form: FormData): Promise<FormState> {
+  const nouveau = String(form.get("nouveau") ?? "");
+  if (nouveau.length < 8) return { error: "Le mot de passe doit faire au moins 8 caractères." };
+  if (nouveau !== String(form.get("confirmation") ?? "")) return { error: "Les deux mots de passe ne sont pas identiques." };
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password: nouveau });
+  if (error) return { error: /different from the old/i.test(error.message) ? "Choisissez un mot de passe différent de l'ancien." : error.message };
+  revalidatePath("/", "layout");
+  redirect("/compte?mdp=ok");
+}

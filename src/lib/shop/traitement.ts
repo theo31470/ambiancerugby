@@ -1,4 +1,5 @@
 import { shopDb, type Commande } from "./admin";
+import { mailCommande } from "@/lib/email/envois";
 import { creerCommandePrintful, lireCommandePrintful, type CommandePrintful } from "./printful";
 
 const maj = (id: string, patch: Record<string, unknown>) => shopDb().rpc("shop_maj_commande", { p_secret: null, p_id: id, p_patch: patch });
@@ -7,6 +8,7 @@ const maj = (id: string, patch: Record<string, unknown>) => shopDb().rpc("shop_m
 export async function commandePayee(c: Commande, paymentIntent: string | null) {
   if (c.statut !== "en_attente") return; // déjà traitée (Stripe peut renvoyer l'événement)
   await maj(c.id, { statut: "payee", stripe_payment_intent: paymentIntent, message: "Paiement reçu, facture émise." });
+  await mailCommande("commande_confirmee", c);
   try {
     const pf = await creerCommandePrintful({
       numero: c.numero,
@@ -36,6 +38,7 @@ export async function synchroniserPrintful(printfulId: number) {
   const envoi = pf.shipments?.[pf.shipments.length - 1];
   if (envoi?.tracking_number && c.statut !== "livree") {
     await maj(c.id, { statut: "expediee", transporteur: envoi.carrier, suivi_numero: envoi.tracking_number, suivi_url: envoi.tracking_url, ...(c.statut !== "expediee" ? { message: `Colis confié à ${envoi.carrier}.` } : {}) });
+    if (c.statut !== "expediee" || c.suivi_numero !== envoi.tracking_number) await mailCommande("commande_expediee", { ...c, transporteur: envoi.carrier, suivi_numero: envoi.tracking_number, suivi_url: envoi.tracking_url });
   } else if (pf.status === "inprocess" && ["payee"].includes(c.statut)) {
     await maj(c.id, { statut: "en_fabrication", message: "En cours de fabrication à l'atelier." });
   } else if (pf.status === "canceled" && !["annulee", "remboursee"].includes(c.statut)) {
