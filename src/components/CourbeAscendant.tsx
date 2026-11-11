@@ -12,7 +12,7 @@ const POIDS: Record<string, number> = { try: 6, penalty_try: 8, conversion: 1.2,
 const TAU = 7; // minutes : vitesse à laquelle un temps fort s'estompe
 const W = 800, H = 190, MID = H / 2;
 
-export default function CourbeAscendant({ events, home, away, minuteActuelle }: { events: Evt[]; home: Equipe; away: Equipe; minuteActuelle: number }) {
+export default function CourbeAscendant({ events, home, away, minuteActuelle, full = true }: { events: Evt[]; home: Equipe; away: Equipe; minuteActuelle: number; full?: boolean }) {
   const utiles = events.filter((e) => e.minute != null && e.team_id && POIDS[e.kind] !== undefined);
   if (utiles.length < 2) return null;
   const fin = Math.max(40, Math.min(90, Math.max(minuteActuelle, ...utiles.map((e) => e.minute ?? 0))));
@@ -53,7 +53,14 @@ export default function CourbeAscendant({ events, home, away, minuteActuelle }: 
         <h2 id="h-ascendant" className="groovy text-2xl text-vin">La courbe d&apos;ascendant</h2>
         <p className="text-sm text-sourdine">Qui pousse, minute par minute</p>
       </div>
-      <div className="bg-surface border border-trait rounded-2xl p-4">
+      <div className="relative bg-surface border border-trait rounded-2xl p-4 overflow-hidden">
+        {!full && (
+          <div className="absolute inset-0 z-10 grid place-items-center bg-surface/40 backdrop-blur-[6px] p-4 text-center">
+            <p className="max-w-sm font-semibold">La courbe d&apos;ascendant, la part de domination et les temps forts sont réservés aux Supporters.
+              <a href="/abonnement" className="block mt-3 bouton-or justify-center">Devenir Supporter</a></p>
+          </div>
+        )}
+        <div aria-hidden={!full || undefined} className={full ? "" : "select-none"}>
         <div className="flex justify-between text-xs font-bold mb-1">
           <span className="text-vin">▲ {nom(home)} domine</span>
           <span className="text-sourdine tnum">{pctH} % / {100 - pctH} %</span>
@@ -88,7 +95,8 @@ export default function CourbeAscendant({ events, home, away, minuteActuelle }: 
           <span className="text-[color-mix(in_srgb,var(--moutarde)_70%,var(--encre))]">▼ {nom(away)} domine</span>
           {minuteActuelle < 80 && <span className="text-sourdine">jusqu&apos;à la {Math.round(minuteActuelle)}e</span>}
         </div>
-        {meilleur.duree >= 4 && (
+        </div>
+        {full && meilleur.duree >= 4 && (
           <p className="mt-3 text-sm">
             Plus long temps fort : <b>{nom(meilleur.equipe)}</b>, {Math.round(meilleur.duree)} minutes de domination à partir de la {Math.max(1, Math.round(meilleur.debut))}<sup>e</sup>.
           </p>

@@ -98,9 +98,16 @@ export default function Simulateur({ equipes, matchs, zones, favori, supporter =
       )}
 
       {supporter && choisi && historique.some((h) => h.team_id === choisi.id) && <Evolution points={historique.filter((h) => h.team_id === choisi.id)} nom={nom(choisi.team)} />}
-      {!supporter && <p className="text-sm text-sourdine -mt-4">L&apos;évolution des chances jour après jour et le partage de scénarios sont réservés aux <a href="/abonnement" className="text-vin font-semibold underline underline-offset-4">Supporters</a>.</p>}
 
+      {!supporter && (
+        <section className="rounded-3xl bg-teinte p-6 text-center">
+          <p className="titre text-xl font-extrabold">Le classement projeté de tous les clubs, les chances place par place et les scénarios à jouer</p>
+          <p className="mt-1 text-sourdine">sont réservés aux Supporters. Changez de club ci-dessus pour voir ses chances de phase finale.</p>
+          <a href="/abonnement" className="bouton-or mt-4">Devenir Supporter</a>
+        </section>
+      )}
       {/* tableau des probabilités */}
+      {supporter && <>
       <section aria-labelledby="h-proj">
         <div className="flex flex-wrap items-end gap-2 mb-3">
           <h2 id="h-proj" className="titre text-2xl font-extrabold">Classement projeté</h2>
@@ -194,6 +201,7 @@ export default function Simulateur({ equipes, matchs, zones, favori, supporter =
           <button type="button" onClick={() => setOuvertes((n) => n + 3)} className="bouton-discret mt-4">Voir les journées suivantes</button>
         )}
       </section>
+      </>}
     </div>
   );
 }
