@@ -3,7 +3,7 @@ import { shopDb, type Commande } from "@/lib/shop/admin";
 import { stripe } from "@/lib/shop/stripe";
 import { commandePayee } from "@/lib/shop/traitement";
 import { enregistrerFacture, synchroniser } from "@/lib/abonnement";
-import { mailCommande, mailPaiementRefuse, mailRemboursementSupporter, mailsAbonnement, mailsFacturePayee } from "@/lib/email/envois";
+import { avoirsEtMails, mailPaiementRefuse, mailsAbonnement, mailsFacturePayee } from "@/lib/email/envois";
 
 /** Événements Stripe : boutique (paiement, remboursement) et abonnement Supporter (échéances, changements). Signature vérifiée. */
 export async function POST(req: Request) {
@@ -29,12 +29,9 @@ export async function POST(req: Request) {
   if (event.type === "charge.refunded") {
     const ch = event.data.object as Stripe.Charge;
     const orderId = ch.metadata?.order_id;
-    if (orderId && ch.refunded) {
-      await db.rpc("shop_maj_commande", { p_secret: null, p_id: orderId, p_patch: { statut: "remboursee", message: "Commande remboursée." } });
-      const { data } = await db.rpc("shop_lire_commande", { p_secret: null, p_id: orderId });
-      const c = (data as Commande[] | null)?.[0];
-      if (c) await mailCommande("commande_remboursee", c, { montantRembourseCents: ch.amount_refunded });
-    } else if (!orderId && ch.amount_refunded > 0) await mailRemboursementSupporter(ch);
+    if (orderId && ch.refunded) await db.rpc("shop_maj_commande", { p_secret: null, p_id: orderId, p_patch: { statut: "remboursee", message: "Commande remboursée." } });
+    // chaque remboursement (total ou partiel) donne un avoir, envoyé par e-mail avec son PDF
+    if (ch.amount_refunded > 0) await avoirsEtMails(ch);
   }
   // abonnement Supporter : chaque échéance payée prolonge l'accès et produit une facture du site
   if (event.type === "invoice.paid") {

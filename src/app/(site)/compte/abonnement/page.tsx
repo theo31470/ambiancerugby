@@ -14,9 +14,10 @@ export default async function MonAbonnement() {
   const viewer = await getViewer();
   if (!viewer) return null;
   const db = await createClient();
-  const [{ data: p }, { data: factures }] = await Promise.all([
+  const [{ data: p }, { data: factures }, { data: avoirs }] = await Promise.all([
     db.from("profiles").select("plan, plan_until, plan_formule, plan_statut, plan_fin_prevue, stripe_subscription_id").eq("id", viewer.id).single(),
     db.from("supporter_factures").select("id, numero, formule, montant_cents, payee_le, periode_debut, periode_fin").eq("user_id", viewer.id).order("payee_le", { ascending: false }),
+    db.from("avoirs").select("id, numero, montant_cents, rembourse_le, facture_origine").eq("user_id", viewer.id).eq("source", "supporter").order("rembourse_le", { ascending: false }),
   ]);
   const actif = hasBadge(viewer);
   const abonne = !!p?.stripe_subscription_id && ["active", "trialing", "past_due"].includes(p?.plan_statut ?? "");
@@ -67,7 +68,15 @@ export default async function MonAbonnement() {
                 <span className="font-semibold tnum">{f.numero ?? "En cours"}</span>
                 <span className="text-sourdine text-sm flex-1">{fmtDate(f.payee_le)}, Supporter {f.formule}{f.periode_fin ? ` jusqu'au ${fmtDate(f.periode_fin)}` : ""}</span>
                 <span className="tnum font-semibold">{euros(f.montant_cents)}</span>
-                {f.numero && <Link href={`/compte/factures/${encodeURIComponent(f.numero)}`} className="text-sm font-semibold text-vin underline underline-offset-4">Voir et télécharger</Link>}
+                {f.numero && <a href={`/factures/${encodeURIComponent(f.numero)}`} target="_blank" rel="noopener" className="text-sm font-semibold text-vin underline underline-offset-4">Facture PDF</a>}
+              </li>
+            ))}
+            {avoirs?.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+                <span className="font-semibold tnum">{a.numero}</span>
+                <span className="text-sourdine text-sm flex-1">{fmtDate(a.rembourse_le)}, remboursement{a.facture_origine ? ` de la facture ${a.facture_origine}` : ""}</span>
+                <span className="tnum font-semibold text-ok">−{euros(a.montant_cents)}</span>
+                {a.numero && <a href={`/factures/${encodeURIComponent(a.numero)}`} target="_blank" rel="noopener" className="text-sm font-semibold text-vin underline underline-offset-4">Avoir PDF</a>}
               </li>
             ))}
           </ul>

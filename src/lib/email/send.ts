@@ -7,7 +7,11 @@ import type { BuiltEmail } from "./templates";
  */
 
 export type EmailKind = "compte" | "supporter" | "boutique" | "test";
-export type OutgoingEmail = { to: string; email: BuiltEmail; kind: EmailKind; template: string; userId?: string | null };
+export type OutgoingEmail = {
+  to: string; email: BuiltEmail; kind: EmailKind; template: string; userId?: string | null;
+  /** Pièces jointes (facture ou avoir PDF), contenu en base64. */
+  attachments?: { filename: string; content: string }[];
+};
 export type SendResult = { ok: true; id: string | null } | { ok: false; error: string };
 
 const FROM = () => process.env.EMAIL_FROM?.trim() || "Ambiance Rugby <noreply@ambiance-rugby.fr>";
@@ -30,6 +34,7 @@ export async function sendOnly(m: OutgoingEmail, opts: { idempotencyKey?: string
       body: JSON.stringify({
         from: FROM(), to: [m.to], subject: m.email.subject, html: m.email.html, text: m.email.text,
         ...(REPLY_TO() ? { reply_to: REPLY_TO() } : {}),
+        ...(m.attachments?.length ? { attachments: m.attachments } : {}),
         tags: [{ name: "type", value: m.kind }, { name: "modele", value: m.template.replace(/[^A-Za-z0-9_-]/g, "_") }],
       }),
       signal: AbortSignal.timeout(10_000),

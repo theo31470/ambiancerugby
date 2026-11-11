@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 export default async function MesCommandes() {
   const db = await createClient();
   const { data } = await db.from("shop_orders").select("id,numero,statut,total_cents,created_at,facture_numero,items").neq("statut", "en_attente").order("created_at", { ascending: false });
+  const { data: av } = await db.from("avoirs").select("order_id, numero").not("order_id", "is", null);
+  const avoirsDe = (id: string) => (av ?? []).filter((a) => a.order_id === id && a.numero);
   const commandes = (data ?? []) as Pick<Commande, "id" | "numero" | "statut" | "total_cents" | "created_at" | "facture_numero" | "items">[];
   if (!commandes.length) return (
     <div>
@@ -26,7 +28,8 @@ export default async function MesCommandes() {
             <p className="text-sm text-sourdine">{new Date(c.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}, {c.items.reduce((s, i) => s + i.quantite, 0)} article(s), {euros(c.total_cents)}</p>
           </div>
           <Link href={`/suivi/${c.numero}`} className="bouton-discret">Suivi</Link>
-          {c.facture_numero && <Link href={`/boutique/facture/${c.numero}`} className="bouton-discret">Facture</Link>}
+          {c.facture_numero && <a href={`/factures/${encodeURIComponent(c.facture_numero)}`} target="_blank" rel="noopener" className="bouton-discret">Facture PDF</a>}
+          {avoirsDe(c.id).map((a) => <a key={a.numero} href={`/factures/${encodeURIComponent(a.numero!)}`} target="_blank" rel="noopener" className="bouton-discret">Avoir {a.numero}</a>)}
         </li>
       ))}
     </ul>

@@ -60,6 +60,7 @@ export default async function ReglagesBoutique({ searchParams }: PageProps<"/stu
           <input type="hidden" name="_back" value="/studio/boutique/reglages" />
           <h2 className="font-bold text-lg">Factures</h2>
           <Field name="vendeur_nom" label="Nom ou nom commercial" defaultValue={r?.vendeur_nom} />
+          <Field name="vendeur_titulaire" label="Titulaire (entrepreneur individuel, sur les factures)" defaultValue={r?.vendeur_titulaire} />
           <Area name="vendeur_adresse" label="Adresse" rows={3} defaultValue={r?.vendeur_adresse} />
           <Field name="vendeur_siret" label="SIRET" defaultValue={r?.vendeur_siret} />
           <Field name="vendeur_email" label="E-mail de contact" type="email" defaultValue={r?.vendeur_email} />

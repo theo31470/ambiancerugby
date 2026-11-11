@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import SuiviTerrain from "@/components/shop/SuiviTerrain";
 import { lireCommandeVisiteur } from "@/lib/shop/lecture";
 import { euros } from "@/lib/shop/format";
-import { STATUTS } from "@/lib/shop/admin";
+import { STATUTS, shopDb } from "@/lib/shop/admin";
 
 export const metadata: Metadata = { title: "Suivi de commande", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -17,6 +17,9 @@ export default async function SuiviCommande({ params, searchParams }: PageProps<
   if (!r) redirect("/suivi?introuvable=1");
   const { commande: c, etapes } = r;
   const q = email ? `?e=${encodeURIComponent(email)}` : "";
+  // accès déjà vérifié ci-dessus : on peut lire les avoirs de cette commande
+  const { data: av } = await shopDb().from("avoirs").select("numero").eq("order_id", c.id).not("numero", "is", null);
+  const avoirs = av ?? [];
   return (
     <div>
       <div className="flex flex-wrap items-end gap-x-6 gap-y-2 mb-6">
@@ -37,7 +40,8 @@ export default async function SuiviCommande({ params, searchParams }: PageProps<
         <div className="bg-surface border border-trait rounded-2xl p-5">
           <h2 className="font-bold text-lg mb-3">Livraison</h2>
           <p className="text-sm whitespace-pre-line">{[c.livraison_nom, c.livraison_adresse1, c.livraison_adresse2, `${c.livraison_cp} ${c.livraison_ville}`, c.livraison_pays].filter(Boolean).join("\n")}</p>
-          {c.facture_numero && <Link href={`/boutique/facture/${c.numero}${q}`} className="bouton-discret mt-4">Télécharger la facture {c.facture_numero}</Link>}
+          {c.facture_numero && <a href={`/factures/${encodeURIComponent(c.facture_numero)}${q}`} target="_blank" rel="noopener" className="bouton-discret mt-4">Télécharger la facture {c.facture_numero}</a>}
+          {avoirs.map((a) => <a key={a.numero} href={`/factures/${encodeURIComponent(a.numero!)}${q}`} target="_blank" rel="noopener" className="bouton-discret mt-2">Télécharger l&apos;avoir {a.numero}</a>)}
         </div>
       </section>
     </div>

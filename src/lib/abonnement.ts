@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 import { stripe, enModeTest } from "@/lib/shop/stripe";
 import { shopDb } from "@/lib/shop/admin";
+import { moyenDeFacture } from "@/lib/factures/donnees";
 
 /** Les deux formules Supporter. Les prix Stripe sont créés à la première utilisation (clé de recherche stable). */
 export const FORMULES = {
@@ -59,11 +60,12 @@ export async function enregistrerFacture(inv: Stripe.Invoice) {
   if (!userId && customer) userId = (await db.from("profiles").select("id").eq("stripe_customer_id", customer).maybeSingle()).data?.id ?? null;
   if (!userId) return null;
   const ligne = inv.lines.data[0];
+  const moyen = await moyenDeFacture(inv.id);
   const { data } = await db.from("supporter_factures").upsert({
     user_id: userId, stripe_invoice_id: inv.id, formule: sub ? formuleDe(sub) : "mensuel", montant_cents: inv.amount_paid,
     periode_debut: ligne?.period?.start ? new Date(ligne.period.start * 1000).toISOString() : null,
     periode_fin: ligne?.period?.end ? new Date(ligne.period.end * 1000).toISOString() : null,
-    client_nom: inv.customer_name ?? null, client_email: inv.customer_email ?? null,
+    client_nom: inv.customer_name ?? null, client_email: inv.customer_email ?? null, client_adresse: inv.customer_address ?? null, moyen,
     payee_le: inv.status_transitions?.paid_at ? new Date(inv.status_transitions.paid_at * 1000).toISOString() : new Date().toISOString(),
     mode_test: enModeTest(),
   }, { onConflict: "stripe_invoice_id" }).select("id, numero").single();

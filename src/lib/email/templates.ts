@@ -164,6 +164,8 @@ export type SupporterInput = {
   periodeFin?: string | null;
   carte?: string | null;
   finAcces?: string | null;
+  /** Numéro de l'avoir émis pour un remboursement. */
+  avoir?: string | null;
 };
 
 const LIBELLE = { mensuel: "Supporter mensuel", annuel: "Supporter annuel" } as const;
@@ -193,7 +195,7 @@ export function supporterEmail(template: SupporterTemplate, i: SupporterInput, s
         reason: "Vous recevez cet e-mail car vous venez de souscrire l'abonnement Supporter.",
       }, site);
     case "facture": {
-      const url = i.numero ? `${site}/compte/factures/${encodeURIComponent(i.numero)}` : compte;
+      const url = i.numero ? `${site}/factures/${encodeURIComponent(i.numero)}` : compte;
       const rows: Ligne[] = [{ label: LIBELLE[i.formule], detail: i.periodeDebut && i.periodeFin ? `Du ${dateFr(i.periodeDebut, { dateStyle: "short" })} au ${dateFr(i.periodeFin, { dateStyle: "short" })}` : undefined, valeur: euros(i.montantCents ?? 0) }];
       if (i.carte) rows.push({ label: "Moyen de paiement", detail: i.carte });
       return build(`Votre facture ${i.numero ?? ""}`.trim(), {
@@ -203,8 +205,8 @@ export function supporterEmail(template: SupporterTemplate, i: SupporterInput, s
           { type: "p", text: bonjour(i.name) },
           { type: "p", text: `Votre paiement du ${dateFr(i.date ?? new Date().toISOString())} a bien été reçu. Voici le récapitulatif :` },
           { type: "lignes", rows, total: { label: "Total payé", valeur: euros(i.montantCents ?? 0) } },
-          { type: "button", label: "Voir la facture", url },
-          { type: "p", text: "Toutes vos factures restent disponibles dans **Mon compte › Abonnement**." },
+          { type: "button", label: "Télécharger la facture (PDF)", url },
+          { type: "p", text: "La facture est aussi **jointe à cet e-mail**, et toutes vos factures restent disponibles dans **Mon compte › Abonnement**." },
         ],
         reason: "Vous recevez cet e-mail car un paiement a été effectué sur votre compte. TVA non applicable, art. 293 B du CGI.",
       }, site);
@@ -253,8 +255,9 @@ export function supporterEmail(template: SupporterTemplate, i: SupporterInput, s
         blocks: [
           { type: "p", text: bonjour(i.name) },
           { type: "p", text: `Nous avons remboursé **${euros(i.montantCents ?? 0)}**${i.numero ? ` (facture ${i.numero})` : ""} sur votre moyen de paiement${i.carte ? ` (${i.carte})` : ""}.` },
+          ...(i.avoir ? [{ type: "p" as const, text: `L'avoir **${i.avoir}** correspondant est joint à cet e-mail.` }] : []),
           { type: "note", text: "Selon votre banque, le montant apparaît sur votre compte sous 5 à 10 jours ouvrés." },
-          { type: "button", label: "Voir mon compte", url: compte },
+          ...(i.avoir ? [{ type: "button" as const, label: "Télécharger l'avoir (PDF)", url: `${site}/factures/${encodeURIComponent(i.avoir)}` }] : [{ type: "button" as const, label: "Voir mon compte", url: compte }]),
         ],
         reason: RAISON_ABO,
       }, site);
@@ -278,6 +281,8 @@ export type BoutiqueInput = {
   suiviNumero?: string | null;
   suiviUrl?: string | null;
   montantRembourseCents?: number;
+  factureNumero?: string | null;
+  avoir?: string | null;
 };
 const RAISON_BOUTIQUE = "Vous recevez cet e-mail suite à votre commande sur la boutique Ambiance Rugby.";
 
@@ -297,6 +302,7 @@ export function boutiqueEmail(template: BoutiqueTemplate, i: BoutiqueInput, site
             { label: "Livraison", valeur: i.livraisonCents ? euros(i.livraisonCents) : "Offerte" },
           ], total: { label: "Total", valeur: euros(i.totalCents) } },
           ...(i.adresse ? [{ type: "note" as const, text: `**Livraison :** ${i.adresse}` }] : []),
+          ...(i.factureNumero ? [{ type: "p" as const, text: `Votre facture **${i.factureNumero}** est jointe à cet e-mail.` }] : []),
           { type: "button", label: "Suivre ma commande", url: suivre },
         ],
         reason: RAISON_BOUTIQUE,
@@ -323,6 +329,7 @@ export function boutiqueEmail(template: BoutiqueTemplate, i: BoutiqueInput, site
         blocks: [
           { type: "p", text: bonjour(i.name) },
           { type: "p", text: `Nous avons remboursé **${euros(i.montantRembourseCents ?? i.totalCents)}** pour votre commande **n° ${i.numero}**, sur le moyen de paiement utilisé.` },
+          ...(i.avoir ? [{ type: "p" as const, text: `L'avoir **${i.avoir}** correspondant est joint à cet e-mail.` }] : []),
           { type: "note", text: "Selon votre banque, le montant apparaît sur votre compte sous 5 à 10 jours ouvrés." },
           { type: "button", label: "Voir ma commande", url: suivre },
         ],

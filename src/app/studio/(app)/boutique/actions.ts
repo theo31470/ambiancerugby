@@ -303,7 +303,7 @@ export async function saveReglagesBoutique(form: FormData) {
     const { viewer, db } = await staff();
     if (viewer.role !== "admin") throw new Error("Réservé aux administrateurs.");
     const { error } = await db.from("shop_settings").update({
-      vendeur_nom: s(form, "vendeur_nom"), vendeur_adresse: s(form, "vendeur_adresse"), vendeur_siret: s(form, "vendeur_siret"),
+      vendeur_nom: s(form, "vendeur_nom"), vendeur_titulaire: s(form, "vendeur_titulaire"), vendeur_adresse: s(form, "vendeur_adresse"), vendeur_siret: s(form, "vendeur_siret"),
       vendeur_email: s(form, "vendeur_email"), mention_tva: s(form, "mention_tva") ?? "TVA non applicable, art. 293 B du CGI", updated_at: new Date().toISOString(),
     }).eq("id", 1);
     if (error) throw new Error(error.message);
