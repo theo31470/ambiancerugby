@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import LiveRefresh from "@/components/LiveRefresh";
 import FilDuMatch from "@/components/FilDuMatch";
+import CourbeAscendant from "@/components/CourbeAscendant";
 import ChronoLive, { type Periodes } from "@/components/ChronoLive";
 import Comments from "@/components/Comments";
 import Confrontations from "@/components/stats/Confrontations";
@@ -37,6 +38,8 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     .order("created_at");
 
   const live = isLive(m.status);
+  const { data: amb } = await publicClient().from("match_ambiance").select("team_id,cris").eq("match_id", m.id);
+  const totauxTribune = { h: amb?.find((a) => a.team_id === m.home_team_id)?.cris ?? 0, a: amb?.find((a) => a.team_id === m.away_team_id)?.cris ?? 0 };
   const showScore = live || m.status === "finished";
   const linescores = Array.isArray(m.linescores) ? (m.linescores as { home: number; away: number }[]) : null;
 
@@ -195,11 +198,15 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
         </section>
       )}
 
+      {events && events.length > 1 && (live || m.status === "finished") && (
+        <CourbeAscendant events={events as never} home={m.home} away={m.away}
+          minuteActuelle={m.status === "finished" ? 80 : m.status === "halftime" ? 40 : Math.min(80, Math.max(0, ...events.map((e) => e.minute ?? 0), m.clock && /^\d+/.test(m.clock) ? parseInt(m.clock, 10) : 0))} />
+      )}
       {events && events.length > 0 && <FilDuMatch events={events as never} home={m.home} away={m.away} live={live} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} />}
 
       <Confrontations matchId={m.id} home={m.home} away={m.away} />
 
-      {m.status !== "cancelled" && <TribuneLive matchId={m.id} enDirect={live} />}
+      {m.status !== "cancelled" && <TribuneLive matchId={m.id} enDirect={live} home={m.home} away={m.away} totaux={totauxTribune} favori={viewer?.favorite_team_id} />}
 
       <Comments matchId={m.id} path={`/matchs/${m.id}`} />
     </article>

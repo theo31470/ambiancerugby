@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import MatchGroups from "@/components/MatchGroups";
 import LiveRefresh from "@/components/LiveRefresh";
+import ClassementTribunes from "@/components/ClassementTribunes";
 import { getCompetitions, getMatchesOfDay } from "@/lib/queries";
 import { fmtDay, parisToday, shiftDay } from "@/lib/format";
 
@@ -70,6 +71,7 @@ export default async function MatchsPage({ searchParams }: PageProps<"/matchs">)
           Pas de match {comp ? `de ${comp.name} ` : ""}ce jour-là. Utilisez les flèches pour changer de semaine.
         </p>
       )}
+      <ClassementTribunes />
     </div>
   );
 }

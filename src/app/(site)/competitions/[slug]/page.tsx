@@ -9,6 +9,9 @@ import LiveRefresh from "@/components/LiveRefresh";
 import { getArticles, getCompetition, getCompetitionMatches, getCompetitionTeams, getSeasons, getStandings } from "@/lib/queries";
 import { fmtDay } from "@/lib/format";
 import type { MatchFull } from "@/lib/types";
+import Simulateur from "@/components/simulateur/Simulateur";
+import { getRatings } from "@/lib/algo";
+import { getViewer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +36,9 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
   const seasons = await getSeasons(c.id);
   if (!seasons.includes(c.current_season)) seasons.unshift(c.current_season);
   const season = typeof sp.saison === "string" && seasons.includes(sp.saison) ? sp.saison : c.current_season;
-  const tabs = c.standings_mode === "none" ? TABS.filter((t) => t.id !== "classement") : TABS;
+  const simulable = !!zonesFor(c.slug).barrage && season === c.current_season;
+  const tabs = (c.standings_mode === "none" ? TABS.filter((t) => t.id !== "classement") : TABS)
+    .flatMap((t) => (t.id === "classement" && simulable ? [t, { id: "simulateur", label: "Simulateur" }] : [t]));
   const tab = tabs.find((t) => t.id === sp.vue)?.id ?? tabs[0].id;
   const href = (v: string, s = season) => `/competitions/${c.slug}?vue=${v}${s !== c.current_season ? `&saison=${s}` : ""}`;
 
@@ -77,6 +82,7 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
 
       <div className="mt-6">
         {tab === "classement" && <Classement compId={c.id} season={season} slug={c.slug} calcule={c.standings_source === "calcul"} />}
+        {tab === "simulateur" && <Simulation compId={c.id} season={season} slug={c.slug} />}
         {tab === "calendrier" && <Calendrier compId={c.id} season={season} upcoming />}
         {tab === "resultats" && <Calendrier compId={c.id} season={season} upcoming={false} />}
         {tab === "clubs" && <Equipes compId={c.id} season={season} />}
@@ -100,6 +106,20 @@ async function Classement({ compId, season, slug, calcule }: { compId: string; s
       )}
     </div>
   );
+}
+
+async function Simulation({ compId, season, slug }: { compId: string; season: string; slug: string }) {
+  const [rows, restants, viewer] = await Promise.all([getStandings(compId, season), getCompetitionMatches(compId, season, { upcoming: true, limit: 400 }), getViewer()]);
+  if (!rows.length) return <Empty>Le simulateur s&apos;ouvrira dès les premiers résultats.</Empty>;
+  if (!restants.length) return <Empty>La saison régulière est terminée : plus rien à simuler.</Empty>;
+  const ratings = await getRatings(rows.map((r) => r.team.id));
+  const equipes = rows.map((r) => ({
+    id: r.team.id, team: r.team, points: r.points, joues: r.played, victoires: r.won, diff: r.points_for - r.points_against, rating: ratings.get(r.team.id)?.rating ?? 1500,
+  }));
+  const matchs = restants.filter((m) => m.status !== "finished").map((m) => ({ id: m.id, dom: m.home.id, ext: m.away.id, journee: m.round }));
+  const z = zonesFor(slug);
+  const zones = { qualif: z.qualif ?? 2, barrage: z.barrage ?? 6, descente: z.descente ?? 1, acces: slug === "top-14" ? 13 : undefined };
+  return <Simulateur equipes={equipes} matchs={matchs} zones={zones} favori={viewer?.favorite_team_id} />;
 }
 
 async function Calendrier({ compId, season, upcoming }: { compId: string; season: string; upcoming: boolean }) {
