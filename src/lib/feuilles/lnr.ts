@@ -9,7 +9,7 @@ import type { MatchLocal } from "./espn";
  *   - statistiques : pour chaque joueur, temps de jeu, essais, plaquages, franchissements, passes après contact, ballons grattés ;
  *   - compositions : numéros de maillot.
  */
-const UA = "Mozilla/5.0 (compatible; AmbianceRugby/1.0; +https://ambiancerugby.vercel.app)";
+const UA = "Mozilla/5.0 (compatible; AmbianceRugby/1.0; +https://ambiance-rugby.fr)";
 const norm = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 const VIDES = new Set(["stade", "rugby", "club", "union", "section", "olympique", "racing", "pays", "sporting", "hérault", "herault", "us", "usa", "ca", "su", "rc", "as", "asm", "fc", "cs", "lou", "paris"]);

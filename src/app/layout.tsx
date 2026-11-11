@@ -18,7 +18,7 @@ const texte = localFont({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://ambiancerugby.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://ambiance-rugby.fr"),
   title: { default: "Ambiance Rugby — le rugby côté tribune", template: "%s · Ambiance Rugby" },
   description: "Scores en direct, classements, Indice Ambiance des clubs, pronostics, stats des joueurs et actus du Top 14, de la Pro D2, des coupes d'Europe et du Tournoi.",
   openGraph: { siteName: "Ambiance Rugby", locale: "fr_FR", type: "website", images: ["/og.jpg"] },
