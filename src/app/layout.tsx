@@ -5,6 +5,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Scoreboard from "@/components/Scoreboard";
 import Celebration from "@/components/deco/Celebration";
+import { getViewer } from "@/lib/supabase/server";
+import type { Prefs } from "@/lib/membres";
 import { getTickerMatches } from "@/lib/queries";
 
 // polices hébergées avec le site : Shrikhand (grands titres groovy), Bricolage Grotesque (titres, scores), Instrument Sans (texte)
@@ -34,9 +36,11 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const ticker = await getTickerMatches();
+  const [ticker, viewer] = await Promise.all([getTickerMatches(), getViewer()]);
+  const prefs = (viewer?.prefs ?? {}) as Prefs;
+  const theme = prefs.theme === "sombre" ? "dark" : prefs.theme === "clair" ? "light" : undefined;
   return (
-    <html lang="fr" className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
+    <html lang="fr" data-theme={theme} className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <a href="#contenu" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:bg-surface focus:p-2">
           Aller au contenu
@@ -47,7 +51,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
         <Footer />
-        <Celebration />
+        {prefs.celebrations !== false && <Celebration />}
       </body>
     </html>
   );

@@ -23,12 +23,17 @@ export default async function Comments({ articleId, matchId, path }: { articleId
       <ul className="mt-6 grid gap-5">
         {comments.map((c) => (
           <li key={c.id} className="flex gap-3">
-            <span className={`w-9 h-9 shrink-0 rounded-full grid place-items-center titre font-bold ${hasBadge(c.author) ? "bg-moutarde text-bordeaux" : "bg-teinte text-vin"}`}>
-              {(c.author?.display_name ?? "?").slice(0, 1).toUpperCase()}
-            </span>
+            {c.author?.avatar_url
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={c.author.avatar_url} alt="" className={`w-9 h-9 shrink-0 rounded-full object-cover ${hasBadge(c.author) ? "ring-2 ring-moutarde" : ""}`} />
+              : <span className={`w-9 h-9 shrink-0 rounded-full grid place-items-center titre font-bold ${hasBadge(c.author) ? "bg-moutarde text-bordeaux" : "bg-teinte text-vin"}`}>
+                  {(c.author?.display_name ?? "?").slice(0, 1).toUpperCase()}
+                </span>}
             <div className="min-w-0 flex-1">
               <p className="text-sm">
-                <span className="font-semibold">{c.author?.display_name ?? c.author?.username ?? "Supporter"}</span>
+                {c.author?.username && c.author.profil_public !== false
+                  ? <Link href={`/membres/${c.author.username}`} className="font-semibold hover:underline underline-offset-4">{c.author.display_name ?? c.author.username}</Link>
+                  : <span className="font-semibold">{c.author?.display_name ?? c.author?.username ?? "Supporter"}</span>}
                 {hasBadge(c.author) && <span className="ml-1.5 text-[10px] font-bold rounded-full bg-moutarde text-bordeaux px-1.5 py-0.5 align-middle">Supporter</span>}
                 <span className="text-sourdine">, {fmtRelative(c.created_at)}</span>
               </p>

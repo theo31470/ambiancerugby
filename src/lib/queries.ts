@@ -157,10 +157,10 @@ export async function getArticle(slug: string, supabase?: SupabaseClient) {
 }
 
 export async function getComments(target: { articleId?: string; matchId?: string }) {
-  let q = publicClient().from("comments").select("id,body,created_at,user_id, author:profiles(display_name,username,avatar_url,plan,plan_until)").order("created_at");
+  let q = publicClient().from("comments").select("id,body,created_at,user_id, author:profiles(display_name,username,avatar_url,plan,plan_until,profil_public)").order("created_at");
   q = target.articleId ? q.eq("article_id", target.articleId) : q.eq("match_id", target.matchId!);
   const { data } = await q.limit(300);
-  return (data ?? []) as unknown as { id: string; body: string; created_at: string; user_id: string; author: { display_name: string | null; username: string | null; avatar_url: string | null; plan: string; plan_until: string | null } | null }[];
+  return (data ?? []) as unknown as { id: string; body: string; created_at: string; user_id: string; author: { display_name: string | null; username: string | null; avatar_url: string | null; plan: string; plan_until: string | null; profil_public?: boolean } | null }[];
 }
 
 /** Groupe une liste de matchs par compétition, dans l'ordre d'affichage des compétitions. */

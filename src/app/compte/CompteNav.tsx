@@ -7,7 +7,7 @@ const TABS = [
   { href: "/compte/alertes", label: "Alertes" },
   { href: "/compte/abonnement", label: "Abonnement" },
   { href: "/compte/commandes", label: "Commandes" },
-  { href: "/compte/profil", label: "Profil" },
+  { href: "/compte/profil", label: "Paramètres" },
 ];
 
 export default function CompteNav() {

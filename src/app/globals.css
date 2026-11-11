@@ -36,6 +36,23 @@
   }
 }
 
+/* thème sombre choisi dans les paramètres du compte */
+:root[data-theme="dark"] {
+    --vin: #c98595;
+    --bordeaux: #260d14;
+    --moutarde: #f5c45a;
+    --rose: #3a1f27;
+    --encre: #f6ecee;
+    --fond: #170a0e;
+    --surface: #221217;
+    --sourdine: #b49ca1;
+    --trait: #3d242b;
+    --teinte: #2d1820;
+    --pelouse: #6fb98a;
+    --ok: #6cc28f;
+    --alerte: #ff8a80;
+}
+
 @theme inline {
   --color-vin: var(--vin);
   --color-bordeaux: var(--bordeaux);

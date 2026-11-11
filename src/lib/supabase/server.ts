@@ -43,6 +43,11 @@ export type Viewer = {
   /** abonnement Supporter actif (ou membre de la rédaction, qui voit tout) */
   supporter: boolean;
   created_at: string;
+  bio?: string | null;
+  ville?: string | null;
+  je_suis?: string | null;
+  profil_public?: boolean;
+  prefs?: Record<string, unknown>;
 };
 
 /** Utilisateur connecté + profil, mémorisé pour la requête. */
