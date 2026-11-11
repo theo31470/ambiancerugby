@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { urlMatch } from "@/lib/seo";
 import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import Pronostic from "@/components/pronos/Pronostic";
@@ -71,7 +72,7 @@ async function AVenir({ userId }: { userId: string | null }) {
             {liste.map((m) => (
               <li key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
                 <span className="w-24 shrink-0 text-xs text-sourdine"><span className="block font-semibold text-encre">{fmtTime(m.kickoff_at)}</span>{m.competition.short_name ?? m.competition.name}</span>
-                <Link href={`/matchs/${m.id}`} className="flex-1 min-w-[12rem] grid gap-1 text-sm font-semibold hover:text-vin">
+                <Link href={urlMatch(m)} className="flex-1 min-w-[12rem] grid gap-1 text-sm font-semibold hover:text-vin">
                   <span className="flex items-center gap-2"><TeamBadge team={m.home} size="xs" />{m.home.short_name ?? m.home.name}</span>
                   <span className="flex items-center gap-2"><TeamBadge team={m.away} size="xs" />{m.away.short_name ?? m.away.name}</span>
                 </Link>
@@ -99,7 +100,7 @@ async function Resultats({ userId }: { userId: string | null }) {
       <ul className="bg-surface border border-trait rounded-2xl divide-y divide-trait">
         {rows.sort((a, b) => +new Date(b.match.kickoff_at) - +new Date(a.match.kickoff_at)).map((r) => (
           <li key={r.match.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
-            <Link href={`/matchs/${r.match.id}`} className="flex-1 min-w-[12rem] font-semibold hover:text-vin">{r.match.home.short_name ?? r.match.home.name} – {r.match.away.short_name ?? r.match.away.name}</Link>
+            <Link href={urlMatch(r.match)} className="flex-1 min-w-[12rem] font-semibold hover:text-vin">{r.match.home.short_name ?? r.match.home.name} – {r.match.away.short_name ?? r.match.away.name}</Link>
             <span className="text-sourdine">Votre prono <b className="text-encre tnum">{r.home_score}-{r.away_score}</b></span>
             <span className="text-sourdine">Score <b className="text-encre tnum">{r.match.status === "finished" ? `${r.match.home_score}-${r.match.away_score}` : "à venir"}</b></span>
             <span className={`w-16 text-right titre font-extrabold tnum ${r.points == null ? "text-sourdine" : r.points >= 8 ? "text-vin" : ""}`}>{r.points == null ? "–" : `${r.points} pt${r.points > 1 ? "s" : ""}`}</span>

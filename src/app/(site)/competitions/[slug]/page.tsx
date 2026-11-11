@@ -15,9 +15,20 @@ import { getViewer, publicClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: PageProps<"/competitions/[slug]">): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: PageProps<"/competitions/[slug]">): Promise<Metadata> {
   const c = await getCompetition((await params).slug);
-  return c ? { title: `${c.name} : classement, calendrier et résultats` } : {};
+  if (!c) return {};
+  const vue = (await searchParams).vue;
+  const titres: Record<string, string> = {
+    calendrier: `Calendrier ${c.name} ${c.current_season} : prochains matchs et horaires`,
+    resultats: `Résultats ${c.name} ${c.current_season} : tous les scores`,
+    clubs: `${c.name} : les équipes de la saison ${c.current_season}`,
+    simulateur: `Simulateur ${c.name} : chances de qualification et de maintien de chaque club`,
+  };
+  const title = (typeof vue === "string" && titres[vue]) || `Classement ${c.name} ${c.current_season} : classement, calendrier et résultats`;
+  const description = `${c.name} ${c.current_season} : classement à jour avec bonus, calendrier, résultats en direct, simulateur de fin de saison et stats des équipes.`;
+  const canonical = `/competitions/${c.slug}${typeof vue === "string" && titres[vue] ? `?vue=${vue}` : ""}`;
+  return { title: { absolute: `${title} · Ambiance Rugby` }, description, alternates: { canonical }, openGraph: { title, description, url: canonical } };
 }
 
 const TABS = [

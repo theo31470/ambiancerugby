@@ -22,6 +22,10 @@ export const metadata: Metadata = {
   title: { default: "Ambiance Rugby — le rugby côté tribune", template: "%s · Ambiance Rugby" },
   description: "Scores en direct, classements, Indice Ambiance des clubs, pronostics, stats des joueurs et actus du Top 14, de la Pro D2, des coupes d'Europe et du Tournoi.",
   openGraph: { siteName: "Ambiance Rugby", locale: "fr_FR", type: "website", images: ["/og.jpg"] },
+  twitter: { card: "summary_large_image" },
+  applicationName: "Ambiance Rugby",
+  keywords: ["rugby", "Top 14", "Pro D2", "score rugby en direct", "classement Top 14", "résultats rugby", "pronostic rugby", "stats joueurs rugby", "Champions Cup", "Tournoi des Six Nations"],
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {

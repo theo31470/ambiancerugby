@@ -1,5 +1,7 @@
+import { absolue, filAriane, jsonLd } from "@/lib/seo";
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
+import { urlMatch } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
@@ -14,7 +16,10 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps<"/joueurs/[slug]">): Promise<Metadata> {
   const p = await getPlayer((await params).slug);
-  return p ? { title: `${p.first_name} ${p.last_name} : stats et notes` } : {};
+  if (!p) return {};
+  const nom = `${p.first_name} ${p.last_name}`;
+  const description = `${nom}${p.position ? `, ${p.position.toLowerCase()}` : ""} : stats saison par saison, essais, points, plaquages, notes sur 10 et derniers matchs.`;
+  return { title: `${nom} : stats, notes et fiche joueur`, description, alternates: { canonical: `/joueurs/${p.slug}` }, openGraph: { type: "profile", title: nom, description, url: `/joueurs/${p.slug}`, images: p.photo_url ? [p.photo_url] : ["/og.jpg"] } };
 }
 
 type Totaux = { season: string; competition_id: string; games: number; starts: number; minutes: number; tries: number; conversions: number; penalty_goals: number; drop_goals: number; points: number; yellow: number; red: number; tackles: number; carries: number; metres: number; line_breaks: number; offloads: number; turnovers_won: number; motm: number; rating: number | null; games_saisis: number; competition?: { name: string; short_name: string | null; slug: string } };
@@ -71,6 +76,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
 
   return (
     <div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd([{ "@context": "https://schema.org", "@type": "Person", name: `${p.first_name} ${p.last_name}`, url: absolue(`/joueurs/${p.slug}`), ...(p.photo_url ? { image: p.photo_url } : {}), ...(p.position ? { jobTitle: `Joueur de rugby (${p.position})` } : { jobTitle: "Joueur de rugby" }), ...(p.nationality ? { nationality: p.nationality } : {}), ...(p.birth_date ? { birthDate: p.birth_date } : {}) }, filAriane([["Accueil", "/"], ["Joueurs", "/joueurs"], [`${p.first_name} ${p.last_name}`, `/joueurs/${p.slug}`]])])} />
       <div className="grid gap-10 md:grid-cols-[17rem_1fr] md:gap-14">
         <div className="relative w-full max-w-64">
           <div className="absolute inset-0 rounded-[1.5rem] bg-moutarde rotate-3" aria-hidden />
@@ -229,7 +235,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
           <ul className="bg-surface border border-trait rounded-2xl divide-y divide-trait overflow-hidden">
             {(full ? matchs : matchs.slice(0, 3)).map((x) => (
               <li key={x.match.id}>
-                <Link href={`/matchs/${x.match.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-teinte">
+                <Link href={urlMatch(x.match)} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-teinte">
                   <span className="text-sm text-sourdine w-24">{fmtDay(x.match.kickoff_at, { day: "numeric", month: "short", year: "2-digit" })}</span>
                   <span className="flex-1 min-w-48 font-semibold">{x.match.home.short_name ?? x.match.home.name} {x.match.home_score}–{x.match.away_score} {x.match.away.short_name ?? x.match.away.name}</span>
                   {full && <span className="text-sm text-sourdine tnum">{[x.minutes ? `${x.minutes} min${x.starter === false ? " (remplaçant)" : ""}` : null, x.tries ? `${x.tries} essai${x.tries > 1 ? "s" : ""}` : null, x.points ? `${x.points} pts` : null, x.tackles ? `${x.tackles} plaquages` : null, x.line_breaks ? `${x.line_breaks} franchissement${x.line_breaks > 1 ? "s" : ""}` : null, x.turnovers_won ? `${x.turnovers_won} ballon${x.turnovers_won > 1 ? "s" : ""} gratté${x.turnovers_won > 1 ? "s" : ""}` : null].filter(Boolean).join(", ")}</span>}

@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import LiveRefresh from "@/components/LiveRefresh";
 import FilDuMatch from "@/components/FilDuMatch";
 import CourbeAscendant from "@/components/CourbeAscendant";
+import { absolue, filAriane, jsonLd, ORGANISATION, urlMatch } from "@/lib/seo";
 import Pronostic from "@/components/pronos/Pronostic";
 import AvantMatch from "@/components/AvantMatch";
 import VoteNote from "@/components/notes/VoteNote";
@@ -25,14 +26,27 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: PageProps<"/matchs/[id]">): Promise<Metadata> {
   const m = await getMatch((await params).id);
   if (!m) return {};
-  const score = m.home_score != null ? ` ${m.home_score}-${m.away_score}` : "";
-  return { title: `${m.home.name}${score} ${m.away.name}`, description: `${m.competition.name}, ${fmtDay(m.kickoff_at)}` };
+  const fini = m.status === "finished" && m.home_score != null;
+  const enDirect = isLive(m.status);
+  const jour = fmtDay(m.kickoff_at, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const affiche = `${m.home.name} – ${m.away.name}`;
+  const title = fini ? `${m.home.name} ${m.home_score}-${m.away_score} ${m.away.name} : résumé, notes et stats (${m.competition.short_name ?? m.competition.name})`
+    : enDirect ? `${affiche} en direct : score et fil du match (${m.competition.short_name ?? m.competition.name})`
+    : `${affiche} : compositions, pronostic et avant-match (${m.competition.short_name ?? m.competition.name})`;
+  const description = fini
+    ? `${m.competition.name}, ${jour} : ${m.home.name} ${m.home_score}-${m.away_score} ${m.away.name}. Fil du match, courbe d'ascendant, notes des joueurs et stats complètes.`
+    : `${m.competition.name}, ${jour} à ${fmtTime(m.kickoff_at)} : ${affiche}. Pronostic de l'algorithme, compositions, duels poste par poste et score en direct.`;
+  const url = urlMatch(m);
+  return { title: { absolute: `${title} · Ambiance Rugby` }, description, alternates: { canonical: url }, openGraph: { type: "article", url, title, description } };
 }
 
 export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
   const { id } = await params;
   const m = await getMatch(id);
   if (!m) notFound();
+  // une seule adresse par match : l'adresse lisible (les anciens liens par identifiant y sont redirigés)
+  const canonique = urlMatch(m);
+  if (`/matchs/${decodeURIComponent(id)}` !== canonique) permanentRedirect(canonique);
 
   const { data: events } = await publicClient()
     .from("match_events")
@@ -82,6 +96,24 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
 
   return (
     <article>
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd([
+        {
+          "@context": "https://schema.org", "@type": "SportsEvent",
+          name: `${m.home.name} – ${m.away.name}`, sport: "Rugby à XV", url: absolue(canonique),
+          startDate: m.kickoff_at,
+          eventStatus: m.status === "postponed" ? "https://schema.org/EventPostponed" : m.status === "cancelled" ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
+          eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+          ...(m.venue ? { location: { "@type": "Place", name: m.venue } } : {}),
+          homeTeam: { "@type": "SportsTeam", name: m.home.name, url: absolue(`/clubs/${m.home.slug}`) },
+          awayTeam: { "@type": "SportsTeam", name: m.away.name, url: absolue(`/clubs/${m.away.slug}`) },
+          competitor: [{ "@type": "SportsTeam", name: m.home.name }, { "@type": "SportsTeam", name: m.away.name }],
+          superEvent: { "@type": "SportsEvent", name: m.competition.name, url: absolue(`/competitions/${m.competition.slug}`) },
+          organizer: ORGANISATION,
+          image: absolue(`${canonique}/opengraph-image`),
+          description: `${m.competition.name} : ${m.home.name} – ${m.away.name}${m.status === "finished" && m.home_score != null ? `, score final ${m.home_score}-${m.away_score}` : ""}.`,
+        },
+        filAriane([["Accueil", "/"], ["Matchs", "/matchs"], [m.competition.name, `/competitions/${m.competition.slug}`], [`${m.home.short_name ?? m.home.name} – ${m.away.short_name ?? m.away.name}`, canonique]]),
+      ])} />
       <LiveRefresh matchId={m.id} />
       <p className="text-sm text-sourdine">
         <Link href={`/competitions/${m.competition.slug}`} className="font-semibold text-vin underline underline-offset-4">{m.competition.name}</Link>
@@ -234,7 +266,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           <Pronostic matchId={m.id} initial={monProno} ferme={false} connecte={!!viewer} />
         </section>
       )}
-      {m.status === "scheduled" && <AvantMatch home={m.home} away={m.away} full={full} />}
+      {m.status === "scheduled" && <AvantMatch match={m as never} home={m.home} away={m.away} full={full} />}
       {events && events.length > 1 && (live || m.status === "finished") && (
         <CourbeAscendant events={events as never} home={m.home} away={m.away}
           minuteActuelle={m.status === "finished" ? 80 : m.status === "halftime" ? 40 : Math.min(80, Math.max(0, ...events.map((e) => e.minute ?? 0), m.clock && /^\d+/.test(m.clock) ? parseInt(m.clock, 10) : 0))} />

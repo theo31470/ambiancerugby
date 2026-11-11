@@ -276,3 +276,29 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
 
 /** Sélection Supabase d'un match prêt pour importerFeuilleLnr / importerFeuilleEspn. */
 export const SELECT_MATCH_FEUILLE = "id, competition_id, kickoff_at, home_score, away_score, home_team_id, away_team_id, espn_event_id, lnr_url, round, season, status, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,is_national), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,is_national), competition:competitions(name, espn_league, lnr_site)";
+
+export type JoueurCompo = { lnrId: string; numero: number; prenom: string; nom: string; photo: string | null };
+
+/**
+ * Composition officielle publiée par la LNR (2 jours avant le match environ) : les 23 de chaque équipe,
+ * dans l'ordre de la page (l'équipe qui reçoit d'abord). Mise en cache 30 minutes.
+ */
+export async function lireCompositionLnr(url: string): Promise<{ dom: JoueurCompo[]; ext: JoueurCompo[] } | null> {
+  const r = await fetch(`${url}/compositions`, { next: { revalidate: 1800 }, signal: AbortSignal.timeout(15_000), headers: { "user-agent": UA, accept: "text/html" } }).catch(() => null);
+  if (!r?.ok) return null;
+  const html = await r.text();
+  const liste: JoueurCompo[] = [];
+  for (const x of html.matchAll(/<a\s+class="player-pitch[^"]*"\s+href="[^"]*\/joueur\/([^"/]+)"\s*>([\s\S]*?)<\/a>/g)) {
+    const id = x[1], bloc = x[2];
+    const numero = Number(bloc.match(/player-pitch__number">\s*(\d+)\s*</)?.[1] ?? NaN);
+    if (!Number.isFinite(numero)) continue;
+    const prenom = decode(bloc.match(/__first-name">([^<]*)</)?.[1] ?? "").trim();
+    const nom = decode(bloc.match(/__last-name">([^<]*)</)?.[1] ?? "").trim();
+    liste.push({ lnrId: id, numero, prenom: joli(prenom), nom: joli(nom), photo: null });
+  }
+  // la numérotation repart à 1 pour la deuxième équipe
+  const coupure = liste.findIndex((j, i) => i > 0 && j.numero < liste[i - 1].numero && j.numero <= 3);
+  if (coupure <= 0) return null;
+  const dom = liste.slice(0, coupure), ext = liste.slice(coupure);
+  return dom.length >= 15 && ext.length >= 15 ? { dom, ext } : null;
+}

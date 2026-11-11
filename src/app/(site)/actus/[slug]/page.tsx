@@ -1,3 +1,4 @@
+import { absolue, filAriane, jsonLd, ORGANISATION } from "@/lib/seo";
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -19,7 +20,8 @@ export async function generateMetadata({ params }: PageProps<"/actus/[slug]">): 
   return {
     title: a.title,
     description: a.excerpt ?? undefined,
-    openGraph: { type: "article", title: a.title, description: a.excerpt ?? undefined, images: a.cover_url ? [a.cover_url] : ["/og.jpg"] },
+    alternates: { canonical: `/actus/${a.slug}` },
+    openGraph: { type: "article", title: a.title, description: a.excerpt ?? undefined, url: `/actus/${a.slug}`, publishedTime: a.published_at ?? undefined, modifiedTime: a.updated_at, images: a.cover_url ? [a.cover_url] : ["/og.jpg"] },
   };
 }
 
@@ -29,6 +31,12 @@ export default async function ArticlePage({ params }: PageProps<"/actus/[slug]">
   if (!a) notFound();
   return (
     <article className="max-w-3xl" id="lecture-article">
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd([{
+        "@context": "https://schema.org", "@type": "NewsArticle", headline: a.title, description: a.excerpt ?? undefined, url: absolue(`/actus/${a.slug}`),
+        image: a.cover_url ? [a.cover_url] : [absolue("/og.jpg")], datePublished: a.published_at ?? a.created_at, dateModified: a.updated_at,
+        author: { "@type": "Person", name: a.author?.display_name ?? "La rédaction Ambiance Rugby" }, publisher: ORGANISATION,
+        isAccessibleForFree: !a.premium, mainEntityOfPage: absolue(`/actus/${a.slug}`),
+      }, filAriane([["Accueil", "/"], ["Actus", "/actus"], [a.title, `/actus/${a.slug}`]])])} />
       <TerrainLecture cible="lecture-article" />
       <p className="text-sm">
         {a.premium && <span className="mr-2 text-[11px] font-bold rounded-full bg-moutarde text-bordeaux px-2 py-0.5 align-middle">Exclusif Supporters</span>}

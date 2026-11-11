@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
+import { urlMatch } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import { browserClient } from "@/lib/supabase/client";
 import { fmtDay, fmtTime, isLive } from "@/lib/format";
@@ -94,7 +95,7 @@ function Case({ m }: { m: MatchFull }) {
     : done ? "Terminé"
     : memeJour(m.kickoff_at) ? `Aujourd'hui ${fmtTime(m.kickoff_at)}` : `${fmtDay(m.kickoff_at, { weekday: "short", day: "numeric" })} ${fmtTime(m.kickoff_at)}`;
   return (
-    <Link href={`/matchs/${m.id}`} className="block w-44 px-3 py-1.5 hover:bg-white/5">
+    <Link href={urlMatch(m)} className="block w-44 px-3 py-1.5 hover:bg-white/5">
       <div className="flex items-center justify-between gap-2 text-[11px]">
         <span className="truncate text-white/55">{m.competition.short_name ?? m.competition.name}</span>
         <span className={`shrink-0 ${live ? "text-moutarde font-bold" : "text-white/55"}`}>{live && <span className="pastille mr-1 align-middle" aria-hidden />}{etat}</span>

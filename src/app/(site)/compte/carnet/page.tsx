@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { urlMatch } from "@/lib/seo";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import TeamBadge from "@/components/TeamBadge";
@@ -80,7 +81,7 @@ export default async function Carnet() {
             const m = p.match, r = issue(p);
             return (
               <li key={m.id}>
-                <Link href={`/matchs/${m.id}`} className="carte-vie relative block rounded-2xl border-2 border-dashed border-trait bg-surface p-4 overflow-hidden">
+                <Link href={urlMatch(m)} className="carte-vie relative block rounded-2xl border-2 border-dashed border-trait bg-surface p-4 overflow-hidden">
                   <span className="text-xs text-sourdine">{fmtDay(m.kickoff_at, { day: "numeric", month: "short", year: "numeric" })} · {m.competition.short_name ?? m.competition.name}</span>
                   {(["home", "away"] as const).map((s) => {
                     const t = m[s], sc = s === "home" ? m.home_score : m.away_score;

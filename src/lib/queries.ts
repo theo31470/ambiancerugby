@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { cleMatch } from "./seo";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicClient } from "./supabase/server";
 import type { Article, Competition, MatchFull, Player, StandingRow, Team } from "./types";
@@ -52,11 +54,15 @@ export async function getTickerMatches(): Promise<MatchFull[]> {
   return list.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true))).slice(0, 22);
 }
 
-export async function getMatch(id: string): Promise<MatchFull | null> {
-  if (!/^[0-9a-f-]{36}$/.test(id)) return null;
-  const { data } = await publicClient().from("matches").select(MATCH_SELECT).eq("id", id).maybeSingle();
+/** Un match, par identifiant complet ou par adresse lisible (« …-2026-11-15-dd27821d »). Mémorisé pour la requête. */
+export const getMatch = cache(async (param: string): Promise<MatchFull | null> => {
+  const cle = cleMatch(param);
+  if (!cle) return null;
+  let q = publicClient().from("matches").select(MATCH_SELECT);
+  q = "id" in cle ? q.eq("id", cle.id) : q.gte("id", `${cle.prefixe}-0000-0000-0000-000000000000`).lte("id", `${cle.prefixe}-ffff-ffff-ffff-ffffffffffff`);
+  const { data } = await q.limit(1).maybeSingle();
   return data as unknown as MatchFull | null;
-}
+});
 
 export async function getCompetitionMatches(competitionId: string, season: string, opts: { upcoming?: boolean; limit?: number } = {}) {
   let q = publicClient().from("matches").select(MATCH_SELECT).eq("competition_id", competitionId).eq("season", season);

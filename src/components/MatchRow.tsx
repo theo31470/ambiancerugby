@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { urlMatch } from "@/lib/seo";
 import TeamBadge from "./TeamBadge";
 import { STATUS_LABEL, fmtDay, fmtTime, isLive } from "@/lib/format";
 import type { MatchFull } from "@/lib/types";
@@ -11,7 +12,7 @@ export default function MatchRow({ m, showDate = false }: { m: MatchFull; showDa
   const winner = done && m.home_score != null && m.away_score != null ? (m.home_score > m.away_score ? "h" : m.away_score > m.home_score ? "a" : null) : null;
 
   return (
-    <Link href={`/matchs/${m.id}`} className="flex items-center gap-4 px-3 sm:px-4 py-3 hover:bg-teinte">
+    <Link href={urlMatch(m)} className="flex items-center gap-4 px-3 sm:px-4 py-3 hover:bg-teinte">
       <div className="w-16 sm:w-20 shrink-0 text-sm leading-tight">
         {live ? (
           <span className="inline-flex items-center gap-1.5 font-bold text-vin">

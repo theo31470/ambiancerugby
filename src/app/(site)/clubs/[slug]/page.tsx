@@ -1,3 +1,4 @@
+import { absolue, filAriane, jsonLd, ORGANISATION } from "@/lib/seo";
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,7 +21,9 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps<"/clubs/[slug]">): Promise<Metadata> {
   const t = await getTeam((await params).slug);
-  return t ? { title: `${t.name} : effectif, calendrier, résultats`, description: t.description ?? undefined } : {};
+  if (!t) return {};
+  const description = (t.description ?? `${t.name}${t.city ? ` (${t.city})` : ""} : effectif et stats des joueurs, calendrier, résultats, classement, forme et Indice Ambiance du club.`).slice(0, 300);
+  return { title: `${t.name} : effectif, calendrier, résultats et stats`, description, alternates: { canonical: `/clubs/${t.slug}` }, openGraph: { title: `${t.name} sur Ambiance Rugby`, description, url: `/clubs/${t.slug}`, images: t.logo_url ? [t.logo_url] : ["/og.jpg"] } };
 }
 
 export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
@@ -47,6 +50,7 @@ export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
 
   return (
     <div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd([{ "@context": "https://schema.org", "@type": "SportsTeam", name: team.name, sport: "Rugby à XV", url: absolue(`/clubs/${team.slug}`), ...(team.logo_url ? { logo: team.logo_url } : {}), ...(team.city ? { location: { "@type": "Place", name: team.city } } : {}), ...(team.founded ? { foundingDate: String(team.founded) } : {}) }, filAriane([["Accueil", "/"], ["Clubs", "/clubs"], [team.name, `/clubs/${team.slug}`]])])} />
       <header className="pleine-largeur -mt-6 sm:-mt-10 text-white relative overflow-hidden" style={{ background: `linear-gradient(120deg, var(--bordeaux) 55%, ${team.color ?? "var(--vin)"} 55%)` }}>
         <Echarpe className="absolute right-6 top-6 w-40 h-auto text-white/10 rotate-12 hidden sm:block" />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-wrap items-center gap-6 relative">

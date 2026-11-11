@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
+import { jsonLd, ORGANISATION, SITE } from "@/lib/seo";
 import Link from "next/link";
+import { urlMatch } from "@/lib/seo";
 import ArticleCard, { ArticleHero } from "@/components/ArticleCard";
 import MatchGroups from "@/components/MatchGroups";
 import StandingsTable from "@/components/StandingsTable";
@@ -63,6 +66,12 @@ async function derniersCommentaires() {
 
 const TITRE = ["Le", "rugby,", "côté", "tribune."];
 
+export const metadata: Metadata = {
+  title: { absolute: "Ambiance Rugby : scores en direct, classements Top 14 et Pro D2, pronos et stats" },
+  description: "Le rugby côté tribune : scores en direct, classement Top 14 et Pro D2, simulateur de qualification, pronostics, notes et stats des joueurs, actus et avant-matchs.",
+  alternates: { canonical: "/" },
+};
+
 export default async function Home() {
   const [articles, upcoming, results, top14, affiche, power, comments, viewer] = await Promise.all([
     getArticles({ limit: 7 }),
@@ -82,6 +91,11 @@ export default async function Home() {
 
   return (
     <div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd([
+        { "@context": "https://schema.org", ...ORGANISATION, sameAs: [] },
+        { "@context": "https://schema.org", "@type": "WebSite", "@id": `${SITE}/#site`, name: "Ambiance Rugby", url: SITE, inLanguage: "fr-FR", publisher: { "@id": `${SITE}/#organisation` },
+          potentialAction: { "@type": "SearchAction", target: { "@type": "EntryPoint", urlTemplate: `${SITE}/joueurs?q={search_term_string}` }, "query-input": "required name=search_term_string" } },
+      ])} />
       <LiveRefresh />
 
       {/* ================= EN-TÊTE ================= */}
@@ -121,7 +135,7 @@ export default async function Home() {
             <div className="absolute -inset-3 rounded-[2rem] bg-vin rotate-2" aria-hidden />
             <div className="relative rounded-[1.75rem] bg-surface text-encre p-6 sm:p-7 shadow-[0_14px_0_-6px_rgba(0,0,0,.25)]">
               {affiche ? (
-                <Link href={`/matchs/${affiche.id}`} className="block group">
+                <Link href={urlMatch(affiche)} className="block group">
                   <p className="flex items-center justify-between text-sm">
                     <span className="font-semibold text-vin">{isLive(affiche.status) ? "En direct" : "Le match à suivre"}</span>
                     <span className="text-sourdine">{affiche.competition.short_name ?? affiche.competition.name}</span>

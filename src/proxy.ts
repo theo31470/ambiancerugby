@@ -23,6 +23,9 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data } = await supabase.auth.getClaims();
+  // seul le domaine principal est indexé (les adresses vercel.app et de prévisualisation ne le sont pas)
+  const hote = request.headers.get("host") ?? "";
+  if (!/(^|\.)ambiance-rugby\.fr$/i.test(hote.replace(/:\d+$/, ""))) response.headers.set("X-Robots-Tag", "noindex");
   const path = request.nextUrl.pathname;
   const vers = (chemin: string, suite: string) => {
     const url = request.nextUrl.clone();
