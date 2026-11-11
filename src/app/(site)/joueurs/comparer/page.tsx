@@ -3,31 +3,39 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import ChoixJoueur from "@/components/comparer/ChoixJoueur";
 import { getViewer, publicClient } from "@/lib/supabase/server";
+import { detailParSaison, type Detail } from "@/lib/stats-detail";
 
 export const metadata: Metadata = { title: "Comparateur de joueurs" };
 export const dynamic = "force-dynamic";
 
 type Saison = { season: string; games: number; minutes: number; tries: number; points: number; tackles: number; carries: number; metres: number; line_breaks: number; turnovers_won: number; motm: number; rating: number | null };
-type Fiche = { id: string; slug: string; first_name: string; last_name: string; photo_url: string | null; position: string | null; team: { short_name: string | null; name: string; slug: string } | null; saisons: Saison[] };
+type Fiche = { id: string; slug: string; first_name: string; last_name: string; photo_url: string | null; position: string | null; team: { short_name: string | null; name: string; slug: string } | null; saisons: Saison[]; detail: Detail };
 
 async function fiche(slug: string | null): Promise<Fiche | null> {
   if (!slug) return null;
   const db = publicClient();
   const { data: p } = await db.from("players").select("id,slug,first_name,last_name,photo_url,position, team:teams(short_name,name,slug)").eq("slug", slug).maybeSingle();
   if (!p) return null;
-  const { data: s } = await db.from("player_season_stats").select("*").eq("player_id", p.id).order("season", { ascending: false });
-  return { ...(p as unknown as Omit<Fiche, "saisons">), saisons: (s ?? []) as Saison[] };
+  const [{ data: s }, detail] = await Promise.all([
+    db.from("player_season_stats").select("*").eq("player_id", p.id).order("season", { ascending: false }),
+    detailParSaison(p.id).then((d) => d.carriere),
+  ]);
+  return { ...(p as unknown as Omit<Fiche, "saisons" | "detail">), saisons: (s ?? []) as Saison[], detail };
 }
 
-const LIGNES: [keyof Saison, string, boolean][] = [
-  ["games", "Matchs", false], ["tries", "Essais", true], ["points", "Points", true], ["tackles", "Plaquages", true],
-  ["carries", "Courses", true], ["metres", "Mètres", true], ["line_breaks", "Franchissements", true], ["turnovers_won", "Ballons grattés", true], ["motm", "Homme du match", false],
+// [clé, libellé, ramené à 80 min, stat de feuille détaillée]
+const LIGNES: [string, string, boolean, boolean][] = [
+  ["games", "Matchs", false, false], ["tries", "Essais", true, false], ["points", "Points", true, false],
+  ["tackles", "Plaquages", true, true], ["line_breaks", "Franchissements", true, true], ["offloads", "Passes après contact", true, true],
+  ["turnovers_won", "Ballons grattés", true, true], ["motm", "Homme du match", false, false],
 ];
 
 function cumul(f: Fiche) {
   const t: Record<string, number> = {};
-  for (const s of f.saisons) for (const [k] of LIGNES) t[k] = (t[k] ?? 0) + (Number(s[k]) || 0);
+  for (const s of f.saisons) for (const [k, , , det] of LIGNES) if (!det) t[k] = (t[k] ?? 0) + (Number(s[k as keyof Saison]) || 0);
+  for (const k of ["tackles", "line_breaks", "offloads", "turnovers_won"] as const) t[k] = f.detail[k];
   t.minutes = f.saisons.reduce((x, s) => x + (s.minutes || 0), 0);
+  t.detail_minutes = f.detail.minutes;
   const notes = f.saisons.filter((s) => s.rating != null);
   t.rating = notes.length ? notes.reduce((x, s) => x + Number(s.rating) * s.games, 0) / Math.max(1, notes.reduce((x, s) => x + s.games, 0)) : 0;
   return t;
@@ -38,7 +46,10 @@ export default async function Comparer({ searchParams }: PageProps<"/joueurs/com
   const [a, b, viewer] = await Promise.all([fiche(typeof sp.a === "string" ? sp.a : null), fiche(typeof sp.b === "string" ? sp.b : null), getViewer()]);
   const full = !!viewer?.supporter;
   const ca = a ? cumul(a) : null, cb = b ? cumul(b) : null;
-  const par80 = (t: Record<string, number>, k: string) => (t.minutes > 0 ? (t[k] / t.minutes) * 80 : 0);
+  const par80 = (t: Record<string, number>, k: string, det: boolean) => {
+    const m = det ? t.detail_minutes : t.minutes;
+    return m > 0 ? (t[k] / m) * 80 : 0;
+  };
 
   return (
     <div>
@@ -64,8 +75,8 @@ export default async function Comparer({ searchParams }: PageProps<"/joueurs/com
           <section aria-labelledby="h-carriere">
             <h2 id="h-carriere" className="titre text-2xl font-extrabold mb-3">Sur toute la carrière suivie</h2>
             <div className="bg-surface border border-trait rounded-2xl p-4 grid gap-3">
-              {[["rating", "Note moyenne", false] as const, ...LIGNES].map(([k, label, ratio]) => {
-                const va = full && ratio ? par80(ca, k) : ca[k] ?? 0, vb = full && ratio ? par80(cb, k) : cb[k] ?? 0;
+              {([["rating", "Note moyenne", false, false], ...LIGNES] as [string, string, boolean, boolean][]).map(([k, label, ratio, det]) => {
+                const va = full && ratio ? par80(ca, k, det) : ca[k] ?? 0, vb = full && ratio ? par80(cb, k, det) : cb[k] ?? 0;
                 const max = Math.max(va, vb, 0.0001);
                 const f = (v: number) => (k === "rating" ? v.toFixed(1) : full && ratio ? v.toFixed(1) : Math.round(v).toLocaleString("fr-FR"));
                 return (
@@ -77,6 +88,11 @@ export default async function Comparer({ searchParams }: PageProps<"/joueurs/com
                 );
               })}
             </div>
+            <p className="mt-2 text-xs text-sourdine">
+              Plaquages, franchissements, passes après contact et ballons grattés ne sont relevés que sur les feuilles détaillées de la LNR :
+              {" "}{a.last_name} sur {a.detail.matchs} match{a.detail.matchs > 1 ? "s" : ""}, {b.last_name} sur {b.detail.matchs} match{b.detail.matchs > 1 ? "s" : ""}.
+              {full ? " Les valeurs « /80 min » sont calculées sur ces seuls matchs." : ""}
+            </p>
           </section>
 
           {full ? (

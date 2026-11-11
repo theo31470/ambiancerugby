@@ -9,6 +9,7 @@ import FavoriteButton from "@/components/FavoriteButton";
 import { Ballon } from "@/components/deco/Icones";
 import { getPlayer, TEAM_LITE } from "@/lib/queries";
 import { getViewer, publicClient } from "@/lib/supabase/server";
+import { detailParSaison } from "@/lib/stats-detail";
 import { POSITIONS, age, fmtDate, fmtDay } from "@/lib/format";
 import type { TeamLite } from "@/lib/types";
 
@@ -33,7 +34,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
   if (!p) notFound();
   const a = age(p.birth_date);
   const db = publicClient();
-  const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }] = await Promise.all([
+  const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }, details] = await Promise.all([
     db.from("player_season_totals").select("*").eq("player_id", p.id).order("season", { ascending: false }),
     db.from("player_match_stats")
       .select(`rating,minutes,starter,tries,points,tackles,line_breaks,turnovers_won,carries,metres,motm, match:matches!inner(id,kickoff_at,home_score,away_score, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}))`)
@@ -42,6 +43,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
       .limit(10),
     getViewer(),
     db.from("player_career").select("kind, ordre, equipe, periode, matchs, points").eq("player_id", p.id).order("kind").order("ordre"),
+    detailParSaison(p.id),
   ]);
   const parcours = (parcoursData ?? []) as { kind: "club" | "selection"; ordre: number; equipe: string; periode: string | null; matchs: number | null; points: number | null }[];
   const { data: compsData } = await db.from("competitions").select("id,name,short_name,slug");
@@ -59,6 +61,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
     return { ...tot, rating };
   };
   const saison = cumul(parComp);
+  const detail = details[vue];
   const noteSaison = saisons[0] ? cumul(lignes.filter((t) => t.season === saisons[0]))?.rating ?? null : null;
   const matchs = (perfs ?? []) as unknown as Perf[];
   const full = !!viewer?.supporter;
@@ -156,13 +159,19 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
                 </div>
               ))}
             </dl>
-            {saison.minutes >= 80 && (saison.tackles > 0 || saison.line_breaks > 0) && (
+            {saison.minutes >= 80 && (
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
                 <span className="text-sourdine">Sur 80 minutes :</span>
-                {([["plaquages", saison.tackles], ["franchissements", saison.line_breaks], ["ballons grattés", saison.turnovers_won], ["passes après contact", saison.offloads], ["points", saison.points]] as [string, number][])
-                  .filter(([, v]) => v > 0).map(([k, v]) => (
-                    <span key={k} className="rounded-full bg-teinte px-3 py-0.5 font-semibold tnum">{((v * 80) / saison.minutes).toFixed(1).replace(".", ",")} {k}</span>
-                  ))}
+                {([
+                  ["plaquages", detail?.tackles ?? 0, detail?.minutes ?? 0], ["franchissements", detail?.line_breaks ?? 0, detail?.minutes ?? 0],
+                  ["ballons grattés", detail?.turnovers_won ?? 0, detail?.minutes ?? 0], ["passes après contact", detail?.offloads ?? 0, detail?.minutes ?? 0],
+                  ["points", saison.points, saison.minutes],
+                ] as [string, number, number][]).filter(([, v, m]) => v > 0 && m >= 80).map(([k, v, m]) => (
+                  <span key={k} className="rounded-full bg-teinte px-3 py-0.5 font-semibold tnum">{((v * 80) / m).toFixed(1).replace(".", ",")} {k}</span>
+                ))}
+                {detail && detail.matchs > 0 && detail.matchs < saison.games && (
+                  <span className="text-xs text-sourdine self-center">(stats défensives sur {detail.matchs} match{detail.matchs > 1 ? "s" : ""} à feuille détaillée)</span>
+                )}
               </div>
             )}
             {parComp.length > 1 && (
