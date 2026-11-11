@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient, getViewer, hasBadge } from "@/lib/supabase/server";
+import { gradeDe, PALIERS } from "@/lib/membres";
 import { fmtDate } from "@/lib/format";
 import { resilier } from "@/app/(site)/abonnement/actions";
 import ChangerMoyen from "@/components/abonnement/ChangerMoyen";
@@ -15,11 +16,15 @@ export default async function MonAbonnement() {
   if (!viewer) return null;
   const db = await createClient();
   const [{ data: p }, { data: factures }, { data: avoirs }] = await Promise.all([
-    db.from("profiles").select("plan, plan_until, plan_formule, plan_statut, plan_fin_prevue, stripe_subscription_id").eq("id", viewer.id).single(),
+    db.from("profiles").select("plan, plan_until, plan_formule, plan_statut, plan_fin_prevue, stripe_subscription_id, supporter_grade, supporter_depuis").eq("id", viewer.id).single(),
     db.from("supporter_factures").select("id, numero, formule, montant_cents, payee_le, periode_debut, periode_fin").eq("user_id", viewer.id).order("payee_le", { ascending: false }),
     db.from("avoirs").select("id, numero, montant_cents, rembourse_le, facture_origine").eq("user_id", viewer.id).eq("source", "supporter").order("rembourse_le", { ascending: false }),
   ]);
   const actif = hasBadge(viewer);
+  const { count: suivis } = await db.from("match_presences").select("match_id", { count: "exact", head: true }).eq("user_id", viewer.id);
+  const grade = p?.supporter_grade ?? 0;
+  const palier = PALIERS[grade];
+  const moisDepuis = p?.supporter_depuis ? Math.floor((Date.now() - new Date(p.supporter_depuis).getTime()) / (30.44 * 86400e3)) : 0;
   const abonne = !!p?.stripe_subscription_id && ["active", "trialing", "past_due"].includes(p?.plan_statut ?? "");
 
   return (
@@ -29,7 +34,7 @@ export default async function MonAbonnement() {
         {actif ? (
           <div className="mt-4 grid gap-4">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-xs font-bold rounded-full bg-moutarde text-bordeaux px-2.5 py-1">Supporter</span>
+              <span className="text-xs font-bold rounded-full bg-moutarde text-bordeaux px-2.5 py-1">{gradeDe(grade)}</span>
               <span className="font-semibold">{p?.plan_formule === "annuel" ? "Formule annuelle, 29 € par an" : p?.plan_formule === "mensuel" ? "Formule mensuelle, 2,99 € par mois" : "Accès offert par la rédaction"}</span>
             </div>
             {p?.plan_until && (
@@ -39,6 +44,10 @@ export default async function MonAbonnement() {
                   : <>Prochain renouvellement le <strong className="text-encre">{fmtDate(p.plan_until)}</strong>.</>}
               </p>
             )}
+            <div className="rounded-xl bg-teinte p-4 text-sm">
+              <p><b>Votre grade : {gradeDe(grade)}.</b> Il monte avec votre ancienneté et les matchs suivis en tribune ({suivis ?? 0} pour l&apos;instant).</p>
+              {palier && <p className="mt-1 text-sourdine">Prochain grade, « {gradeDe(grade + 1)} » : {palier.mois} mois d&apos;abonnement (vous en êtes à {moisDepuis}) ou {palier.matchs} matchs suivis dans votre carnet.</p>}
+            </div>
             {p?.plan_statut === "past_due" && <p className="rounded-xl bg-alerte/10 text-alerte p-3 text-sm font-semibold">Le dernier prélèvement a échoué. Mettez à jour votre moyen de paiement pour garder votre accès.</p>}
             {abonne && (
               <div className="flex flex-wrap items-start gap-3 pt-2 border-t border-trait">

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { publicClient, hasBadge } from "@/lib/supabase/server";
+import { gradeDe } from "@/lib/membres";
 import TeamBadge from "@/components/TeamBadge";
 import { fmtDate } from "@/lib/format";
 import { JE_SUIS } from "@/lib/membres";
@@ -11,7 +12,7 @@ type Profil = { id: string; username: string; display_name: string | null; avata
 
 async function charger(pseudo: string) {
   const { data } = await publicClient().from("profiles")
-    .select("id, username, display_name, avatar_url, bio, ville, je_suis, profil_public, plan, plan_until, role, created_at, club:teams!profiles_fav_team_fk(id, slug, name, short_name, logo_url, color, abbreviation)")
+    .select("id, username, display_name, avatar_url, bio, ville, je_suis, profil_public, plan, plan_until, role, created_at, supporter_grade, club:teams!profiles_fav_team_fk(id, slug, name, short_name, logo_url, color, abbreviation)")
     .ilike("username", decodeURIComponent(pseudo)).maybeSingle();
   return data as unknown as Profil | null;
 }
@@ -40,7 +41,7 @@ export default async function PageMembre({ params }: PageProps<"/membres/[pseudo
             <h1 className="groovy text-4xl sm:text-5xl break-words">{nom}</h1>
             <p className="mt-1 text-white/70">@{p.username}{p.ville ? `, ${p.ville}` : ""}</p>
             <p className="mt-2 flex flex-wrap gap-2 text-xs font-bold">
-              {badge && <span className="rounded-full bg-moutarde text-bordeaux px-2.5 py-1">Supporter</span>}
+              {badge && <span className="rounded-full bg-moutarde text-bordeaux px-2.5 py-1">{gradeDe((p as { supporter_grade?: number }).supporter_grade)}</span>}
               {p.role !== "user" && <span className="rounded-full bg-white/15 px-2.5 py-1">Rédaction</span>}
               {p.je_suis && <span className="rounded-full bg-white/15 px-2.5 py-1">{JE_SUIS[p.je_suis]}</span>}
             </p>

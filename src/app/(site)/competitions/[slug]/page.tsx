@@ -11,7 +11,7 @@ import { fmtDay } from "@/lib/format";
 import type { MatchFull } from "@/lib/types";
 import Simulateur from "@/components/simulateur/Simulateur";
 import { getRatings } from "@/lib/algo";
-import { getViewer } from "@/lib/supabase/server";
+import { getViewer, publicClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -119,7 +119,11 @@ async function Simulation({ compId, season, slug }: { compId: string; season: st
   const matchs = restants.filter((m) => m.status !== "finished").map((m) => ({ id: m.id, dom: m.home.id, ext: m.away.id, journee: m.round }));
   const z = zonesFor(slug);
   const zones = { qualif: z.qualif ?? 2, barrage: z.barrage ?? 6, descente: z.descente ?? 1, acces: slug === "top-14" ? 13 : undefined };
-  return <Simulateur equipes={equipes} matchs={matchs} zones={zones} favori={viewer?.favorite_team_id} />;
+  const supporter = !!viewer?.supporter;
+  const { data: hist } = supporter
+    ? await publicClient().from("sim_historique").select("team_id, jour, p_phase").eq("competition_id", compId).gte("jour", new Date(Date.now() - 120 * 86400e3).toISOString().slice(0, 10)).order("jour")
+    : { data: [] };
+  return <Simulateur equipes={equipes} matchs={matchs} zones={zones} favori={viewer?.favorite_team_id} supporter={supporter} historique={(hist ?? []).map((h) => ({ ...h, p_phase: Number(h.p_phase) }))} />;
 }
 
 async function Calendrier({ compId, season, upcoming }: { compId: string; season: string; upcoming: boolean }) {

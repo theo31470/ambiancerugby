@@ -1,5 +1,5 @@
 "use client";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import TeamBadge from "@/components/TeamBadge";
 import { simuler, victoiresNecessaires, type EquipeSim, type Force, type MatchSim, type Zones } from "@/lib/simulation";
 import type { TeamLite } from "@/lib/types";
@@ -10,8 +10,31 @@ const fmt = (p: number) => (p <= 0 ? "–" : p < 0.01 ? "<1 %" : p > 0.99 && p <
 const nom = (t: TeamLite) => t.short_name ?? t.name;
 
 /** Chances de fin de saison, recalculées dans le navigateur à chaque scénario choisi. */
-export default function Simulateur({ equipes, matchs, zones, favori }: { equipes: EquipeAffichee[]; matchs: MatchSim[]; zones: Zones; favori?: string | null }) {
+export type Historique = { team_id: string; jour: string; p_phase: number }[];
+
+/** Scénario encodé dans l'adresse : « id:d,id:n,id:e » (8 premiers caractères de l'identifiant du match). */
+const encoder = (f: Record<string, Force>) => Object.entries(f).map(([id, v]) => `${id.slice(0, 8)}:${v[0]}`).join(",");
+const decoder = (s: string, matchs: MatchSim[]) => {
+  const out: Record<string, Force> = {};
+  for (const part of s.split(",")) {
+    const [court, v] = part.split(":");
+    const m = matchs.find((x) => x.id.startsWith(court));
+    const f = v === "d" ? "dom" : v === "n" ? "nul" : v === "e" ? "ext" : null;
+    if (m && f) out[m.id] = f;
+  }
+  return out;
+};
+
+export default function Simulateur({ equipes, matchs, zones, favori, supporter = false, historique = [] }: { equipes: EquipeAffichee[]; matchs: MatchSim[]; zones: Zones; favori?: string | null; supporter?: boolean; historique?: Historique }) {
   const [forces, setForces] = useState<Record<string, Force>>({});
+  const [lien, setLien] = useState<string | null>(null);
+  // scénario partagé (adresse ?scenario=…), ou le dernier enregistré sur cet appareil
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("scenario");
+    let s = p;
+    if (!s) try { s = localStorage.getItem(`scenario-${matchs[0]?.id ?? ""}`); } catch { /* indisponible */ }
+    if (s) setForces(decoder(s, matchs));
+  }, [matchs]);
   const [club, setClub] = useState<string>(favori && equipes.some((e) => e.id === favori) ? favori : equipes[0]?.id ?? "");
   const forcesDiff = useDeferredValue(forces);
   const calcul = useMemo(() => simuler(equipes, matchs, forcesDiff, zones), [equipes, matchs, forcesDiff, zones]);
@@ -74,6 +97,9 @@ export default function Simulateur({ equipes, matchs, zones, favori }: { equipes
         </section>
       )}
 
+      {supporter && choisi && historique.some((h) => h.team_id === choisi.id) && <Evolution points={historique.filter((h) => h.team_id === choisi.id)} nom={nom(choisi.team)} />}
+      {!supporter && <p className="text-sm text-sourdine -mt-4">L&apos;évolution des chances jour après jour et le partage de scénarios sont réservés aux <a href="/abonnement" className="text-vin font-semibold underline underline-offset-4">Supporters</a>.</p>}
+
       {/* tableau des probabilités */}
       <section aria-labelledby="h-proj">
         <div className="flex flex-wrap items-end gap-2 mb-3">
@@ -131,7 +157,16 @@ export default function Simulateur({ equipes, matchs, zones, favori }: { equipes
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <h2 id="h-scen" className="titre text-2xl font-extrabold">À vous de jouer</h2>
           <p className="text-sm text-sourdine flex-1">Imposez des résultats : les chances se recalculent aussitôt.</p>
-          {nbForces > 0 && <button type="button" onClick={() => setForces({})} className="bouton-discret text-sm">Tout remettre à zéro</button>}
+          {nbForces > 0 && supporter && (
+            <button type="button" className="bouton-or text-sm" onClick={async () => {
+              const code = encoder(forces);
+              try { localStorage.setItem(`scenario-${matchs[0]?.id ?? ""}`, code); } catch { /* indisponible */ }
+              const url = `${location.origin}${location.pathname}?vue=simulateur&scenario=${encodeURIComponent(code)}`;
+              try { if (navigator.share) await navigator.share({ title: "Mon scénario de fin de saison", url }); else { await navigator.clipboard.writeText(url); } setLien("Lien copié ✓"); } catch { setLien(url); }
+            }}>{lien ?? "Enregistrer et partager mon scénario"}</button>
+          )}
+          {nbForces > 0 && !supporter && <a href="/abonnement" className="text-sm text-vin font-semibold underline underline-offset-4">Enregistrer et partager : réservé aux Supporters</a>}
+          {nbForces > 0 && <button type="button" onClick={() => { setForces({}); setLien(null); }} className="bouton-discret text-sm">Tout remettre à zéro</button>}
         </div>
         <div className="grid gap-5">
           {journees.slice(0, ouvertes).map(([j, liste]) => (
@@ -178,5 +213,29 @@ function Bouton({ actif, onClick, label, etroit, children }: { actif: boolean; o
       className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-semibold min-w-0 ${etroit ? "shrink-0 w-12" : "flex-1"} ${actif ? "bg-vin text-white" : "bg-teinte hover:bg-trait"}`}>
       {children}
     </button>
+  );
+}
+
+/** Courbe des chances de phase finale, jour après jour. */
+function Evolution({ points, nom }: { points: { jour: string; p_phase: number }[]; nom: string }) {
+  const pts = [...points].sort((a, b) => a.jour.localeCompare(b.jour));
+  if (pts.length < 2) return <p className="text-sm text-sourdine -mt-4">La courbe d&apos;évolution de {nom} apparaîtra dès demain.</p>;
+  const W = 600, H = 120;
+  const x = (i: number) => (i / (pts.length - 1)) * W;
+  const y = (p: number) => H - 8 - p * (H - 16);
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.p_phase).toFixed(1)}`).join(" ");
+  const fmtJ = (j: string) => new Date(`${j}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  return (
+    <section aria-label={`Évolution des chances de phase finale de ${nom}`} className="bg-surface border border-trait rounded-2xl p-4 -mt-2">
+      <p className="text-sm font-bold">Chances de phase finale de {nom}, jour après jour</p>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto mt-2" role="img" aria-label={`De ${Math.round(pts[0].p_phase * 100)} % le ${fmtJ(pts[0].jour)} à ${Math.round(pts[pts.length - 1].p_phase * 100)} % le ${fmtJ(pts[pts.length - 1].jour)}`}>
+        <line x1={0} x2={W} y1={y(0.5)} y2={y(0.5)} stroke="var(--trait)" strokeDasharray="4 5" />
+        <text x={W - 2} y={y(0.5) - 4} textAnchor="end" fontSize="11" fill="var(--sourdine)">50 %</text>
+        <path d={`${d} L${W},${H} L0,${H} Z`} fill="var(--vin)" fillOpacity={0.12} />
+        <path d={d} fill="none" stroke="var(--vin)" strokeWidth={2.5} strokeLinejoin="round" />
+        <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1].p_phase)} r={4} fill="var(--vin)" />
+      </svg>
+      <div className="flex justify-between text-xs text-sourdine"><span>{fmtJ(pts[0].jour)}</span><span className="font-bold text-encre">{Math.round(pts[pts.length - 1].p_phase * 100)} % aujourd&apos;hui</span></div>
+    </section>
   );
 }

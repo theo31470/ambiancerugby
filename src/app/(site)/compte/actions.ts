@@ -58,6 +58,8 @@ export async function enregistrerPreferences(_: FormState, form: FormData): Prom
       email_actus: coche("email_actus"), email_alertes: coche("email_alertes"), email_boutique: coche("email_boutique"),
       alertes_essais: coche("alertes_essais"), alertes_debut: coche("alertes_debut"), alertes_resultat: coche("alertes_resultat"),
       celebrations: coche("celebrations"),
+      alertes_cartons: coche("alertes_cartons"), alertes_joueurs: coche("alertes_joueurs"), alertes_serre: coche("alertes_serre"),
+      alertes_simulateur: coche("alertes_simulateur"), couleurs_club: coche("couleurs_club"),
     };
     const { error } = await db.from("profiles").update({ prefs, profil_public: coche("profil_public") }).eq("id", uid);
     if (error) return { error: error.message };

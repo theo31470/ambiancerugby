@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Ballon, Beret, Echarpe, Pinte, Poteaux, Trompette } from "@/components/deco/Icones";
+import { Ballon, Beret, Echarpe, Maillot, Pinte, Podium, Poteaux, Sifflet, Trompette } from "@/components/deco/Icones";
 import { getViewer, hasBadge } from "@/lib/supabase/server";
 import { fmtDate } from "@/lib/format";
 import DevenirSupporter from "@/components/abonnement/DevenirSupporter";
@@ -9,10 +9,14 @@ export const metadata: Metadata = { title: "Devenir Supporter", description: "L'
 export const dynamic = "force-dynamic";
 
 const AVANTAGES = [
-  { Icone: Poteaux, titre: "Stats et algorithme complets", texte: "Pronostics en pourcentages avec l'écart estimé, Indice Ambiance de toutes les équipes, courbes d'évolution, notes et stats détaillées des joueurs." },
-  { Icone: Trompette, titre: "Alertes de match", texte: "Coup d'envoi, essais, mi-temps et score final de vos clubs suivis, dans votre espace et en notification sur votre appareil." },
-  { Icone: Pinte, titre: "Contenus exclusifs", texte: "Analyses, avant-matchs et articles réservés aux Supporters." },
-  { Icone: Echarpe, titre: "Badge Supporter", texte: "Votre badge doré sur votre profil et sous chacun de vos commentaires." },
+  { Icone: Poteaux, titre: "L'avant-match complet", texte: "Les 15 duels poste par poste, les buteurs en forme, le pronostic détaillé de l'algorithme et toutes les notes des joueurs." },
+  { Icone: Ballon, titre: "Ligues de pronos entre potes", texte: "Créez votre ligue privée, invitez vos amis avec un code et affrontez-les chaque week-end. Vos amis la rejoignent gratuitement." },
+  { Icone: Maillot, titre: "XV de la semaine", texte: "Composez votre XV parmi les joueurs de la journée, entrez au classement des sélectionneurs et faites le XV des Supporters." },
+  { Icone: Echarpe, titre: "Carnet du supporter", texte: "Chaque match suivi en tribune tamponné dans votre carnet, et votre récap de saison à partager." },
+  { Icone: Trompette, titre: "Alertes sur mesure", texte: "Essais de vos joueurs favoris, fin de match serrée, cartons, entrée ou sortie du top 6 au simulateur." },
+  { Icone: Podium, titre: "Simulateur avancé et comparateur", texte: "Évolution des chances de votre club jour après jour, scénarios à partager, joueurs comparés saison par saison." },
+  { Icone: Pinte, titre: "Notez les joueurs", texte: "Donnez votre note à chaque joueur après le match et élisez l'homme du match des Supporters." },
+  { Icone: Sifflet, titre: "Un badge qui monte en grade", texte: "Supporter, Abonné de tribune, Pilier de buvette, Légende du virage : votre badge évolue avec votre fidélité. Et le site aux couleurs de votre club." },
 ];
 
 export default async function AbonnementPage() {

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { getViewer } from "@/lib/supabase/server";
+import { getViewer, publicClient } from "@/lib/supabase/server";
 import type { Prefs } from "@/lib/membres";
 import Tactile from "@/components/deco/Tactile";
 
@@ -36,8 +36,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const viewer = await getViewer();
   const prefs = (viewer?.prefs ?? {}) as Prefs;
   const theme = prefs.theme === "sombre" ? "dark" : prefs.theme === "clair" ? "light" : undefined;
+  // Supporters : le site aux couleurs de leur club (accents seulement, contraste garanti en CSS)
+  let club: string | null = null;
+  if (viewer?.supporter && prefs.couleurs_club && viewer.favorite_team_id) {
+    const { data } = await publicClient().from("teams").select("color").eq("id", viewer.favorite_team_id).maybeSingle();
+    if (data?.color && /^#[0-9a-f]{6}$/i.test(data.color)) club = data.color;
+  }
   return (
-    <html lang="fr" data-theme={theme} className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
+    <html lang="fr" data-theme={theme} data-club={club ? "" : undefined} style={club ? ({ "--club": club } as React.CSSProperties) : undefined} className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col"><Tactile />{children}</body>
     </html>
   );

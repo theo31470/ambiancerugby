@@ -16,7 +16,10 @@ export default async function JoueursPage({ searchParams }: PageProps<"/joueurs"
 
   return (
     <div>
-      <h1 className="groovy text-5xl sm:text-6xl text-vin">Joueurs</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="groovy text-5xl sm:text-6xl text-vin">Joueurs</h1>
+        <Link href="/joueurs/comparer" className="bouton-discret">Comparer deux joueurs</Link>
+      </div>
       <form className="mt-6 flex flex-wrap gap-2" role="search">
         <label htmlFor="q" className="sr-only">Nom du joueur</label>
         <input id="q" name="q" defaultValue={q} placeholder="Rechercher un joueur" className="champ max-w-xs" />

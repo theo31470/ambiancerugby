@@ -387,3 +387,16 @@ summary { list-style-position: inside; }
   .entree-page, .barre-navigation[data-etat="route"], .squelette { animation: none; }
   .billet { transform: none; }
 }
+
+/* terrain du XV de la semaine : pelouse rayée, lignes blanches */
+.terrain-xv {
+  background:
+    linear-gradient(90deg, transparent 49.7%, rgba(255,255,255,.35) 49.7% 50.3%, transparent 50.3%) 0 50% / 100% 2px no-repeat,
+    repeating-linear-gradient(180deg, #2f6b45 0 44px, #2a6140 44px 88px);
+  box-shadow: inset 0 0 0 3px rgba(255,255,255,.35);
+}
+
+/* Supporters : accents aux couleurs du club favori (assombris pour rester lisibles sur fond clair) */
+:root[data-club] { --vin: color-mix(in oklab, var(--club) 78%, #1a0a0e); --bordeaux: color-mix(in oklab, var(--club) 42%, #12060a); }
+@media (prefers-color-scheme: dark) { :root[data-club]:not([data-theme="light"]) { --vin: color-mix(in oklab, var(--club) 70%, #ffffff); } }
+:root[data-theme="dark"][data-club] { --vin: color-mix(in oklab, var(--club) 70%, #ffffff); }

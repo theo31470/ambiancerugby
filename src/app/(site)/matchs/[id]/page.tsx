@@ -7,6 +7,7 @@ import FilDuMatch from "@/components/FilDuMatch";
 import CourbeAscendant from "@/components/CourbeAscendant";
 import Pronostic from "@/components/pronos/Pronostic";
 import AvantMatch from "@/components/AvantMatch";
+import VoteNote from "@/components/notes/VoteNote";
 import { createClient } from "@/lib/supabase/server";
 import ChronoLive, { type Periodes } from "@/components/ChronoLive";
 import Comments from "@/components/Comments";
@@ -65,6 +66,14 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     ["carries", "Courses", "Courses"], ["metres", "Mètres", "Mètres gagnés"], ["cartons", "Cartons", "Cartons"],
   ] as [string, string, string][]).filter(([k]) => k === "cartons" ? notes.some((x) => Number(x.yellow) || Number(x.red)) : notes.some((x) => Number(x[k]) > 0));
   const full = !!viewer?.supporter;
+  const [{ data: moyennes }, mesVotes] = await Promise.all([
+    publicClient().from("player_votes_moyennes").select("player_id,note,votes").eq("match_id", m.id),
+    viewer?.supporter && m.status === "finished"
+      ? (await createClient()).from("player_votes").select("player_id,note").eq("match_id", m.id).eq("user_id", viewer.id).then(({ data }) => new Map((data ?? []).map((x) => [x.player_id, x.note as number])))
+      : Promise.resolve(new Map<string, number>()),
+  ]);
+  const noteSup = new Map((moyennes ?? []).map((x) => [x.player_id as string, { note: Number(x.note), votes: Number(x.votes) }]));
+  const hommeSup = [...noteSup.entries()].filter(([, v]) => v.votes >= 3).sort((a, b) => b[1].note - a[1].note)[0];
   const monProno = viewer && m.status === "scheduled"
     ? await (await createClient()).from("pronos").select("home_score,away_score").eq("user_id", viewer.id).eq("match_id", m.id).maybeSingle().then(({ data }) => (data ? { h: data.home_score, a: data.away_score } : null))
     : null;
@@ -168,14 +177,18 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
               </Link>
             ))}
           </div>
-          <details className="group">
-          <summary className="cursor-pointer text-sm font-semibold text-vin underline underline-offset-4 mb-3">Voir toutes les notes ({notes.length})</summary>
+          {hommeSup && (() => { const j = notes.find((x) => x.player_id === hommeSup[0]); return j ? (
+            <p className="mb-3 text-sm">Homme du match des Supporters : <Link href={`/joueurs/${j.player.slug}`} className="font-bold hover:text-vin">{j.player.first_name} {j.player.last_name}</Link> <span className="text-sourdine">({hommeSup[1].note.toFixed(1)}/10, {hommeSup[1].votes} votes)</span></p>
+          ) : null; })()}
+          <details className="group" open={full && m.status === "finished" ? true : undefined}>
+          <summary className="cursor-pointer text-sm font-semibold text-vin underline underline-offset-4 mb-3">Voir toutes les notes ({notes.length}){full && m.status === "finished" ? " et donner les vôtres" : ""}</summary>
           <div className="bg-surface border border-trait rounded-2xl overflow-x-auto max-h-[28rem] overflow-y-auto">
             <table className="w-full text-sm tnum">
               <thead>
                 <tr className="text-xs text-sourdine border-b border-trait">
                   <th scope="col" className="text-left font-semibold py-2.5 pl-4">Joueur</th>
                   <th scope="col" className="font-semibold px-2">Note</th>
+                  {m.status === "finished" && <th scope="col" className="font-semibold px-2" title="Moyenne des notes données par les Supporters">Supporters</th>}
                   {full && colonnes.map(([, court, long]) => <th key={court} scope="col" className="font-semibold px-2"><abbr title={long} className="no-underline">{court}</abbr></th>)}
                 </tr>
               </thead>
@@ -188,6 +201,14 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
                       {s.motm && <span className="ml-2 text-[10px] font-bold rounded-full bg-moutarde text-bordeaux px-1.5 py-0.5">Homme du match</span>}
                     </th>
                     <td className="px-2 text-center">{s.rating == null ? <span className="text-sourdine">…</span> : <span className={`inline-block min-w-10 rounded-full px-2 py-0.5 titre font-extrabold ${s.rating >= 8 ? "bg-moutarde text-bordeaux" : s.rating >= 6.5 ? "bg-teinte" : "bg-alerte/10 text-alerte"}`}>{Number(s.rating).toFixed(1)}</span>}</td>
+                    {m.status === "finished" && (
+                      <td className="px-2 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="titre font-extrabold" title={noteSup.get(s.player_id) ? `${noteSup.get(s.player_id)!.votes} vote(s)` : "Pas encore de vote"}>{noteSup.get(s.player_id)?.note.toFixed(1) ?? "–"}</span>
+                          {full && <VoteNote matchId={m.id} playerId={s.player_id} initial={mesVotes.get(s.player_id) ?? null} nom={`${s.player.first_name} ${s.player.last_name}`} />}
+                        </span>
+                      </td>
+                    )}
                     {full && colonnes.map(([cle]) => <td key={cle} className="px-2 text-center">{cle === "cartons" ? `${"🟨".repeat(Number(s.yellow) || 0)}${"🟥".repeat(Number(s.red) || 0)}` || "–" : Number(s[cle]) || "–"}</td>)}
                   </tr>
                 ))}

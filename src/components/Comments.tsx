@@ -2,6 +2,7 @@ import Link from "next/link";
 import { deleteComment } from "@/app/actions";
 import { getComments } from "@/lib/queries";
 import { getViewer, hasBadge } from "@/lib/supabase/server";
+import { gradeDe } from "@/lib/membres";
 import { fmtRelative } from "@/lib/format";
 import CommentForm from "./CommentForm";
 
@@ -34,7 +35,7 @@ export default async function Comments({ articleId, matchId, path }: { articleId
                 {c.author?.username && c.author.profil_public !== false
                   ? <Link href={`/membres/${c.author.username}`} className="font-semibold hover:underline underline-offset-4">{c.author.display_name ?? c.author.username}</Link>
                   : <span className="font-semibold">{c.author?.display_name ?? c.author?.username ?? "Supporter"}</span>}
-                {hasBadge(c.author) && <span className="ml-1.5 text-[10px] font-bold rounded-full bg-moutarde text-bordeaux px-1.5 py-0.5 align-middle">Supporter</span>}
+                {hasBadge(c.author) && <span className={`ml-1.5 text-[10px] font-bold rounded-full px-1.5 py-0.5 align-middle ${(c.author?.supporter_grade ?? 0) >= 2 ? "bg-bordeaux text-moutarde" : "bg-moutarde text-bordeaux"}`}>{gradeDe(c.author?.supporter_grade)}</span>}
                 <span className="text-sourdine">, {fmtRelative(c.created_at)}</span>
               </p>
               <p className="mt-0.5 whitespace-pre-line break-words">{c.body}</p>

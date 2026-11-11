@@ -106,6 +106,14 @@ export function Preferences({ m }: { m: Membre }) {
           <Interrupteur name="celebrations" label="Célébrations à l'écran" aide="Ballon, confettis et « ESSAI ! » en direct." defaut={p.celebrations} />
         </fieldset>
         <fieldset>
+          <legend className="font-bold">Alertes sur mesure <span className="ml-1 text-[10px] font-bold rounded-full bg-moutarde text-bordeaux px-1.5 py-0.5 align-middle">Supporter</span></legend>
+          <Interrupteur name="alertes_joueurs" label="Essais de mes joueurs favoris" aide="Dès qu'un joueur que vous suivez marque." defaut={p.alertes_joueurs} />
+          <Interrupteur name="alertes_serre" label="Fin de match serrée" aide="À partir de la 70e, quand l'écart est de 7 points ou moins." defaut={p.alertes_serre} />
+          <Interrupteur name="alertes_cartons" label="Cartons" aide="Chaque carton jaune ou rouge dans les matchs de mes clubs." defaut={p.alertes_cartons} />
+          <Interrupteur name="alertes_simulateur" label="Top 6 du simulateur" aide="Quand mon club entre dans le top 6 projeté ou en sort." defaut={p.alertes_simulateur} />
+          <Interrupteur name="couleurs_club" label="Le site aux couleurs de mon club" aide="Les accents du site prennent la couleur de votre club favori." defaut={p.couleurs_club} />
+        </fieldset>
+        <fieldset>
           <legend className="font-bold">E-mails</legend>
           <Interrupteur name="email_alertes" label="Résumé de mes clubs" aide="Après chaque journée : résultats, notes, prochains matchs." defaut={p.email_alertes} />
           <Interrupteur name="email_actus" label="La lettre d'Ambiance Rugby" aide="Le meilleur de la semaine, une fois par semaine." defaut={p.email_actus} />
