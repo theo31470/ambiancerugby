@@ -27,8 +27,8 @@ export default async function AbonnementPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20 relative text-center">
           <h1 className="groovy text-5xl sm:text-7xl">Passez en <span className="text-moutarde">tribune d&apos;honneur</span></h1>
           <p className="mt-5 text-lg text-white/80 max-w-xl mx-auto">Ambiance Rugby est un média indépendant. L&apos;abonnement Supporter le fait vivre et vous donne le meilleur du site.</p>
-          <div className="mt-10 inline-block relative max-w-full">
-            <div className="absolute inset-0 rounded-[2rem] bg-moutarde rotate-2" aria-hidden />
+          <div className={`mt-10 relative max-w-full ${actif || !viewer ? "inline-block" : "block max-w-5xl mx-auto"}`}>
+            <div className="absolute inset-0 rounded-[2rem] bg-moutarde rotate-1" aria-hidden />
             <div className="relative rounded-[2rem] bg-surface text-encre px-5 sm:px-10 py-8 flex flex-col items-center">
               <p className="text-sm font-semibold text-vin">Supporter</p>
               {actif ? (
@@ -39,7 +39,7 @@ export default async function AbonnementPage() {
               ) : (
                 <>
                   <p className="mt-1 mb-6 text-sourdine">2,99 € par mois ou 29 € par an</p>
-                  <DevenirSupporter connecte={!!viewer} />
+                  <DevenirSupporter connecte={!!viewer} nom={viewer?.display_name ?? ""} depuis={new Intl.DateTimeFormat("fr-FR", { month: "short", year: "numeric" }).format(new Date())} />
                 </>
               )}
             </div>

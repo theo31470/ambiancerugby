@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { getViewer } from "@/lib/supabase/server";
 import type { Prefs } from "@/lib/membres";
+import Tactile from "@/components/deco/Tactile";
 
 // polices hébergées avec le site : Shrikhand (grands titres groovy), Bricolage Grotesque (titres, scores), Instrument Sans (texte)
 const groovy = localFont({ variable: "--font-groovy", src: "./fonts/shrikhand.woff2", weight: "400", display: "swap" });
@@ -37,7 +38,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const theme = prefs.theme === "sombre" ? "dark" : prefs.theme === "clair" ? "light" : undefined;
   return (
     <html lang="fr" data-theme={theme} className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col"><Tactile />{children}</body>
     </html>
   );
 }

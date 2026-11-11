@@ -59,6 +59,71 @@ export async function demarrerAbonnement(formule: string): Promise<Reponse<{ sec
   }
 }
 
+/** Appelé à l'ouverture de la caisse : déclare le domaine pour Google Pay / Apple Pay. */
+export async function preparerCaisse() {
+  await declarerDomaine();
+}
+
+const texte = (fd: FormData, k: string, max = 200) => String(fd.get(k) ?? "").trim().slice(0, max);
+
+/** Code promo : vérifie qu'il existe et renvoie la remise à afficher avant le paiement. */
+export async function verifierCodePromo(code: string, formule: string): Promise<Reponse<{ id: string; libelle: string; cents: number }>> {
+  try {
+    const c = code.trim();
+    if (!c || !estFormule(formule)) return { ok: false, message: "Saisissez un code." };
+    const { data } = await stripe().promotionCodes.list({ code: c, active: true, limit: 1, expand: ["data.promotion.coupon"] });
+    const p = data[0];
+    const coupon = p && typeof p.promotion?.coupon === "object" ? p.promotion.coupon : null;
+    if (!p || !coupon || !coupon.valid) return { ok: false, message: "Ce code n'existe pas ou n'est plus valable." };
+    const base = FORMULES[formule].cents;
+    const remise = coupon.percent_off ? Math.round(base * coupon.percent_off / 100) : Math.min(base, coupon.amount_off ?? 0);
+    const libelle = coupon.percent_off ? `−${coupon.percent_off} %` : `−${(remise / 100).toFixed(2).replace(".", ",")} €`;
+    return { ok: true, id: p.id, libelle, cents: base - remise };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
+/**
+ * Notre propre caisse : la carte est saisie et vérifiée dans la page (elements.submit),
+ * puis on crée l'abonnement avec les informations de facturation et on renvoie le secret à confirmer.
+ */
+export async function lancerAbonnement(fd: FormData): Promise<Reponse<{ secret: string | null; abonnement: string }>> {
+  try {
+    const viewer = await getViewer();
+    if (!viewer) return { ok: false, message: "Connectez-vous pour devenir Supporter." };
+    if (hasBadge(viewer) && viewer.role === "user") return { ok: false, message: "Vous êtes déjà Supporter. Merci !" };
+    const formule = texte(fd, "formule", 10);
+    if (!estFormule(formule)) return { ok: false, message: "Formule inconnue." };
+    const nom = texte(fd, "nom", 120), ligne1 = texte(fd, "ligne1"), cp = texte(fd, "cp", 20), ville = texte(fd, "ville", 100);
+    const pays = texte(fd, "pays", 2).toUpperCase() || "FR";
+    if (nom.length < 2) return { ok: false, message: "Indiquez le nom qui figurera sur vos factures." };
+    if (!ligne1 || !cp || !ville) return { ok: false, message: "Complétez votre adresse de facturation." };
+    const s = stripe();
+    const customer = await clientStripe(viewer);
+    await s.customers.update(customer, { name: nom, address: { line1: ligne1, line2: texte(fd, "ligne2") || undefined, postal_code: cp, city: ville, country: pays } });
+    const { data: enCours } = await s.subscriptions.list({ customer, status: "incomplete", limit: 10 });
+    for (const x of enCours) await s.subscriptions.cancel(x.id).catch(() => null);
+    const promo = texte(fd, "promo", 60);
+    const sub = await s.subscriptions.create({
+      customer,
+      items: [{ price: await prixStripe(formule) }],
+      payment_behavior: "default_incomplete",
+      payment_settings: { save_default_payment_method: "on_subscription" },
+      ...(promo ? { discounts: [{ promotion_code: promo }] } : {}),
+      metadata: { user_id: viewer.id, formule },
+      expand: ["latest_invoice.confirmation_secret"],
+    });
+    const inv = sub.latest_invoice;
+    const secret = inv && typeof inv !== "string" ? inv.confirmation_secret?.client_secret ?? null : null;
+    // code à 100 % : rien à payer, l'abonnement est déjà actif
+    if (!secret && sub.status !== "active") return { ok: false, message: "Le paiement n'a pas pu être préparé. Réessayez dans un instant." };
+    return { ok: true, secret, abonnement: sub.id };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
 /** Au retour du paiement : met le profil à jour sans attendre le message de Stripe. */
 export async function verifierAbonnement(abonnement: string, revalider = true): Promise<Reponse<{ actif: boolean }>> {
   try {
