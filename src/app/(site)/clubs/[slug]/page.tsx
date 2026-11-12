@@ -7,6 +7,7 @@ import TeamBadge from "@/components/TeamBadge";
 import MatchRow from "@/components/MatchRow";
 import BilanSaison from "@/components/stats/BilanSaison";
 import HistoriqueClub from "@/components/club/HistoriqueClub";
+import Palmares from "@/components/club/Palmares";
 import { StandingsPools, zonesFor } from "@/components/StandingsTable";
 import ArticleCard from "@/components/ArticleCard";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -78,6 +79,8 @@ export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
       </header>
 
       {team.description && <p className="mt-8 max-w-prose text-lg">{team.description}</p>}
+
+      <Palmares teamId={team.id} nom={team.name} />
 
       <section aria-labelledby="h-indice" className="mt-10 grid gap-5 md:grid-cols-[16rem_16rem_1fr]">
         <h2 id="h-indice" className="sr-only">Indice Ambiance et forme</h2>
