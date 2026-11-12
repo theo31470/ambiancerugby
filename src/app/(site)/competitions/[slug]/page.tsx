@@ -7,11 +7,13 @@ import TeamBadge from "@/components/TeamBadge";
 import ArticleCard from "@/components/ArticleCard";
 import LiveRefresh from "@/components/LiveRefresh";
 import { getArticles, getCompetition, getCompetitionMatches, getCompetitionTeams, getSeasons, getStandings } from "@/lib/queries";
-import { fmtDay } from "@/lib/format";
+import { fmtDay, isoFromNow } from "@/lib/format";
 import type { MatchFull } from "@/lib/types";
 import Simulateur from "@/components/simulateur/Simulateur";
 import { getRatings } from "@/lib/algo";
 import { getViewer, publicClient } from "@/lib/supabase/server";
+import { getRecords } from "@/lib/records";
+import RecordsVue from "@/components/records/Records";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,7 @@ export async function generateMetadata({ params, searchParams }: PageProps<"/com
     resultats: `Résultats ${c.name} ${c.current_season} : tous les scores`,
     clubs: `${c.name} : les équipes de la saison ${c.current_season}`,
     simulateur: `Simulateur ${c.name} : chances de qualification et de maintien de chaque club`,
+    records: `Records ${c.name} : plus larges victoires, séries, meilleurs marqueurs d'essais`,
   };
   const title = (typeof vue === "string" && titres[vue]) || `Classement ${c.name} ${c.current_season} : classement, calendrier et résultats`;
   const description = `${c.name} ${c.current_season} : classement à jour avec bonus, calendrier, résultats en direct, simulateur de fin de saison et stats des équipes.`;
@@ -36,6 +39,7 @@ const TABS = [
   { id: "calendrier", label: "Calendrier" },
   { id: "resultats", label: "Résultats" },
   { id: "clubs", label: "Équipes" },
+  { id: "records", label: "Records" },
 ];
 
 export default async function CompetitionPage({ params, searchParams }: PageProps<"/competitions/[slug]">) {
@@ -97,6 +101,7 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
         {tab === "calendrier" && <Calendrier compId={c.id} season={season} upcoming />}
         {tab === "resultats" && <Calendrier compId={c.id} season={season} upcoming={false} />}
         {tab === "clubs" && <Equipes compId={c.id} season={season} />}
+        {tab === "records" && <RecordsVue r={await getRecords(c.id)} />}
       </div>
 
       <News compId={c.id} />
@@ -132,7 +137,7 @@ async function Simulation({ compId, season, slug }: { compId: string; season: st
   const zones = { qualif: z.qualif ?? 2, barrage: z.barrage ?? 6, descente: z.descente ?? 1, acces: slug === "top-14" ? 13 : undefined };
   const supporter = !!viewer?.supporter;
   const { data: hist } = supporter
-    ? await publicClient().from("sim_historique").select("team_id, jour, p_phase").eq("competition_id", compId).gte("jour", new Date(Date.now() - 120 * 86400e3).toISOString().slice(0, 10)).order("jour")
+    ? await publicClient().from("sim_historique").select("team_id, jour, p_phase").eq("competition_id", compId).gte("jour", isoFromNow(-120 * 86400e3).slice(0, 10)).order("jour")
     : { data: [] };
   return <Simulateur equipes={equipes} matchs={matchs} zones={zones} favori={viewer?.favorite_team_id} supporter={supporter} historique={(hist ?? []).map((h) => ({ ...h, p_phase: Number(h.p_phase) }))} />;
 }
