@@ -232,3 +232,27 @@ export async function chercherFeuille(opts: {
   const remarques = outil ? String(brut.remarques ?? "").slice(0, 600) : "Claude n'a pas trouvé de compte rendu exploitable.";
   return { lignes, evenements: filPropre(brut.evenements), remarques, inputTokens, outputTokens, coutUsd, recherches };
 }
+
+// ---------- rédaction libre (légendes de posts) ----------
+export type TexteIA = { texte: string; inputTokens: number; outputTokens: number; coutUsd: number };
+
+/** Texte court rédigé par Claude (Haiku) à partir de faits fournis : rien n'est inventé au-delà. */
+export async function rediger(opts: { systeme: string; consigne: string; maxTokens?: number }): Promise<TexteIA> {
+  const cle = process.env.ANTHROPIC_API_KEY;
+  if (!cle) throw new Error("La clé ANTHROPIC_API_KEY n'est pas encore configurée sur Vercel.");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": cle, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({ model: IA_MODELE, max_tokens: opts.maxTokens ?? 700, system: opts.systeme, messages: [{ role: "user", content: opts.consigne }] }),
+    signal: AbortSignal.timeout(45_000),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Clé Claude refusée : vérifiez ANTHROPIC_API_KEY sur Vercel.");
+    if (res.status === 429 || res.status === 529) throw new Error("Claude est très sollicité, réessayez dans une minute.");
+    throw new Error(`Claude : ${body?.error?.message ?? `HTTP ${res.status}`}`);
+  }
+  const texte = (body?.content ?? []).filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("\n").trim();
+  const inputTokens = body?.usage?.input_tokens ?? 0, outputTokens = body?.usage?.output_tokens ?? 0;
+  return { texte, inputTokens, outputTokens, coutUsd: (inputTokens * PRIX_ENTREE + outputTokens * PRIX_SORTIE) / 1e6 };
+}

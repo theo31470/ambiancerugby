@@ -15,6 +15,7 @@ export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0,
     {
       titre: "Rédaction",
       liens: [
+        { href: "/studio/contenu", label: "Contenu et réseaux", Icone: Trompette, exact: true },
         { href: "/studio/articles", label: "Articles", Icone: Journal, badge: brouillons },
         { href: "/studio/commentaires", label: "Commentaires", Icone: Trompette, badge: commentaires },
       ],
