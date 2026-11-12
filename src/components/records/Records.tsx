@@ -21,7 +21,7 @@ function Rang({ i, valeur, children, href }: { i: number; valeur: ReactNode; chi
   const corps = (
     <>
       <span className={`w-7 h-7 shrink-0 grid place-items-center rounded-full text-xs font-bold tnum ${i === 0 ? "bg-moutarde text-bordeaux" : "bg-teinte text-sourdine"}`}>{i + 1}</span>
-      <span className="min-w-0 flex-1 text-sm">{children}</span>
+      <span className="min-w-0 flex-1 overflow-hidden text-sm">{children}</span>
       <b className={`tnum shrink-0 ${i === 0 ? "groovy text-2xl text-vin font-normal" : "text-lg"}`}>{valeur}</b>
     </>
   );
@@ -30,9 +30,12 @@ function Rang({ i, valeur, children, href }: { i: number; valeur: ReactNode; chi
 
 function Match({ m }: { m: LigneMatch }) {
   return (
-    <span className="flex items-center gap-1.5 min-w-0">
-      <TeamBadge team={m.home} /><span className="truncate">{nom(m.home)} <b className="tnum">{m.home_score}-{m.away_score}</b> {nom(m.away)}</span><TeamBadge team={m.away} />
-      <span className="text-xs text-sourdine shrink-0 hidden sm:inline">{jour(m.kickoff_at)}</span>
+    <span className="flex items-center gap-2 min-w-0">
+      <TeamBadge team={m.home} />
+      <span className="min-w-0">
+        <span className="block truncate">{nom(m.home)} <b className="tnum">{m.home_score}-{m.away_score}</b> {nom(m.away)}</span>
+        <span className="block text-xs text-sourdine">{jour(m.kickoff_at)}</span>
+      </span>
     </span>
   );
 }
@@ -72,7 +75,7 @@ export default function Records({ r }: { r: R }) {
           <Carte titre="Plus gros totaux d'une équipe" unite="points">
             {r.plusGrosScores.map((m, i) => (
               <Rang key={m.id + m.cote} i={i} valeur={m.valeur} href={urlMatch(m)}>
-                <span className="flex items-center gap-2 min-w-0"><TeamBadge team={m[m.cote]} /><span className="truncate"><b>{nom(m[m.cote])}</b> contre {nom(m[m.cote === "home" ? "away" : "home"])}</span><span className="text-xs text-sourdine shrink-0">{jour(m.kickoff_at)}</span></span>
+                <span className="flex items-center gap-2 min-w-0"><TeamBadge team={m[m.cote]} /><span className="min-w-0"><span className="block truncate"><b>{nom(m[m.cote])}</b> contre {nom(m[m.cote === "home" ? "away" : "home"])}</span><span className="block text-xs text-sourdine">{jour(m.kickoff_at)}</span></span></span>
               </Rang>
             ))}
           </Carte>
