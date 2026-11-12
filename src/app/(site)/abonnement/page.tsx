@@ -5,7 +5,7 @@ import { getViewer, hasBadge } from "@/lib/supabase/server";
 import { fmtDate } from "@/lib/format";
 import DevenirSupporter from "@/components/abonnement/DevenirSupporter";
 
-export const metadata: Metadata = { title: "Devenir Supporter", description: "L'abonnement Ambiance Rugby : stats et algorithme complets, alertes de match, contenus exclusifs et badge Supporter, pour 2,99 € par mois ou 29 € par an." };
+export const metadata: Metadata = { title: "Devenir Supporter", description: "L'abonnement Ambiance Rugby : stats et algorithme complets, alertes de match, contenus exclusifs et badge Supporter, pour 5,99 € par mois ou 59 € par an." };
 export const dynamic = "force-dynamic";
 
 const AVANTAGES = [
@@ -42,7 +42,7 @@ export default async function AbonnementPage() {
                 </>
               ) : (
                 <>
-                  <p className="mt-1 mb-6 text-sourdine">2,99 € par mois ou 29 € par an</p>
+                  <p className="mt-1 mb-6 text-sourdine">5,99 € par mois ou 59 € par an</p>
                   <DevenirSupporter connecte={!!viewer} nom={viewer?.display_name ?? ""} depuis={new Intl.DateTimeFormat("fr-FR", { month: "short", year: "numeric" }).format(new Date())} />
                 </>
               )}

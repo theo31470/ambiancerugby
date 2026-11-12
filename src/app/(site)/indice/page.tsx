@@ -88,7 +88,7 @@ export default async function IndicePage({ searchParams }: PageProps<"/indice">)
                 <div className="border-t border-trait p-6 text-center bg-gradient-to-b from-surface to-teinte">
                   <p className="titre font-bold text-lg">Et {caches} autres équipes classées</p>
                   <p className="text-sourdine mt-1">Le classement complet, les courbes et les pronostics détaillés sont réservés aux Supporters.</p>
-                  <Link href="/abonnement" className="bouton-or mt-4"><Ballon className="tourne w-6" />Devenir Supporter, 2,99 €/mois</Link>
+                  <Link href="/abonnement" className="bouton-or mt-4"><Ballon className="tourne w-6" />Devenir Supporter, 5,99 €/mois</Link>
                 </div>
               )}
             </div>

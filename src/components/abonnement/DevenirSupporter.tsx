@@ -12,8 +12,8 @@ const cle = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromesse = cle ? loadStripe(cle, { locale: "fr" }).catch(() => null) : null;
 
 const FORMULES = {
-  mensuel: { titre: "Mensuel", cents: 299, rythme: "par mois", note: "Sans engagement, résiliable en un clic." },
-  annuel: { titre: "Annuel", cents: 2900, rythme: "par an", note: "Soit 2,42 € par mois.", badge: "2 mois offerts" },
+  mensuel: { titre: "Mensuel", cents: 599, rythme: "par mois", note: "Sans engagement, résiliable en un clic." },
+  annuel: { titre: "Annuel", cents: 5900, rythme: "par an", note: "Soit 4,92 € par mois.", badge: "2 mois offerts" },
 } as const;
 type Formule = keyof typeof FORMULES;
 const euros = (c: number) => `${(c / 100).toFixed(2).replace(".", ",").replace(",00", "")} €`;

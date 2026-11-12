@@ -3,10 +3,10 @@ import { stripe, enModeTest } from "@/lib/shop/stripe";
 import { shopDb } from "@/lib/shop/admin";
 import { moyenDeFacture } from "@/lib/factures/donnees";
 
-/** Les deux formules Supporter. Les prix Stripe sont créés à la première utilisation (clé de recherche stable). */
+/** Les deux formules Supporter. Les prix Stripe sont créés à la première utilisation (clé de recherche stable : changer le prix = changer la clé). */
 export const FORMULES = {
-  mensuel: { cle: "supporter_mensuel", cents: 299, intervalle: "month" as const, libelle: "Supporter mensuel", prix: "2,99 €", rythme: "par mois" },
-  annuel: { cle: "supporter_annuel", cents: 2900, intervalle: "year" as const, libelle: "Supporter annuel", prix: "29 €", rythme: "par an" },
+  mensuel: { cle: "supporter_mensuel_599", cents: 599, intervalle: "month" as const, libelle: "Supporter mensuel", prix: "5,99 €", rythme: "par mois" },
+  annuel: { cle: "supporter_annuel_5900", cents: 5900, intervalle: "year" as const, libelle: "Supporter annuel", prix: "59 €", rythme: "par an" },
 };
 export type Formule = keyof typeof FORMULES;
 export const estFormule = (f: unknown): f is Formule => f === "mensuel" || f === "annuel";

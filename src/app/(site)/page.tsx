@@ -294,7 +294,7 @@ export default async function Home() {
             <Beret className="absolute -right-6 -top-4 w-40 h-auto text-white/[0.06] rotate-12" />
             <div>
               <h2 id="h-supporter" className="groovy text-4xl sm:text-5xl">Devenez <span className="text-moutarde">Supporter</span></h2>
-              <p className="mt-3 text-white/80 max-w-md">Pour 2,99 € par mois, soutenez un média rugby indépendant et passez en tribune d&apos;honneur.</p>
+              <p className="mt-3 text-white/80 max-w-md">Pour 5,99 € par mois, soutenez un média rugby indépendant et passez en tribune d&apos;honneur.</p>
               <Link href="/abonnement" className="bouton-or mt-6"><Ballon className="tourne w-6" />Voir l&apos;abonnement</Link>
             </div>
             <ul className="grid gap-3">

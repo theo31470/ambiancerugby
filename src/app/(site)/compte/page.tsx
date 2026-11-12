@@ -98,7 +98,7 @@ export default async function ComptePage() {
           ) : (
             <>
               <p className="mt-2 text-sm text-white/80">Passez Supporter pour les stats complètes, les alertes de match, les contenus exclusifs et le badge.</p>
-              <Link href="/abonnement" className="bouton-or mt-4"><Ballon className="tourne w-6" />2,99 € / mois</Link>
+              <Link href="/abonnement" className="bouton-or mt-4"><Ballon className="tourne w-6" />5,99 € / mois</Link>
             </>
           )}
         </section>

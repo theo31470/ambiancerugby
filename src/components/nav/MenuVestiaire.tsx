@@ -95,7 +95,7 @@ export default function MenuVestiaire({ connecte, supporter }: { connecte: boole
               {!supporter && (
                 <Link href="/abonnement" onClick={fermer} className="flex items-center gap-3 rounded-2xl bg-white/10 p-4">
                   <Ballon className="w-10 text-moutarde [--deco-trait:var(--bordeaux)]" />
-                  <span><span className="font-semibold block">Devenir Supporter</span><span className="text-sm text-white/70">Stats complètes, alertes, exclusivités. 2,99 €/mois</span></span>
+                  <span><span className="font-semibold block">Devenir Supporter</span><span className="text-sm text-white/70">Stats complètes, alertes, exclusivités. 5,99 €/mois</span></span>
                 </Link>
               )}
               <div className="mt-2"><SonStade variante="menu" /></div>

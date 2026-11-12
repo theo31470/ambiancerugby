@@ -169,7 +169,7 @@ export type SupporterInput = {
 };
 
 const LIBELLE = { mensuel: "Supporter mensuel", annuel: "Supporter annuel" } as const;
-const PRIX = { mensuel: "2,99 €/mois", annuel: "29 €/an" } as const;
+const PRIX = { mensuel: "5,99 €/mois", annuel: "59 €/an" } as const;
 const RAISON_ABO = "Vous recevez cet e-mail car il concerne votre abonnement Supporter Ambiance Rugby.";
 
 export function supporterEmail(template: SupporterTemplate, i: SupporterInput, siteUrl: string): BuiltEmail {

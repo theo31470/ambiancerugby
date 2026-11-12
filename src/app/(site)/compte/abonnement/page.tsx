@@ -35,7 +35,7 @@ export default async function MonAbonnement() {
           <div className="mt-4 grid gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-xs font-bold rounded-full bg-moutarde text-bordeaux px-2.5 py-1">{gradeDe(grade)}</span>
-              <span className="font-semibold">{p?.plan_formule === "annuel" ? "Formule annuelle, 29 € par an" : p?.plan_formule === "mensuel" ? "Formule mensuelle, 2,99 € par mois" : "Accès offert par la rédaction"}</span>
+              <span className="font-semibold">{p?.plan_formule === "annuel" ? "Formule annuelle, 59 € par an" : p?.plan_formule === "mensuel" ? "Formule mensuelle, 5,99 € par mois" : "Accès offert par la rédaction"}</span>
             </div>
             {p?.plan_until && (
               <p className="text-sourdine">
@@ -62,7 +62,7 @@ export default async function MonAbonnement() {
           </div>
         ) : (
           <div className="mt-4">
-            <p className="text-sourdine">Vous n&apos;êtes pas encore Supporter. Stats et notes complètes, alertes de match, contenus exclusifs et badge doré : 2,99 € par mois ou 29 € par an.</p>
+            <p className="text-sourdine">Vous n&apos;êtes pas encore Supporter. Stats et notes complètes, alertes de match, contenus exclusifs et badge doré : 5,99 € par mois ou 59 € par an.</p>
             <Link href="/abonnement" className="bouton-or mt-4">Devenir Supporter</Link>
           </div>
         )}

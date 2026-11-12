@@ -64,7 +64,7 @@ export default async function ArticlePage({ params }: PageProps<"/actus/[slug]">
               <Pinte className="w-12 h-auto mx-auto text-bordeaux" />
               <p className="groovy text-3xl mt-3">La suite est en tribune d&apos;honneur</p>
               <p className="mt-2 text-white/80">Cet article est réservé aux Supporters d&apos;Ambiance Rugby.</p>
-              <Link href="/abonnement" className="bouton-or mt-5">Devenir Supporter, 2,99 €/mois</Link>
+              <Link href="/abonnement" className="bouton-or mt-5">Devenir Supporter, 5,99 €/mois</Link>
             </div>
           </>
         )}
