@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import MatchRow from "@/components/MatchRow";
 import BilanSaison from "@/components/stats/BilanSaison";
+import HistoriqueClub from "@/components/club/HistoriqueClub";
 import { StandingsPools, zonesFor } from "@/components/StandingsTable";
 import ArticleCard from "@/components/ArticleCard";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -140,6 +141,8 @@ export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {
           <StandingsPools rows={standings} zones={zonesFor(league.slug)} highlight={team.id} onlyPoolOf={team.id} />
         </section>
       )}
+
+      <HistoriqueClub teamId={team.id} />
 
       <section aria-labelledby="h-effectif" className="mt-10">
         <h2 id="h-effectif" className="text-xl font-bold mb-3">Effectif</h2>
