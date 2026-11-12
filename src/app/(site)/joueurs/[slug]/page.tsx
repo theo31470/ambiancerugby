@@ -213,7 +213,6 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
                 <li key={c.season + c.team.id}>
                   <Link href={`/clubs/${c.team.slug}`} className="flex items-center gap-2 rounded-full bg-surface border border-trait pl-1.5 pr-3 py-1 text-sm hover:border-vin">
                     {c.team.logo_url
-                      // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={c.team.logo_url} alt="" className="w-6 h-6 object-contain" />
                       : <span className="w-6 h-6 rounded-full bg-teinte" />}
                     <span className="text-sourdine tnum">{c.season}</span>
