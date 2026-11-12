@@ -12,7 +12,7 @@ import type { MatchLocal } from "./espn";
 const UA = "Mozilla/5.0 (compatible; AmbianceRugby/1.0; +https://ambiance-rugby.fr)";
 const norm = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-const VIDES = new Set(["stade", "rugby", "club", "union", "section", "olympique", "racing", "pays", "sporting", "hérault", "herault", "us", "usa", "ca", "su", "rc", "as", "asm", "fc", "cs", "lou", "paris"]);
+const VIDES = new Set(["stade", "rugby", "club", "union", "section", "olympique", "racing", "pays", "sporting", "hérault", "herault", "us", "usa", "ca", "su", "rc", "as", "asm", "fc", "cs", "lou"]);
 
 async function page(url: string) {
   const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20_000), headers: { "user-agent": UA, accept: "text/html" } });
@@ -65,8 +65,10 @@ function journees(round: string | null) {
 
 /** Retrouve l'adresse de la feuille de match LNR dans le calendrier de la journée. */
 export async function trouverMatchLnr(site: string, saison: string, round: string | null, dom: MatchLocal["home"], ext: MatchLocal["away"]) {
-  const mots = (t: MatchLocal["home"]) => [t.name, t.short_name, ...(t.aliases ?? [])].flatMap((n) => norm(n).split(" ")).filter((w) => w.length >= 3 && !VIDES.has(w));
-  const colle = (t: MatchLocal["home"], slug: string) => mots(t).some((w) => slug.split("-").some((s) => s.length >= 3 && (w.startsWith(s) || s.startsWith(w))));
+  // un mot utile : 3 lettres ou plus, ou un numéro (« 92 » pour le Racing 92 que la LNR écrit « racing-92 »)
+  const utile = (w: string) => /^\d{2,}$/.test(w) || w.length >= 3;
+  const mots = (t: MatchLocal["home"]) => [t.name, t.short_name, ...(t.aliases ?? [])].flatMap((n) => norm(n).split(" ")).filter((w) => utile(w) && !VIDES.has(w));
+  const colle = (t: MatchLocal["home"], slug: string) => mots(t).some((w) => slug.split("-").some((s) => utile(s) && (/^\d+$/.test(w) ? s === w : w.startsWith(s) || s.startsWith(w))));
   for (const j of journees(round)) {
     const html = await page(`${site}/calendrier-et-resultats/${saison}/${j}`).catch(() => "");
     const liens = [...new Set([...html.matchAll(/\/feuille-de-match\/[a-z0-9-]+\/[a-z0-9-]+\/\d+-[a-z0-9-]+/g)].map((x) => x[0]))];
