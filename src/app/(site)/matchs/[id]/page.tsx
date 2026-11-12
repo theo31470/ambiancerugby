@@ -5,6 +5,8 @@ import TeamBadge from "@/components/TeamBadge";
 import LiveRefresh from "@/components/LiveRefresh";
 import FilDuMatch from "@/components/FilDuMatch";
 import CourbeAscendant from "@/components/CourbeAscendant";
+import CarteTerrain from "@/components/CarteTerrain";
+import type { ActionTerrain } from "@/lib/terrain";
 import { absolue, filAriane, jsonLd, ORGANISATION, urlMatch } from "@/lib/seo";
 import Pronostic from "@/components/pronos/Pronostic";
 import AvantMatch from "@/components/AvantMatch";
@@ -80,6 +82,10 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     ["carries", "Courses", "Courses"], ["metres", "Mètres", "Mètres gagnés"], ["cartons", "Cartons", "Cartons"],
   ] as [string, string, string][]).filter(([k]) => k === "cartons" ? notes.some((x) => Number(x.yellow) || Number(x.red)) : notes.some((x) => Number(x[k]) > 0));
   const full = !!viewer?.supporter;
+  const { data: terrainRow } = m.status === "finished" || live
+    ? await publicClient().from("match_terrain").select("evenements").eq("match_id", m.id).maybeSingle()
+    : { data: null };
+  const terrain = (terrainRow?.evenements as ActionTerrain[] | undefined) ?? null;
   const [{ data: moyennes }, mesVotes] = await Promise.all([
     publicClient().from("player_votes_moyennes").select("player_id,note,votes").eq("match_id", m.id),
     viewer?.supporter && m.status === "finished"
@@ -271,6 +277,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
         <CourbeAscendant full={full} events={events as never} home={m.home} away={m.away}
           minuteActuelle={m.status === "finished" ? 80 : m.status === "halftime" ? 40 : Math.min(80, Math.max(0, ...events.map((e) => e.minute ?? 0), m.clock && /^\d+/.test(m.clock) ? parseInt(m.clock, 10) : 0))} />
       )}
+      {terrain && <CarteTerrain actions={terrain} home={m.home} away={m.away} full={full} />}
       {events && events.length > 0 && <FilDuMatch events={events as never} home={m.home} away={m.away} live={live} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} />}
 
       <Confrontations matchId={m.id} home={m.home} away={m.away} />

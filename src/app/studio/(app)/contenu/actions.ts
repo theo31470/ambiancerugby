@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { IA_MODELE, IA_PLAFOND_MOIS_USD, rediger } from "@/lib/ia";
 import { donneesApresMatch, courbe } from "@/lib/contenu/apres-match";
+import { lireFilSportradar } from "@/lib/terrain";
 
 const STATUTS = ["idee", "brouillon", "pret", "publie"] as const;
 type Statut = (typeof STATUTS)[number];
@@ -80,4 +81,24 @@ export async function changerStatut(id: string, statut: Statut) {
   if (!STATUTS.includes(statut)) return;
   await db.from("contenus").update({ statut, publie_le: statut === "publie" ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq("id", id);
   revalidatePath("/studio/contenu");
+}
+
+/** Récupère le fil positionné Sportradar d'un match (une seule requête) et l'enregistre pour la carte du terrain. */
+export async function recupererTerrain(_: { ok: boolean; message: string }, fd: FormData): Promise<{ ok: boolean; message: string }> {
+  try {
+    const { db } = await redaction();
+    const matchId = String(fd.get("match_id") ?? "");
+    const srId = String(fd.get("sr_id") ?? "").trim();
+    const { data: m } = await db.from("matches").select("id,home_score,away_score").eq("id", matchId).maybeSingle();
+    if (!m) return { ok: false, message: "Match introuvable." };
+    const actions = await lireFilSportradar(srId, { dom: m.home_score, ext: m.away_score });
+    const placees = actions.filter((a) => a.x != null).length;
+    if (placees < 30) return { ok: false, message: `Fil trop pauvre (${placees} actions placées) : Sportradar ne couvre pas ce match en détail.` };
+    const { error } = await db.from("match_terrain").upsert({ match_id: matchId, source: "sportradar", source_id: srId, evenements: actions, recupere_le: new Date().toISOString() });
+    if (error) return { ok: false, message: error.message };
+    revalidatePath(`/studio/contenu/apres-match/${matchId}`);
+    return { ok: true, message: `${placees} actions placées sur le terrain. La carte est en ligne sur la page du match.` };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
 }
