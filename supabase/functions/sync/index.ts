@@ -4,7 +4,7 @@
 //   competition  même chose pour une seule compétition (params.slug)
 //   live         scores du jour, toutes les 2 minutes quand un match est en cours
 //   stats        statistiques d'équipe, par lots (curseur) pour rester sous les limites
-//   history      saison précédente de chaque compétition (pour l'Indice Ambiance)
+//   history      saisons passées (matchs + classement final), params.saisons = profondeur
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
 
@@ -197,9 +197,9 @@ async function syncGames(db: SupabaseClient, api: Api, c: Competition, idx: Team
 type Ligne = { team_id: string; pool: string; played: number; won: number; drawn: number; lost: number; pf: number; pa: number; bonus: number; points: number; res: { k: number; r: string }[] };
 
 /** Classement calculé à partir de nos propres résultats (poules déduites des matchs joués entre équipes). */
-async function classementCalcule(db: SupabaseClient, c: Competition) {
+async function classementCalcule(db: SupabaseClient, c: Competition, label = c.current_season) {
   const { data } = await db.from("matches").select("home_team_id,away_team_id,home_score,away_score,status,round,kickoff_at")
-    .eq("competition_id", c.id).eq("season", c.current_season).limit(2000);
+    .eq("competition_id", c.id).eq("season", label).limit(2000);
   let games = (data ?? []).filter((m) => m.round == null || /^\d+$/.test(String(m.round)));
   if (!games.length) return { rows: [] as Ligne[], teams: 0 };
   const maxK = Math.max(...games.map((m) => new Date(m.kickoff_at).getTime()));
@@ -233,17 +233,17 @@ async function classementCalcule(db: SupabaseClient, c: Competition) {
   return { rows: [...tab.values()], teams: tab.size };
 }
 
-async function syncStandings(db: SupabaseClient, api: Api, c: Competition, idx: TeamIndex) {
+async function syncStandings(db: SupabaseClient, api: Api, c: Competition, idx: TeamIndex, season = c.apisports_season, label = c.current_season) {
   if (c.standings_mode === "none") return 0;
-  const calc = await classementCalcule(db, c);
+  const calc = await classementCalcule(db, c, label);
   const now = new Date().toISOString();
   type Row = Record<string, unknown> & { team_id: string; pool: string; points: number; pf: number; pa: number };
   let rows: Row[] = [];
   let source = "calcul";
 
   if (c.standings_mode === "api") {
-    const groups = await api.get(`/standings?league=${c.apisports_id}&season=${c.apisports_season}`);
-    const flat: any[] = (groups ?? []).flat();
+    const groups = await api.get(`/standings?league=${c.apisports_id}&season=${season}`);
+    const flat: any[] = Array.isArray(groups) ? groups.flat(2).filter((r: any) => r?.team?.id) : [];
     if (flat.length) {
       const multi = new Set(flat.map((r) => r.group?.name ?? "")).size > 1;
       const seen = new Set<string>();
@@ -280,15 +280,15 @@ async function syncStandings(db: SupabaseClient, api: Api, c: Competition, idx: 
   for (const list of pools.values()) {
     if (source === "calcul") list.sort((a, b) => b.points - a.points || (b.pf - b.pa) - (a.pf - a.pa) || b.pf - a.pf);
     list.forEach((r, i) => out.push({
-      competition_id: c.id, season: c.current_season, team_id: r.team_id, pool: r.pool, rank: i + 1,
+      competition_id: c.id, season: label, team_id: r.team_id, pool: r.pool, rank: i + 1,
       played: r.played, won: r.won, drawn: r.drawn, lost: r.lost, points_for: r.pf, points_against: r.pa,
       tries_for: null, tries_against: null, bonus: r.bonus, points: r.points, form: r.form ?? null, updated_at: now,
     }));
   }
-  await db.from("standings").delete().eq("competition_id", c.id).eq("season", c.current_season);
+  await db.from("standings").delete().eq("competition_id", c.id).eq("season", label);
   const { error } = await db.from("standings").insert(out);
   if (error) throw error;
-  await db.from("competitions").update({ standings_source: source }).eq("id", c.id);
+  if (label === c.current_season) await db.from("competitions").update({ standings_source: source }).eq("id", c.id);
   return out.length;
 }
 
@@ -345,8 +345,14 @@ Deno.serve(async (req) => {
 
   const { data: compsData } = await db.from("competitions").select("*").not("apisports_id", "is", null).order("sort_order");
   const comps = ((compsData ?? []) as Competition[]).filter((c) => c.active);
-  const { data: teams } = await db.from("teams").select("id,slug,name,short_name,aliases,apisports_id,logo_url,stadium,founded,country");
-  const idx = new TeamIndex(db, (teams ?? []) as Team[]);
+  // tous les clubs (par pages : l'API Supabase s'arrête à 1 000 lignes par requête)
+  const teams: Team[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data } = await db.from("teams").select("id,slug,name,short_name,aliases,apisports_id,logo_url,stadium,founded,country").order("id").range(de, de + 999);
+    teams.push(...((data ?? []) as Team[]));
+    if (!data || data.length < 1000) break;
+  }
+  const idx = new TeamIndex(db, teams);
   const lignes: string[] = [];
   let okRun = true;
 
@@ -437,24 +443,37 @@ Deno.serve(async (req) => {
     }
 
     if (job === "history") {
+      // saisons passées : matchs + classement final. params.saisons = nombre de saisons en arrière (1 par défaut),
+      // params.slug pour une seule compétition, params.force pour tout réimporter. Reprend là où il s'est arrêté.
+      const n = Math.max(1, Math.min(8, Number(params.saisons) || 1));
       const leagues = await syncCompetitions(db, api, comps);
-      for (const c of comps) {
-        if (Date.now() - t0 > TIME_BUDGET_MS) { lignes.push("temps écoulé, relancez pour finir"); break; }
+      let fini = true;
+      for (const c of comps.filter((x) => !params.slug || x.slug === params.slug)) {
         const l = leagues.find((x) => x.id === c.apisports_id);
-        const prev = (l?.seasons ?? []).filter((s) => s.season < c.apisports_season!).sort((a, b) => b.season - a.season)[0];
-        if (!prev) continue;
-        const label = libelleSaison(prev);
-        const { count } = await db.from("matches").select("id", { count: "exact", head: true }).eq("competition_id", c.id).eq("season", label);
-        if ((count ?? 0) > 0 && !params.force) continue;
-        try {
-          await syncTeams(db, api, c, idx, prev.season, label);
-          const g = await syncGames(db, api, c, idx, prev.season, label);
-          lignes.push(`${c.short_name ?? c.name} ${label} : ${g.total} matchs`);
-        } catch (e) {
-          okRun = false;
-          lignes.push(`${c.slug} ${label} : ERREUR ${(e as Error).message}`);
+        const passees = (l?.seasons ?? []).filter((s) => s.season < c.apisports_season!).sort((a, b) => b.season - a.season).slice(0, n);
+        for (const prev of passees) {
+          if (Date.now() - t0 > TIME_BUDGET_MS) { fini = false; break; }
+          const label = libelleSaison(prev);
+          if (label === c.current_season) continue;
+          try {
+            const { count } = await db.from("matches").select("id", { count: "exact", head: true }).eq("competition_id", c.id).eq("season", label);
+            let msg = "";
+            if ((count ?? 0) === 0 || params.force) {
+              await syncTeams(db, api, c, idx, prev.season, label);
+              const g = await syncGames(db, api, c, idx, prev.season, label);
+              msg = `${g.total} matchs`;
+            }
+            const { count: cl } = await db.from("standings").select("team_id", { count: "exact", head: true }).eq("competition_id", c.id).eq("season", label);
+            if (c.standings_mode !== "none" && ((cl ?? 0) === 0 || params.force)) msg += `${msg ? ", " : ""}${await syncStandings(db, api, c, idx, prev.season, label)} au classement`;
+            if (msg) lignes.push(`${c.short_name ?? c.name} ${label} : ${msg}`);
+          } catch (e) {
+            okRun = false;
+            lignes.push(`${c.slug} ${label} : ERREUR ${(e as Error).message}`);
+          }
         }
+        if (!fini) break;
       }
+      lignes.push(fini ? "historique complet" : "temps écoulé, relancez pour finir");
     }
   } catch (e) {
     okRun = false;

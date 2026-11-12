@@ -33,3 +33,23 @@ export async function detailParSaison(playerId: string): Promise<Record<string, 
   }
   return out;
 }
+
+export type ClubSaison = { season: string; matchs: number; team: { id: string; slug: string; name: string; short_name: string | null; logo_url: string | null; is_national: boolean } };
+
+/** Où jouait le joueur, saison par saison, d'après les feuilles de match (clubs seulement, du plus récent au plus ancien). */
+export async function clubsParSaison(playerId: string): Promise<ClubSaison[]> {
+  const { data } = await publicClient().from("player_match_stats")
+    .select("match:matches!inner(season), team:teams!inner(id,slug,name,short_name,logo_url,is_national)")
+    .eq("player_id", playerId).limit(2000);
+  const tally = new Map<string, ClubSaison>();
+  for (const r of (data ?? []) as unknown as { match: { season: string }; team: ClubSaison["team"] }[]) {
+    if (r.team.is_national) continue;
+    // saisons internationales « 2025 » rangées avec la saison de club « 2024-2025 »
+    const s = /^\d{4}$/.test(r.match.season) ? `${Number(r.match.season) - 1}-${r.match.season}` : r.match.season;
+    const k = `${s}|${r.team.id}`;
+    const x = tally.get(k) ?? { season: s, matchs: 0, team: r.team };
+    x.matchs++;
+    tally.set(k, x);
+  }
+  return [...tally.values()].sort((a, b) => b.season.localeCompare(a.season) || b.matchs - a.matchs);
+}

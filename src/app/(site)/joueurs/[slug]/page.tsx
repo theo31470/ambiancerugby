@@ -9,7 +9,7 @@ import FavoriteButton from "@/components/FavoriteButton";
 import { Ballon } from "@/components/deco/Icones";
 import { getPlayer, TEAM_LITE } from "@/lib/queries";
 import { getViewer, publicClient } from "@/lib/supabase/server";
-import { detailParSaison } from "@/lib/stats-detail";
+import { detailParSaison, clubsParSaison } from "@/lib/stats-detail";
 import { POSITIONS, age, fmtDate, fmtDay } from "@/lib/format";
 import type { TeamLite } from "@/lib/types";
 
@@ -34,7 +34,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
   if (!p) notFound();
   const a = age(p.birth_date);
   const db = publicClient();
-  const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }, details] = await Promise.all([
+  const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }, details, clubs] = await Promise.all([
     db.from("player_season_totals").select("*").eq("player_id", p.id).order("season", { ascending: false }),
     db.from("player_match_stats")
       .select(`rating,minutes,starter,tries,points,tackles,line_breaks,turnovers_won,carries,metres,motm, match:matches!inner(id,kickoff_at,home_score,away_score, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}))`)
@@ -44,6 +44,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
     getViewer(),
     db.from("player_career").select("kind, ordre, equipe, periode, matchs, points").eq("player_id", p.id).order("kind").order("ordre"),
     detailParSaison(p.id),
+    clubsParSaison(p.id),
   ]);
   const parcours = (parcoursData ?? []) as { kind: "club" | "selection"; ordre: number; equipe: string; periode: string | null; matchs: number | null; points: number | null }[];
   const { data: compsData } = await db.from("competitions").select("id,name,short_name,slug");
@@ -201,6 +202,27 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
           <div className="bg-surface border border-dashed border-trait rounded-2xl p-8 text-center">
             <Ballon className="w-14 mx-auto text-vin" />
             <p className="mt-3 text-sourdine">{vue === "carriere" ? "Pas encore de stats suivies par Ambiance Rugby." : "Pas encore de stats cette saison."} Elles arrivent automatiquement après chaque match.</p>
+          </div>
+        )}
+
+        {vue === "carriere" && clubs.length > 0 && (
+          <div className="mt-8">
+            <h3 className="titre font-bold mb-3">Ses clubs, saison après saison</h3>
+            <ol className="flex flex-wrap gap-2">
+              {clubs.map((c) => (
+                <li key={c.season + c.team.id}>
+                  <Link href={`/clubs/${c.team.slug}`} className="flex items-center gap-2 rounded-full bg-surface border border-trait pl-1.5 pr-3 py-1 text-sm hover:border-vin">
+                    {c.team.logo_url
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={c.team.logo_url} alt="" className="w-6 h-6 object-contain" />
+                      : <span className="w-6 h-6 rounded-full bg-teinte" />}
+                    <span className="text-sourdine tnum">{c.season}</span>
+                    <b>{c.team.short_name ?? c.team.name}</b>
+                    <span className="text-xs text-sourdine tnum">{c.matchs} m.</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
           </div>
         )}
 
