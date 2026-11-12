@@ -18,7 +18,13 @@ export default function ChoixProduit({ p }: { p: Produit }) {
   const tailleUnique = tailles.length === 1;
   const taille = tailleUnique ? tailles[0].size : tailleChoisie;
   const variante = p.variants.find((v) => (!couleur || v.color === couleur) && (tailles.length ? v.size === taille : true)) ?? null;
-  const images = [variante?.image, ...p.images].filter((x, i, a): x is string => !!x && a.indexOf(x) === i);
+  // maquettes maison rangées par couleur (« …/maroon-dos.webp », « …/maroon-face.webp ») : on montre les vues de la couleur choisie
+  const vueDe = (u: string) => u.match(/^(.*)-(dos|face)\.(webp|png|jpe?g)$/);
+  const serie = variante?.image ? vueDe(variante.image)?.[1] : null;
+  const images = (serie
+    ? [variante!.image, ...p.images.filter((x) => vueDe(x)?.[1] === serie)]
+    : [variante?.image, ...p.images]
+  ).filter((x, i, a): x is string => !!x && a.indexOf(x) === i);
   const [vue, setVue] = useState(0);
   const [ajoute, setAjoute] = useState(false);
   const prix = variante?.price_cents ?? p.price_cents;
