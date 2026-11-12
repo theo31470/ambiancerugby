@@ -9,18 +9,26 @@ export const metadata: Metadata = { title: "Comparateur de joueurs" };
 export const dynamic = "force-dynamic";
 
 type Saison = { season: string; games: number; minutes: number; tries: number; points: number; tackles: number; carries: number; metres: number; line_breaks: number; turnovers_won: number; motm: number; rating: number | null };
-type Fiche = { id: string; slug: string; first_name: string; last_name: string; photo_url: string | null; position: string | null; team: { short_name: string | null; name: string; slug: string } | null; saisons: Saison[]; detail: Detail };
+type Fiche = { id: string; slug: string; first_name: string; last_name: string; photo_url: string | null; position: string | null; team: { short_name: string | null; name: string; slug: string } | null; saisons: Saison[]; toutes: Saison[]; saison: string | null; detail: Detail };
 
-async function fiche(slug: string | null): Promise<Fiche | null> {
+/** Fiche d'un joueur, sur toute sa carrière suivie ou sur une seule saison. */
+async function fiche(slug: string | null, saisonVoulue: string | null): Promise<Fiche | null> {
   if (!slug) return null;
   const db = publicClient();
   const { data: p } = await db.from("players").select("id,slug,first_name,last_name,photo_url,position, team:teams(short_name,name,slug)").eq("slug", slug).maybeSingle();
   if (!p) return null;
   const [{ data: s }, detail] = await Promise.all([
     db.from("player_season_stats").select("*").eq("player_id", p.id).order("season", { ascending: false }),
-    detailParSaison(p.id).then((d) => d.carriere),
+    detailParSaison(p.id),
   ]);
-  return { ...(p as unknown as Omit<Fiche, "saisons" | "detail">), saisons: (s ?? []) as Saison[], detail };
+  const toutes = (s ?? []) as Saison[];
+  const saison = saisonVoulue && toutes.some((x) => x.season === saisonVoulue) ? saisonVoulue : null;
+  const vide: Detail = { matchs: 0, minutes: 0, tackles: 0, line_breaks: 0, turnovers_won: 0, offloads: 0 };
+  return {
+    ...(p as unknown as Omit<Fiche, "saisons" | "toutes" | "saison" | "detail">),
+    toutes, saison, saisons: saison ? toutes.filter((x) => x.season === saison) : toutes,
+    detail: detail[saison ?? "carriere"] ?? vide,
+  };
 }
 
 // [clé, libellé, ramené à 80 min, stat de feuille détaillée]
@@ -43,7 +51,16 @@ function cumul(f: Fiche) {
 
 export default async function Comparer({ searchParams }: PageProps<"/joueurs/comparer">) {
   const sp = await searchParams;
-  const [a, b, viewer] = await Promise.all([fiche(typeof sp.a === "string" ? sp.a : null), fiche(typeof sp.b === "string" ? sp.b : null), getViewer()]);
+  const str = (v: unknown) => (typeof v === "string" ? v : null);
+  const [a, b, viewer] = await Promise.all([fiche(str(sp.a), str(sp.sa)), fiche(str(sp.b), str(sp.sb)), getViewer()]);
+  /** Lien qui change la saison d'un des deux joueurs en gardant le reste. */
+  const lienSaison = (cle: "sa" | "sb", saison: string | null) => {
+    const p = new URLSearchParams();
+    for (const k of ["a", "b", "sa", "sb"] as const) { const v = str(sp[k]); if (v) p.set(k, v); }
+    if (saison) p.set(cle, saison); else p.delete(cle);
+    return `/joueurs/comparer?${p}`;
+  };
+  const periode = (j: Fiche) => (j.saison ? `en ${j.saison}` : "sur sa carrière suivie");
   const full = !!viewer?.supporter;
   const ca = a ? cumul(a) : null, cb = b ? cumul(b) : null;
   const par80 = (t: Record<string, number>, k: string, det: boolean) => {
@@ -55,7 +72,7 @@ export default async function Comparer({ searchParams }: PageProps<"/joueurs/com
     <div>
       <Link href="/joueurs" className="text-sm text-sourdine hover:text-vin">← Joueurs</Link>
       <h1 className="groovy text-5xl sm:text-6xl text-vin mt-2">Comparateur</h1>
-      <p className="mt-2 text-sourdine">Deux joueurs côte à côte, sur toute la carrière et saison par saison.</p>
+      <p className="mt-2 text-sourdine">Deux joueurs côte à côte, sur toute la carrière ou sur la saison de votre choix. Le même joueur à deux saisons différentes, ça marche aussi.</p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <ChoixJoueur cle="a" label="Joueur 1" actuel={a ? `${a.first_name} ${a.last_name}` : null} />
         <ChoixJoueur cle="b" label="Joueur 2" actuel={b ? `${b.first_name} ${b.last_name}` : null} />
@@ -65,15 +82,28 @@ export default async function Comparer({ searchParams }: PageProps<"/joueurs/com
         <div className="mt-8 grid gap-8">
           <div className="grid grid-cols-2 gap-4">
             {[a, b].map((j, i) => (
-              <Link key={j.id} href={`/joueurs/${j.slug}`} className={`flex items-center gap-3 rounded-2xl p-4 ${i === 0 ? "bg-bordeaux text-white" : "bg-moutarde text-bordeaux sm:flex-row-reverse sm:text-right"}`}>
+              <Link key={i} href={`/joueurs/${j.slug}`} className={`flex items-center gap-3 rounded-2xl p-4 ${i === 0 ? "bg-bordeaux text-white" : "bg-moutarde text-bordeaux sm:flex-row-reverse sm:text-right"}`}>
                 {j.photo_url ? <img src={j.photo_url} alt="" className="w-16 h-16 rounded-full object-cover object-top bg-white/20" /> : <span className="w-16 h-16 rounded-full bg-white/20" />}
                 <span className="min-w-0"><span className="block groovy text-2xl truncate">{j.last_name}</span><span className="block text-sm opacity-75 truncate">{j.first_name} · {j.team?.short_name ?? j.team?.name ?? "Sans club"}{j.position ? ` · ${j.position}` : ""}</span></span>
               </Link>
             ))}
           </div>
 
+          <div className="grid grid-cols-2 gap-4 -mt-4">
+            {([[a, "sa"], [b, "sb"]] as const).map(([j, cle], i) => (
+              <nav key={cle} aria-label={`Saison de ${j.first_name} ${j.last_name}`} className={`flex flex-wrap gap-1.5 ${i === 1 ? "sm:justify-end" : ""}`}>
+                {[null, ...j.toutes.map((x) => x.season)].map((sa) => (
+                  <Link key={sa ?? "tout"} href={lienSaison(cle, sa)} aria-current={j.saison === sa ? "true" : undefined}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tnum ${j.saison === sa ? "bg-bordeaux text-white" : "bg-teinte hover:bg-teinte/60"}`}>
+                    {sa ?? "Carrière"}
+                  </Link>
+                ))}
+              </nav>
+            ))}
+          </div>
+
           <section aria-labelledby="h-carriere">
-            <h2 id="h-carriere" className="titre text-2xl font-extrabold mb-3">Sur toute la carrière suivie</h2>
+            <h2 id="h-carriere" className="titre text-2xl font-extrabold mb-3">{a.saison || b.saison ? `${a.last_name} ${periode(a)}, ${b.last_name} ${periode(b)}` : "Sur toute la carrière suivie"}</h2>
             <div className="bg-surface border border-trait rounded-2xl p-4 grid gap-3">
               {([["rating", "Note moyenne", false, false], ...LIGNES] as [string, string, boolean, boolean][]).map(([k, label, ratio, det]) => {
                 const va = full && ratio ? par80(ca, k, det) : ca[k] ?? 0, vb = full && ratio ? par80(cb, k, det) : cb[k] ?? 0;
@@ -99,13 +129,13 @@ export default async function Comparer({ searchParams }: PageProps<"/joueurs/com
             <section aria-labelledby="h-saisons">
               <h2 id="h-saisons" className="titre text-2xl font-extrabold mb-3">Saison par saison</h2>
               <div className="grid gap-4 lg:grid-cols-2">
-                {[a, b].map((j) => (
-                  <div key={j.id} className="bg-surface border border-trait rounded-2xl overflow-x-auto">
+                {[a, b].map((j, i) => (
+                  <div key={i} className="bg-surface border border-trait rounded-2xl overflow-x-auto">
                     <p className="px-4 pt-3 font-bold">{j.first_name} {j.last_name}</p>
                     <table className="w-full text-sm tnum">
                       <thead><tr className="text-xs text-sourdine border-b border-trait"><th className="text-left py-2 pl-4 font-semibold">Saison</th><th className="font-semibold">M</th><th className="font-semibold">E</th><th className="font-semibold">Pts</th><th className="font-semibold">Plaq.</th><th className="font-semibold pr-4">Note</th></tr></thead>
-                      <tbody>{j.saisons.map((s) => (
-                        <tr key={s.season} className="border-b border-trait last:border-0"><td className="py-1.5 pl-4">{s.season}</td><td className="text-center">{s.games}</td><td className="text-center">{s.tries}</td><td className="text-center">{s.points}</td><td className="text-center">{s.tackles}</td><td className="text-center pr-4 font-bold">{s.rating != null ? Number(s.rating).toFixed(1) : "–"}</td></tr>
+                      <tbody>{j.toutes.map((s) => (
+                        <tr key={s.season} className={`border-b border-trait last:border-0 ${s.season === j.saison ? "bg-teinte/60" : ""}`}><td className="py-1.5 pl-4">{s.season}</td><td className="text-center">{s.games}</td><td className="text-center">{s.tries}</td><td className="text-center">{s.points}</td><td className="text-center">{s.tackles}</td><td className="text-center pr-4 font-bold">{s.rating != null ? Number(s.rating).toFixed(1) : "–"}</td></tr>
                       ))}</tbody>
                     </table>
                   </div>
