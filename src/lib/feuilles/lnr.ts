@@ -43,6 +43,15 @@ type Timer = { firstPeriodStartDate?: string | null; firstPeriodEndDate?: string
 const idLnr = (j?: JoueurLnr) => j?.url?.match(/\/joueur\/([^/?#]+)/)?.[1] ?? null;
 const nomComplet = (j?: JoueurLnr) => (j?.firstName || j?.lastName ? `${j?.firstName ?? ""} ${j?.lastName ?? ""}` : j?.name ?? "").replace(/\s+/g, " ").trim();
 const joli = (s: string) => s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_, a, b) => a + b.toUpperCase());
+/** Premier prénom d'après l'identifiant LNR (« 12609-regis-desire-omby » + « Omby » → « Regis »). */
+function prenomDuSlug(id: string, nom: string | null | undefined): string | null {
+  const morceaux = id.split("-").slice(1).filter(Boolean);
+  const fin = norm(nom).split(" ").filter(Boolean);
+  if (!morceaux.length || !fin.length) return null;
+  // le nom peut perdre ses espaces dans l'identifiant (« N'Koa » → « nkoa »)
+  for (let k = 1; k < morceaux.length; k++) if (morceaux.slice(k).join("") === fin.join("")) return joli(morceaux[0]);
+  return null;
+}
 
 /** Journée LNR correspondant à notre « round » (numéro, ou phase finale). */
 function journees(round: string | null) {
@@ -122,7 +131,11 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     const c = nomsCompos.get(id);
     if (c) return { ...j, ...c };
     const m = (j.name ?? "").match(/^(\p{L})\.\s+(.+)$/u);
-    return m ? { ...j, firstName: `${m[1]}.`, lastName: m[2] } : j;
+    const base = m ? { ...j, firstName: `${m[1]}.`, lastName: m[2] } : j;
+    // dernier recours : l'identifiant LNR porte l'état civil complet (« 13648-alvaro-garcia-iandolino »)
+    const prenom = prenomDuSlug(id, base.lastName);
+    return prenom && (!base.firstName || /^\p{L}\.$/u.test(base.firstName)) && (!base.firstName || norm(prenom)[0] === norm(base.firstName)[0])
+      ? { ...base, firstName: prenom } : base;
   };
 
   // tous les joueurs cités, avec leur côté
