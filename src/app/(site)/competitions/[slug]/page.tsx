@@ -92,7 +92,7 @@ export default async function CompetitionPage({ params, searchParams }: PageProp
       </nav>
 
       <div className="mt-6">
-        {tab === "classement" && <Classement compId={c.id} season={season} slug={c.slug} calcule={c.standings_source === "calcul"} />}
+        {tab === "classement" && <Classement compId={c.id} season={season} slug={c.slug} calcule={c.standings_source === "calcul" && season === c.current_season} />}
         {tab === "simulateur" && <Simulation compId={c.id} season={season} slug={c.slug} />}
         {tab === "calendrier" && <Calendrier compId={c.id} season={season} upcoming />}
         {tab === "resultats" && <Calendrier compId={c.id} season={season} upcoming={false} />}
