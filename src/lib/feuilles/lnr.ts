@@ -104,7 +104,9 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   // chrono exact des mi-temps
   const t = (x?: string | null) => (x ? new Date(x).toISOString() : null);
   const chrono = { periode1_debut: t(timer.firstPeriodStartDate), periode1_fin: t(timer.firstPeriodEndDate), periode2_debut: t(timer.secondPeriodStartDate), periode2_fin: t(timer.secondPeriodEndDate) };
-  const enCours = !!chrono.periode1_debut && !chrono.periode2_fin;
+  // « en cours » seulement pour un match commencé il y a moins de 4 h : les vieilles feuilles n'ont souvent pas d'heure de fin
+  const recent = Date.now() - new Date((m as { kickoff_at?: string }).kickoff_at ?? 0).getTime() < 4 * 3600e3;
+  const enCours = recent && !!chrono.periode1_debut && !chrono.periode2_fin;
   const fini = !!chrono.periode2_fin;
   if (!chrono.periode1_debut && !faits.length && !classements.length) return { ok: false, raison: "match pas encore commencé sur la LNR" };
 
