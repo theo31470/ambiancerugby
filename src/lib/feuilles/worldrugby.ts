@@ -26,7 +26,30 @@ type JoueurWr = { id: string; altId?: string; name?: Nom; isPlayerOfTheMatch?: b
 type EquipeWr = { id: string; name: string; abbreviation?: string | null };
 type MatchInfo = { matchId: string; teams: EquipeWr[]; scores?: number[]; status?: string; clock?: { secs?: number; label?: string } | null; time?: { millis?: number } };
 type Stats = { match: MatchInfo; teamStats: { playerStats: { player: JoueurWr; number: string | null; position?: string | null; stats: Record<string, number> }[] }[] };
-type Resume = { teams?: { teamList?: { list?: { player: JoueurWr; number: string | number | null; position?: string | null }[] } }[]; motm?: { motm?: JoueurWr | null } | null };
+type Officiel = { official?: { name?: Nom; country?: string | null }; position?: string | null };
+type Resume = { teams?: { teamList?: { list?: { player: JoueurWr; number: string | number | null; position?: string | null }[] } }[]; motm?: { motm?: JoueurWr | null } | null; officials?: Officiel[]; match?: { venue?: { name?: string; city?: string } | null } };
+
+/** Arbitre principal et stade d'après le résumé World Rugby. */
+function officiels(r: Resume | null) {
+  const arb = (r?.officials ?? []).find((o) => norm(o.position) === "referee");
+  const nom = arb?.official?.name ? `${prenomDe(arb.official.name)} ${nomDe(arb.official.name)}`.trim() : null;
+  const v = r?.match?.venue;
+  return { arbitre: nom || null, arbitre_pays: arb?.official?.country ?? null, stade: v?.name ?? null, ville: v?.city ?? null };
+}
+
+/** Avant-match : arbitre, stade et ville chez World Rugby (désignations connues quelques jours avant). Enregistré dans la base. */
+export async function completerAvantMatch(db: SupabaseClient, m: MatchWr & { venue?: string | null }): Promise<{ arbitre: string | null; arbitre_pays: string | null } | null> {
+  const cible = await trouver(m);
+  if (!cible) return null;
+  const r = await lire<Resume>(`/match/${cible.id}/summary`);
+  const o = officiels(r);
+  await db.from("matches").update({
+    wr_id: cible.id, officiels_at: new Date().toISOString(),
+    ...(o.arbitre ? { arbitre: o.arbitre, arbitre_pays: o.arbitre_pays } : {}),
+    ...(o.stade && !m.venue ? { venue: o.stade } : {}), ...(o.ville ? { stade_ville: o.ville } : {}),
+  }).eq("id", m.id);
+  return o.arbitre ? { arbitre: o.arbitre, arbitre_pays: o.arbitre_pays } : null;
+}
 type Evt = { phase?: string; time?: { secs?: number }; type?: string; typeLabel?: string; group?: string; points?: number; playerId?: string | null; playerAltId?: string | null; teamIndex?: number };
 
 type EquipeLocale = { id: string; name: string; short_name?: string | null; abbreviation?: string | null; aliases?: string[] | null; wr_id?: string | null; is_national?: boolean | null };
@@ -95,7 +118,22 @@ async function trouver(m: MatchWr): Promise<{ id: string; inverse: boolean } | n
     }
     if (meilleur) break;
   }
-  return meilleur && { id: meilleur.id, inverse: meilleur.inverse };
+  if (meilleur) return { id: meilleur.id, inverse: meilleur.inverse };
+  // noms trop différents (« Stade Toulousain » / « Toulouse ») : match terminé au même horaire avec exactement le même score
+  if (m.home_score == null || m.away_score == null || m.home_score + m.away_score === 0) return null;
+  const memes: { id: string; inverse: boolean }[] = [];
+  for (const d of jours) {
+    for (const x of await matchsDuJour(d)) {
+      if (!x.scores || x.scores.length !== 2 || !x.time?.millis || Math.abs(x.time.millis - k) > 3 * 3600e3) continue;
+      if ((x.status ?? "").toUpperCase() !== "C") continue;
+      const [a, b] = x.scores.map(Number);
+      if (a === b) continue; // match nul : impossible de savoir qui reçoit
+      if (a === m.home_score && b === m.away_score) memes.push({ id: x.matchId, inverse: false });
+      else if (a === m.away_score && b === m.home_score && a !== b) memes.push({ id: x.matchId, inverse: true });
+    }
+  }
+  const uniques = [...new Map(memes.map((x) => [x.id, x])).values()];
+  return uniques.length === 1 ? uniques[0] : null;
 }
 
 const POSTE: Record<string, string> = { PR: "pilier", LP: "pilier", TP: "pilier", HK: "talonneur", LK: "deuxieme-ligne", L: "deuxieme-ligne", FL: "troisieme-ligne", BR: "troisieme-ligne", N8: "troisieme-ligne", SH: "demi-de-melee", FH: "demi-d-ouverture", C: "centre", CE: "centre", W: "ailier", WI: "ailier", FB: "arriere" };
@@ -160,7 +198,8 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
 
   const equipes = cible.inverse ? [m.away_team_id, m.home_team_id] : [m.home_team_id, m.away_team_id];
   // mémorise les identifiants World Rugby pour les fois suivantes
-  await db.from("matches").update({ wr_id: cible.id }).eq("id", m.id);
+  const o = officiels(resume);
+  await db.from("matches").update({ wr_id: cible.id, ...(o.arbitre ? { arbitre: o.arbitre, arbitre_pays: o.arbitre_pays } : {}), ...(o.ville ? { stade_ville: o.ville } : {}) }).eq("id", m.id);
   const [w0, w1] = s.match.teams ?? [];
   if (w0 && w1) {
     const [tA, tB] = cible.inverse ? [m.away, m.home] : [m.home, m.away];
