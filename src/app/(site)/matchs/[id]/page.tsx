@@ -80,7 +80,10 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
   const colonnes = ([
     ["minutes", "Min", "Minutes jouées"], ["tries", "E", "Essais"], ["points", "Pts", "Points"], ["tackles", "Plaq.", "Plaquages réussis"],
     ["line_breaks", "Fr.", "Franchissements"], ["offloads", "PAC", "Passes après contact"], ["turnovers_won", "BG", "Ballons grattés"],
-    ["carries", "Courses", "Courses"], ["metres", "Mètres", "Mètres gagnés"], ["cartons", "Cartons", "Cartons"],
+    ["carries", "Courses", "Courses"], ["metres", "Mètres", "Mètres gagnés"], ["defenders_beaten", "DB", "Défenseurs battus"],
+    ["try_assists", "PD", "Passes décisives"], ["missed_tackles", "PM", "Plaquages manqués"], ["dominant_tackles", "PDom", "Plaquages dominants"],
+    ["passes", "Passes", "Passes"], ["kick_metres", "Pied (m)", "Mètres au pied"], ["lineouts_won", "Touches", "Touches gagnées"],
+    ["penalties_conceded", "Pén.", "Pénalités concédées"], ["turnovers_conceded", "BP", "Ballons perdus"], ["cartons", "Cartons", "Cartons"],
   ] as [string, string, string][]).filter(([k]) => k === "cartons" ? notes.some((x) => Number(x.yellow) || Number(x.red)) : notes.some((x) => Number(x[k]) > 0));
   const full = !!viewer?.supporter;
   const { data: terrainRow } = m.status === "finished" || live

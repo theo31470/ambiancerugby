@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import ChoixJoueur from "@/components/comparer/ChoixJoueur";
 import { getViewer, publicClient } from "@/lib/supabase/server";
-import { detailParSaison, type Detail } from "@/lib/stats-detail";
+import { detailParSaison, detailVide, type Detail } from "@/lib/stats-detail";
 
 export const metadata: Metadata = { title: "Comparateur de joueurs" };
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ async function fiche(slug: string | null, saisonVoulue: string | null): Promise<
   ]);
   const toutes = (s ?? []) as Saison[];
   const saison = saisonVoulue && toutes.some((x) => x.season === saisonVoulue) ? saisonVoulue : null;
-  const vide: Detail = { matchs: 0, minutes: 0, tackles: 0, line_breaks: 0, turnovers_won: 0, offloads: 0 };
+  const vide = detailVide();
   return {
     ...(p as unknown as Omit<Fiche, "saisons" | "toutes" | "saison" | "detail">),
     toutes, saison, saisons: saison ? toutes.filter((x) => x.season === saison) : toutes,

@@ -1,34 +1,58 @@
 import { publicClient } from "@/lib/supabase/server";
 
 /**
- * Plaquages, franchissements, grattages et passes après contact n'existent que sur les feuilles
- * détaillées (LNR). Pour les ramener à 80 minutes, on ne compte que les minutes de ces matchs-là :
- * sinon un joueur suivi en partie via ESPN paraît ne jamais défendre.
+ * Deux niveaux de feuille : « détaillée » (plaquages, franchissements, grattages, passes après contact : LNR et World Rugby)
+ * et « complète » (en plus courses, mètres, défenseurs battus, passes, jeu au pied, touches… : World Rugby).
+ * Pour ramener une stat à 80 minutes, on ne compte que les minutes des matchs où elle est mesurée :
+ * sinon un joueur suivi en partie sans feuille détaillée paraît ne jamais défendre.
  */
-export type Detail = { matchs: number; minutes: number; tackles: number; line_breaks: number; turnovers_won: number; offloads: number };
-const vide = (): Detail => ({ matchs: 0, minutes: 0, tackles: 0, line_breaks: 0, turnovers_won: 0, offloads: 0 });
+export const CLES_COMPLETES = ["carries", "metres", "defenders_beaten", "missed_tackles", "dominant_tackles", "passes", "try_assists", "kicks", "kick_metres",
+  "lineouts_won", "lineouts_stolen", "rucks_won", "penalties_conceded", "handling_errors", "turnovers_conceded"] as const;
+export type CleComplete = (typeof CLES_COMPLETES)[number];
+export type Detail = {
+  matchs: number; minutes: number; tackles: number; line_breaks: number; turnovers_won: number; offloads: number;
+  complet: { matchs: number; minutes: number; tries: number; tackles: number; line_breaks: number; offloads: number; turnovers_won: number } & Record<CleComplete, number>;
+};
+export const detailVide = (): Detail => ({
+  matchs: 0, minutes: 0, tackles: 0, line_breaks: 0, turnovers_won: 0, offloads: 0,
+  complet: { matchs: 0, minutes: 0, tries: 0, tackles: 0, line_breaks: 0, offloads: 0, turnovers_won: 0, ...(Object.fromEntries(CLES_COMPLETES.map((k) => [k, 0])) as Record<CleComplete, number>) },
+});
+
+async function matchsAvec(ids: string[], colonne: "tackles" | "carries") {
+  const db = publicClient();
+  const out = new Set<string>();
+  for (let i = 0; i < ids.length; i += 80) {
+    const { data } = await db.from("player_match_stats").select("match_id").in("match_id", ids.slice(i, i + 80)).gt(colonne, 0);
+    for (const d of data ?? []) out.add(d.match_id as string);
+  }
+  return out;
+}
 
 /** Détail par saison, plus la clé "carriere" pour le total. */
 export async function detailParSaison(playerId: string): Promise<Record<string, Detail>> {
   const db = publicClient();
   const { data: lignes } = await db.from("player_match_stats")
-    .select("match_id,minutes,tackles,line_breaks,turnovers_won,offloads, match:matches!inner(season)")
-    .eq("player_id", playerId);
-  const rows = (lignes ?? []) as unknown as { match_id: string; minutes: number | null; tackles: number | null; line_breaks: number | null; turnovers_won: number | null; offloads: number | null; match: { season: string } }[];
+    .select(`match_id,minutes,tries,tackles,line_breaks,turnovers_won,offloads,${CLES_COMPLETES.join(",")}, match:matches!inner(season)`)
+    .eq("player_id", playerId).limit(3000);
+  const rows = (lignes ?? []) as unknown as (Record<string, number | null> & { match_id: string; match: { season: string } })[];
   const ids = [...new Set(rows.map((r) => r.match_id))];
-  const detailles = new Set<string>();
-  for (let i = 0; i < ids.length; i += 80) {
-    const { data } = await db.from("player_match_stats").select("match_id").in("match_id", ids.slice(i, i + 80)).gt("tackles", 0);
-    for (const d of data ?? []) detailles.add(d.match_id as string);
-  }
-  const out: Record<string, Detail> = { carriere: vide() };
+  const [detailles, complets] = await Promise.all([matchsAvec(ids, "tackles"), matchsAvec(ids, "carries")]);
+  const out: Record<string, Detail> = { carriere: detailVide() };
+  const n = (v: unknown) => Number(v) || 0;
   for (const r of rows) {
-    if (!detailles.has(r.match_id)) continue;
+    // saisons internationales « 2025 » rangées avec la saison de club « 2024-2025 »
     for (const cle of ["carriere", r.match.season]) {
-      const d = (out[cle] ??= vide());
-      d.matchs++; d.minutes += Number(r.minutes) || 0;
-      d.tackles += Number(r.tackles) || 0; d.line_breaks += Number(r.line_breaks) || 0;
-      d.turnovers_won += Number(r.turnovers_won) || 0; d.offloads += Number(r.offloads) || 0;
+      const d = (out[cle] ??= detailVide());
+      if (detailles.has(r.match_id)) {
+        d.matchs++; d.minutes += n(r.minutes);
+        d.tackles += n(r.tackles); d.line_breaks += n(r.line_breaks); d.turnovers_won += n(r.turnovers_won); d.offloads += n(r.offloads);
+      }
+      if (complets.has(r.match_id)) {
+        const c = d.complet;
+        c.matchs++; c.minutes += n(r.minutes); c.tries += n(r.tries);
+        c.tackles += n(r.tackles); c.line_breaks += n(r.line_breaks); c.offloads += n(r.offloads); c.turnovers_won += n(r.turnovers_won);
+        for (const k of CLES_COMPLETES) c[k] += n(r[k]);
+      }
     }
   }
   return out;

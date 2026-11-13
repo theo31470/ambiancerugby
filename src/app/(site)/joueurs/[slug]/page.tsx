@@ -10,6 +10,7 @@ import { Ballon } from "@/components/deco/Icones";
 import { getPlayer, TEAM_LITE } from "@/lib/queries";
 import { getViewer, publicClient } from "@/lib/supabase/server";
 import { detailParSaison, clubsParSaison } from "@/lib/stats-detail";
+import StatsCompletes from "@/components/joueur/StatsCompletes";
 import { POSITIONS, age, fmtDate, fmtDay } from "@/lib/format";
 import type { TeamLite } from "@/lib/types";
 
@@ -197,6 +198,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
                 </table>
               </div>
             )}
+            {detail && <StatsCompletes d={detail} full={full} periode={vue === "carriere" ? "sur toute la période suivie" : `en ${vue}`} />}
           </>
         ) : (
           <div className="bg-surface border border-dashed border-trait rounded-2xl p-8 text-center">
