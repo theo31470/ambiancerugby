@@ -189,10 +189,24 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
 
   if (opts.completer) {
     // feuille officielle déjà en place (LNR) : on ajoute seulement les stats que la LNR ne donne pas (courses, mètres, défenseurs battus…)
-    const { data: existantes } = await db.from("player_match_stats").select("player_id, team_id, numero, tackles, line_breaks, offloads, turnovers_won").eq("match_id", m.id);
+    const { data: existantes } = await db.from("player_match_stats")
+      .select("player_id, team_id, numero, tackles, line_breaks, offloads, turnovers_won, player:players(first_name, last_name, wr_id)").eq("match_id", m.id);
+    type Ex = { player_id: string; team_id: string; numero: number | null; tackles: number | null; line_breaks: number | null; offloads: number | null; turnovers_won: number | null; player: { first_name: string; last_name: string; wr_id: string | null } };
+    const ex = (existantes ?? []) as unknown as Ex[];
+    const faits = new Set<string>();
+    // les remplaçants n'ont pas toujours de numéro sur la feuille LNR : identifiant WR, numéro, puis nom dans l'équipe
+    const retrouver = (j: J): Ex | undefined => {
+      const libres = ex.filter((x) => x.team_id === j.team_id && !faits.has(x.player_id));
+      const nf = norm(nomDe(j.wr.name)), pf = norm(prenomDe(j.wr.name));
+      return libres.find((x) => x.player.wr_id === j.wr.id)
+        ?? libres.find((x) => x.numero === j.numero && (!x.player.wr_id || x.player.wr_id === j.wr.id))
+        ?? (() => { const c = libres.filter((x) => norm(x.player.last_name) === nf && norm(x.player.first_name).slice(0, 1) === pf.slice(0, 1)); return c.length === 1 ? c[0] : undefined; })()
+        ?? (() => { const c = libres.filter((x) => norm(x.player.last_name) === nf); return c.length === 1 ? c[0] : undefined; })();
+    };
     let maj = 0;
     for (const j of joueurs.values()) {
-      const l = existantes?.find((x) => x.team_id === j.team_id && x.numero === j.numero);
+      const l = retrouver(j);
+      if (l) faits.add(l.player_id);
       if (!l || !Object.keys(j.stats).length) continue;
       const d = detail(j.stats);
       const garder = (cle: "tackles" | "line_breaks" | "offloads" | "turnovers_won") => (l[cle] ?? 0) > 0 ? { [cle]: l[cle] } : {};
