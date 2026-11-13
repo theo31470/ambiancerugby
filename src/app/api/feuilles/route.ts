@@ -53,20 +53,24 @@ export async function GET(req: Request) {
   after(async () => {
     const bilan: string[] = [];
     const debut = Date.now();
-    for (const m of aFaire) {
-      if (Date.now() - debut > 100_000) break;
-      let resultat: string;
-      try { resultat = await lire(m); } catch (e) { resultat = `erreur : ${(e as Error).message}`.slice(0, 200); }
-      await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: resultat }).eq("id", m.id);
-      bilan.push(resultat);
-    }
+    // deux files en parallèle : les feuilles à lire (direct d'abord), et le rattrapage des stats World Rugby
+    const feuilles = async () => {
+      for (const m of aFaire) {
+        if (Date.now() - debut > 100_000) break;
+        let resultat: string;
+        try { resultat = await lire(m); } catch (e) { resultat = `erreur : ${(e as Error).message}`.slice(0, 200); }
+        await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: resultat }).eq("id", m.id);
+        bilan.push(resultat);
+      }
+    };
     // rattrapage : feuilles ESPN remplacées par World Rugby ; feuilles LNR complétées (courses, mètres, défenseurs battus…)
-    const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 10 });
-    const idsWr = ((wr ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { stats_wr_a_traiter: string }).stats_wr_a_traiter));
-    if (idsWr.length) {
+    const rattrapage = async () => {
+      const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 30 });
+      const idsWr = ((wr ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { stats_wr_a_traiter: string }).stats_wr_a_traiter));
+      if (!idsWr.length) return;
       const { data: ms } = await db.from("matches").select(`${SELECT_MATCH_WR}, competition:competitions(lnr_site)`).in("id", idsWr);
       for (const m of (ms ?? []) as unknown as (MatchWr & { competition: { lnr_site: string | null } | null })[]) {
-        if (Date.now() - debut > 105_000) break;
+        if (Date.now() - debut > 100_000) break;
         const r = await importerFeuilleWr(db, m, { completer: !!m.competition?.lnr_site }).catch((e: Error) => ({ ok: false as const, raison: `erreur : ${e.message}`.slice(0, 200) }));
         const res = r.ok ? `wr ${r.joueurs} joueurs${r.detail ? "" : " (sans détail)"}` : r.raison;
         // introuvable chez World Rugby : on n'y revient pas avant longtemps ; sinon nouvel essai dans 3 heures
@@ -75,7 +79,8 @@ export async function GET(req: Request) {
         await db.from("matches").update({ stats_wr_at: quand.toISOString(), stats_wr_resultat: res }).eq("id", m.id);
         bilan.push(res);
       }
-    }
+    };
+    await Promise.all([feuilles(), rattrapage()]);
     if (bilan.some((b) => /^(espn|lnr|direct|wr) /.test(b))) revalidatePath("/", "layout");
   });
   return Response.json({ lances: aFaire.length });
