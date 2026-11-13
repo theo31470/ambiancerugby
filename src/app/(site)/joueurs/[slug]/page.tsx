@@ -92,7 +92,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
         <div className="relative w-full max-w-64">
           <div className="absolute inset-0 rounded-[1.5rem] bg-moutarde rotate-3" aria-hidden />
           {p.photo_url ? (
-            <img src={p.photo_url} alt={`${p.first_name} ${p.last_name}`} className="relative w-full aspect-[4/5] object-cover object-bottom rounded-[1.5rem] bg-[linear-gradient(180deg,var(--vin),var(--bordeaux))]" />
+            <img src={p.photo_url} alt={`${p.first_name} ${p.last_name}`} className="relative w-full aspect-[4/5] object-cover object-bottom rounded-[1.5rem]" />
           ) : (
             <div className="relative w-full aspect-[4/5] rounded-[1.5rem] bg-vin grid place-items-center overflow-hidden" aria-hidden>
               <span className="groovy text-white text-8xl">{p.first_name.slice(0, 1)}{p.last_name.slice(0, 1)}</span>

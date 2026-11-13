@@ -1,6 +1,6 @@
 """
 Portraits des joueurs : photo officielle (LNR pour le Top 14 et la Pro D2, ESPN pour les autres championnats),
-détourée sur fond transparent, enregistrée en WebP transparent dans public/portraits/<slug>.webp.
+déjà détourée à la source (PNG sans fond), recadrée et enregistrée en WebP transparent ; les photos avec fond sont ignorées dans public/portraits/<slug>.webp.
 Le manifeste public/portraits/index.json dit d'où vient chaque photo ; le site le recopie dans la base.
 
 Tourne sur GitHub Actions (réseau libre, détourage sur CPU) : python scripts/portraits.py --max 1200
@@ -61,22 +61,12 @@ def photo_espn(espn_id):
     return r.content if r.status_code == 200 and len(r.content) > 3000 else None
 
 
-_rembg = None
-
-
 def detourer(im):
-    """Garde la transparence d'origine si la photo est déjà détourée, sinon détourage automatique."""
+    """On ne garde que les photos déjà détourées à la source (PNG transparent) : aucun traitement, aucun fond ajouté."""
     im = im.convert("RGBA")
     a = im.getchannel("A")
     transparent = sum(1 for v in a.resize((64, 80)).getdata() if v < 200) / (64 * 80)
-    if transparent > 0.08:
-        return im
-    global _rembg
-    if _rembg is None:
-        from rembg import new_session, remove
-        _rembg = (new_session("u2net_human_seg"), remove)
-    sess, remove = _rembg
-    return remove(im, session=sess, post_process_mask=True)
+    return im if transparent > 0.08 else None
 
 
 def fond():
@@ -150,7 +140,8 @@ def main():
             manif.setdefault("_sans_photo", {})[slug] = date.today().isoformat()
             continue
         try:
-            img = composer(detourer(Image.open(io.BytesIO(brut))))
+            sujet = detourer(Image.open(io.BytesIO(brut)))
+            img = composer(sujet) if sujet is not None else None
         except Exception as e:  # image illisible
             print(f"  {slug} : {e}", flush=True)
             img = None

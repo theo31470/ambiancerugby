@@ -26,15 +26,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Modèle de détourage en cache
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.u2net
-          key: rembg-u2net-human-seg
-      - run: pip install "rembg[cpu]" pillow requests
+      - run: pip install pillow requests
       - name: Portraits
-        env:
-          U2NET_HOME: /home/runner/.u2net
         run: python scripts/portraits.py --max 1500 --minutes 300
       - name: Enregistrer
         run: |
