@@ -419,6 +419,9 @@ export async function saveStats(form: FormData) {
       fail(error, "Feuille de stats");
     }
     if (remove.length) await db.from("player_match_stats").delete().eq("match_id", matchId).in("player_id", remove);
+    // l'homme du match choisi ici est l'officiel : les notes recalculées (import ESPN, LNR) le respectent
+    await db.from("matches").update({ homme_du_match: motm && ids.includes(motm) ? motm : null }).eq("id", matchId);
+    await db.rpc("noter_matchs", { p_matchs: [matchId] });
     revalidatePath("/", "layout");
     redirect(`/studio/matchs/${matchId}/stats?ok=enregistre`);
   });
