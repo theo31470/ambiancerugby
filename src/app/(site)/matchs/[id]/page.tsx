@@ -274,7 +274,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
         </section>
       )}
       {m.status === "scheduled" && <AvantMatch match={m as never} home={m.home} away={m.away} full={full} />}
-      {(live || m.status === "finished") && <Compositions lignes={notes as never} home={m.home} away={m.away} live={live} />}
+      {(live || m.status === "finished") && <Compositions matchId={m.id} lnrUrl={(m as { lnr_url?: string | null }).lnr_url ?? null} lignes={notes as never} home={m.home} away={m.away} live={live} />}
       {events && events.length > 1 && (live || m.status === "finished") && (
         <CourbeAscendant full={full} events={events as never} home={m.home} away={m.away}
           minuteActuelle={m.status === "finished" ? 80 : m.status === "halftime" ? 40 : Math.min(80, Math.max(0, ...events.map((e) => e.minute ?? 0), m.clock && /^\d+/.test(m.clock) ? parseInt(m.clock, 10) : 0))} />
