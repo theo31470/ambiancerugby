@@ -4,6 +4,10 @@ import { shopDb } from "@/lib/shop/admin";
 import { importerFeuilleEspn, type MatchLocal } from "@/lib/feuilles/espn";
 import { importerFeuilleLnr, SELECT_MATCH_FEUILLE } from "@/lib/feuilles/lnr";
 import { importerFeuilleWr, SELECT_MATCH_WR, type MatchWr } from "@/lib/feuilles/worldrugby";
+import portraits from "../../../../public/portraits/index.json";
+
+// portraits détourés (GitHub Actions) : recopiés dans les fiches une fois par instance
+let portraitsSynchro = false;
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -51,6 +55,10 @@ export async function GET(req: Request) {
 
   // on répond tout de suite (la file d'appels de la base n'attend pas), le travail continue ensuite
   after(async () => {
+    if (!portraitsSynchro) {
+      portraitsSynchro = true;
+      await db.rpc("maj_portraits", { p: portraits }).then(({ data }) => { if (Number(data) > 0) revalidatePath("/joueurs", "layout"); }, () => { portraitsSynchro = false; });
+    }
     const bilan: string[] = [];
     const debut = Date.now();
     // on ne vide le cache du site que si un match récent a changé (le rattrapage de vieux matchs ne doit pas tout régénérer)

@@ -1,0 +1,48 @@
+name: Portraits des joueurs
+
+# photos officielles détourées, fond Ambiance Rugby (voir scripts/portraits.py)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"   # chaque nuit tant qu'il reste des joueurs sans portrait
+  push:
+    branches: [main]
+    paths: [scripts/portraits.py, .github/workflows/portraits.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: portraits
+  cancel-in-progress: false
+
+jobs:
+  portraits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Modèle de détourage en cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.u2net
+          key: rembg-u2net-human-seg
+      - run: pip install "rembg[cpu]" pillow requests
+      - name: Portraits
+        env:
+          U2NET_HOME: /home/runner/.u2net
+        run: python scripts/portraits.py --max 1500 --minutes 300
+      - name: Enregistrer
+        run: |
+          git config user.name "Ambiance Rugby (portraits)"
+          git config user.email "portraits@ambiance-rugby.fr"
+          git add public/portraits
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          n=$(git diff --cached --name-only -- 'public/portraits/*.webp' | wc -l)
+          git commit -m "Portraits : $n nouveaux joueurs"
+          git pull --rebase -X ours origin main
+          git push
