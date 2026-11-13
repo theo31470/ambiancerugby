@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { shopDb } from "@/lib/shop/admin";
 import { importerFeuilleEspn, type MatchLocal } from "@/lib/feuilles/espn";
 import { importerFeuilleLnr, SELECT_MATCH_FEUILLE } from "@/lib/feuilles/lnr";
+import { importerStatsWorldRugby, type MatchWr } from "@/lib/feuilles/worldrugby";
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -51,7 +52,24 @@ export async function GET(req: Request) {
       await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: resultat }).eq("id", m.id);
       bilan.push(resultat);
     }
-    if (bilan.some((b) => /^(espn|lnr|direct) /.test(b))) revalidatePath("/", "layout");
+    // stats détaillées World Rugby pour les matchs hors LNR déjà terminés (tests internationaux surtout)
+    const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 5 });
+    const idsWr = ((wr ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { stats_wr_a_traiter: string }).stats_wr_a_traiter));
+    if (idsWr.length) {
+      const { data: ms } = await db.from("matches")
+        .select("id, kickoff_at, home_team_id, away_team_id, home_score, away_score, home:teams!matches_home_team_id_fkey(name,short_name,abbreviation,aliases), away:teams!matches_away_team_id_fkey(name,short_name,abbreviation,aliases)")
+        .in("id", idsWr);
+      for (const m of (ms ?? []) as unknown as MatchWr[]) {
+        if (Date.now() - debut > 110_000) break;
+        const r = await importerStatsWorldRugby(db, m).catch((e: Error) => ({ ok: false as const, raison: `erreur : ${e.message}`.slice(0, 200) }));
+        const res = r.ok ? `wr ${r.joueurs} joueurs${r.hommeDuMatch ? ", homme du match" : ""}` : r.raison;
+        // introuvable chez World Rugby : on n'y revient pas ; stats pas encore publiées : nouvel essai dans 3 heures
+        const quand = !r.ok && r.raison.startsWith("match introuvable") ? new Date(Date.now() + 365 * 86400e3) : new Date();
+        await db.from("matches").update({ stats_wr_at: quand.toISOString(), stats_wr_resultat: res }).eq("id", m.id);
+        bilan.push(res);
+      }
+    }
+    if (bilan.some((b) => /^(espn|lnr|direct|wr) /.test(b))) revalidatePath("/", "layout");
   });
   return Response.json({ lances: aFaire.length });
 }
