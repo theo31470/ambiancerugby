@@ -2,7 +2,7 @@ import { absolue, filAriane, jsonLd } from "@/lib/seo";
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { urlMatch } from "@/lib/seo";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import TeamBadge from "@/components/TeamBadge";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -32,7 +32,13 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
   const { slug } = await params;
   const sp = await searchParams;
   const p = await getPlayer(slug);
-  if (!p) notFound();
+  if (!p) {
+    // fiche fusionnée avec une autre : l'ancien lien redirige vers la bonne
+    const { data: alias } = await publicClient().from("player_aliases").select("player:players(slug)").eq("slug", slug).maybeSingle();
+    const cible = (alias as unknown as { player: { slug: string } | null } | null)?.player?.slug;
+    if (cible) permanentRedirect(`/joueurs/${cible}`);
+    notFound();
+  }
   const a = age(p.birth_date);
   const db = publicClient();
   const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }, details, clubs] = await Promise.all([
