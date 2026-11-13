@@ -292,7 +292,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
 }
 
 /** Sélection Supabase d'un match prêt pour importerFeuilleLnr / importerFeuilleEspn. */
-export const SELECT_MATCH_FEUILLE = "id, competition_id, kickoff_at, home_score, away_score, home_team_id, away_team_id, espn_event_id, lnr_url, round, season, status, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,is_national), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,is_national), competition:competitions(name, espn_league, lnr_site)";
+export const SELECT_MATCH_FEUILLE = "id, competition_id, kickoff_at, home_score, away_score, home_team_id, away_team_id, espn_event_id, wr_id, lnr_url, round, season, status, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,wr_id,is_national), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,espn_id,wr_id,is_national), competition:competitions(name, espn_league, lnr_site, wr_ok)";
 
 export type JoueurCompo = { lnrId: string; numero: number; prenom: string; nom: string; photo: string | null };
 
