@@ -61,7 +61,9 @@ function matchsDuJour(d: string): Promise<MatchInfo[]> {
     cacheJours.set(d, (async () => {
       const tous: MatchInfo[] = [];
       for (let page = 0; page < 5; page++) {
-        const r = await lire<{ content?: MatchInfo[]; pageInfo?: { numPages?: number } }>(`/match?startDate=${d}&endDate=${d}&sort=asc&pageSize=100&page=${page}`);
+        // la fin doit être après le début (même jour = erreur 400) : on prend jusqu'au lendemain
+        const fin = new Date(new Date(`${d}T00:00:00Z`).getTime() + 86400e3).toISOString().slice(0, 10);
+        const r = await lire<{ content?: MatchInfo[]; pageInfo?: { numPages?: number } }>(`/match?startDate=${d}&endDate=${fin}&sort=asc&pageSize=100&page=${page}`);
         tous.push(...(r?.content ?? []));
         if (!r || (r.pageInfo?.numPages ?? 1) <= page + 1) break;
       }

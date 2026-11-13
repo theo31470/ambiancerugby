@@ -4,6 +4,7 @@ import { createClient, getViewer } from "@/lib/supabase/server";
 import { analyserFeuille, chercherFeuille, IA_MODELE, IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { fmtDay } from "@/lib/format";
 import { ecrireFil, filDepuisIA } from "@/lib/fil";
+import { importerFeuilleWr, SELECT_MATCH_WR, type MatchWr } from "@/lib/feuilles/worldrugby";
 import { importerFeuilleEspn, type MatchLocal } from "@/lib/feuilles/espn";
 import { importerFeuilleLnr, SELECT_MATCH_FEUILLE } from "@/lib/feuilles/lnr";
 
@@ -62,7 +63,27 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
       }
     }
 
-    // 2. feuille de match ESPN
+    // 2. feuille World Rugby (stats complètes), hors Top 14 / Pro D2
+    if (me && (me as { status: string }).status === "finished" && !ml?.competition?.lnr_site) {
+      try {
+        const { data: mw } = await db.from("matches").select(SELECT_MATCH_WR).eq("id", matchId).single();
+        const r = mw ? await importerFeuilleWr(db, mw as unknown as MatchWr, { remplacer }) : { ok: false as const, raison: "match introuvable" };
+        if (r.ok) {
+          await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: `wr ${r.dom}-${r.ext}`, stats_wr_at: new Date().toISOString(), stats_wr_resultat: `wr ${r.joueurs} joueurs` }).eq("id", matchId);
+          revalidatePath("/", "layout");
+          const detail = `${r.joueurs} joueurs (compositions, minutes, points, cartons et toutes les stats détaillées)${r.crees ? `, ${r.crees} nouveaux joueurs créés` : ""}${r.fil ? `, ${r.fil} faits de jeu` : ""}`;
+          return r.conforme
+            ? { matchId, etat: "valide", message: `Feuille World Rugby : ${detail}. ${r.dom}–${r.ext}, conforme au score.` }
+            : { matchId, etat: "proposition", message: `Feuille World Rugby enregistrée : ${detail}. Score World Rugby ${r.dom}–${r.ext} pour ${(me as { home_score: number }).home_score}–${(me as { away_score: number }).away_score} affiché : vérifiez.` };
+        }
+        if (r.raison.startsWith("déjà saisi")) return { matchId, etat: "deja", message: "Déjà saisi à la main : cochez « Remplacer les matchs déjà saisis » pour reprendre la feuille World Rugby." };
+        raisonEspn = [raisonEspn, `World Rugby : ${r.raison}`].filter(Boolean).join(". ");
+      } catch (e) {
+        raisonEspn = [raisonEspn, `World Rugby : ${(e as Error).message}`].filter(Boolean).join(". ");
+      }
+    }
+
+    // 3. feuille de match ESPN (secours)
     if (me && (me as { status: string }).status === "finished" && (me as unknown as MatchLocal).competition?.espn_league) {
       try {
         const r = await importerFeuilleEspn(db, me as unknown as MatchLocal, { remplacer });
