@@ -53,6 +53,9 @@ export async function GET(req: Request) {
   after(async () => {
     const bilan: string[] = [];
     const debut = Date.now();
+    // on ne vide le cache du site que si un match récent a changé (le rattrapage de vieux matchs ne doit pas tout régénérer)
+    let recent = false;
+    const marquer = (kickoff: string, ok: boolean) => { if (ok && Date.now() - new Date(kickoff).getTime() < 4 * 86400e3) recent = true; };
     // deux files en parallèle : les feuilles à lire (direct d'abord), et le rattrapage des stats World Rugby
     const feuilles = async () => {
       for (const m of aFaire) {
@@ -60,6 +63,7 @@ export async function GET(req: Request) {
         let resultat: string;
         try { resultat = await lire(m); } catch (e) { resultat = `erreur : ${(e as Error).message}`.slice(0, 200); }
         await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: resultat }).eq("id", m.id);
+        marquer(m.kickoff_at, /^(espn|lnr|direct|wr) /.test(resultat));
         bilan.push(resultat);
       }
     };
@@ -77,11 +81,12 @@ export async function GET(req: Request) {
         const vieux = Date.now() - new Date(m.kickoff_at).getTime() > 3 * 86400e3;
         const quand = r.ok ? new Date() : r.raison.startsWith("match introuvable") ? new Date(Date.now() + 365 * 86400e3) : vieux ? new Date(Date.now() + 30 * 86400e3) : new Date();
         await db.from("matches").update({ stats_wr_at: quand.toISOString(), stats_wr_resultat: res }).eq("id", m.id);
+        marquer(m.kickoff_at, r.ok);
         bilan.push(res);
       }
     };
     await Promise.all([feuilles(), rattrapage()]);
-    if (bilan.some((b) => /^(espn|lnr|direct|wr) /.test(b))) revalidatePath("/", "layout");
+    if (recent) revalidatePath("/", "layout");
   });
   return Response.json({ lances: aFaire.length });
 }
