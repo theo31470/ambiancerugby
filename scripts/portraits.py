@@ -1,6 +1,6 @@
 """
 Portraits des joueurs : photo officielle (LNR pour le Top 14 et la Pro D2, ESPN pour les autres championnats),
-détourée, posée sur un fond aux couleurs d'Ambiance Rugby, enregistrée en WebP dans public/portraits/<slug>.webp.
+détourée sur fond transparent, enregistrée en WebP transparent dans public/portraits/<slug>.webp.
 Le manifeste public/portraits/index.json dit d'où vient chaque photo ; le site le recopie dans la base.
 
 Tourne sur GitHub Actions (réseau libre, détourage sur CPU) : python scripts/portraits.py --max 1200
@@ -99,31 +99,19 @@ def fond():
     return f
 
 
-FOND = None
-
-
 def composer(sujet):
-    global FOND
-    if FOND is None:
-        FOND = fond()
+    """Joueur détouré sur fond transparent, cadré en portrait 4:5, posé en bas (buste coupé par le bord)."""
     box = sujet.getchannel("A").point(lambda v: 255 if v > 20 else 0).getbbox()
     if not box:
         return None
     sujet = sujet.crop(box)
     if sujet.height < 120:
         return None
-    # le sujet remplit le cadre en hauteur, posé en bas (buste coupé par le bord)
-    echelle = min(H * 0.94 / sujet.height, L * 0.98 / sujet.width)
+    echelle = min(H * 0.96 / sujet.height, L * 0.98 / sujet.width)
     sujet = sujet.resize((max(1, int(sujet.width * echelle)), max(1, int(sujet.height * echelle))), Image.LANCZOS)
-    # ombre douce sous le joueur
-    ombre = Image.new("RGBA", (L, H), (0, 0, 0, 0))
-    masque = sujet.getchannel("A").filter(ImageFilter.GaussianBlur(14)).point(lambda v: int(v * 0.35))
-    x, y = (L - sujet.width) // 2, H - sujet.height
-    ombre.paste(Image.new("RGBA", sujet.size, (20, 5, 10, 255)), (x + 8, y + 6), masque)
-    img = FOND.convert("RGBA")
-    img = Image.alpha_composite(img, ombre)
-    img.paste(sujet, (x, y), sujet)
-    return img.convert("RGB")
+    img = Image.new("RGBA", (L, H), (0, 0, 0, 0))
+    img.paste(sujet, ((L - sujet.width) // 2, H - sujet.height), sujet)
+    return img
 
 
 def main():
@@ -141,7 +129,8 @@ def main():
         if faits >= args.max or time.time() - debut > args.minutes * 60:
             break
         slug = j["slug"]
-        if slug in manif and not args.refaire:
+        # « t » : portrait transparent (les premiers portraits avaient un fond, ils sont refaits)
+        if slug in manif and manif[slug].get("t") and not args.refaire:
             continue
         if j.get("photo_source") in ("manuel", "Ambiance Rugby"):
             continue
@@ -168,8 +157,8 @@ def main():
         if img is None:
             rates += 1
             continue
-        img.save(os.path.join(DOSSIER, f"{slug}.webp"), "WEBP", quality=80, method=6)
-        manif[slug] = {"s": source, "v": date.today().strftime("%Y%m%d")}
+        img.save(os.path.join(DOSSIER, f"{slug}.webp"), "WEBP", quality=82, method=6, exact=False)
+        manif[slug] = {"s": source, "v": date.today().strftime("%Y%m%d"), "t": True}
         manif.get("_sans_photo", {}).pop(slug, None)
         faits += 1
         if faits % 50 == 0:
