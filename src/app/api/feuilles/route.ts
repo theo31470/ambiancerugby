@@ -8,6 +8,7 @@ import portraits from "../../../../public/portraits/index.json";
 
 // portraits détourés (GitHub Actions) : recopiés dans les fiches une fois par instance
 let portraitsSynchro = false;
+let classementsVerifies = 0;
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -16,6 +17,21 @@ export const dynamic = "force-dynamic";
  * Appelée toutes les 2 minutes par la base (pg_cron) : lit les feuilles de match (LNR pour le Top 14 et la Pro D2, ESPN sinon)
  * des matchs en direct et des matchs terminés qui n'ont pas encore leurs stats. Protégée par le secret de synchro.
  */
+async function corrigerClassements() {
+  const db = shopDb();
+  const { data: comps } = await db.from("competitions").select("id, current_season, standings_source, poules").eq("active", true);
+  for (const c of comps ?? []) {
+    const poules = c.poules as Record<string, string[]> | null;
+    if (poules) {
+      for (const [nom, ids] of Object.entries(poules)) {
+        await db.from("standings").update({ pool: nom }).eq("competition_id", c.id).eq("season", c.current_season).in("team_id", ids).neq("pool", nom);
+      }
+    }
+    // recalcule les bonus offensifs et les rangs dans chaque poule
+    if (c.standings_source === "calcul" || poules) await db.rpc("appliquer_bonus_offensif", { p_comp: c.id });
+  }
+}
+
 export async function GET(req: Request) {
   const db = shopDb();
   const { data: ok } = await db.rpc("cron_secret_ok", { p_secret: req.headers.get("x-sync-secret") });
@@ -94,6 +110,11 @@ export async function GET(req: Request) {
       }
     };
     await Promise.all([feuilles(), rattrapage()]);
+    // toutes les 20 minutes : poules fixées (Nations Championship…) et bonus offensifs, que la synchro de nuit réécrit sans eux
+    if (Date.now() - classementsVerifies > 20 * 60e3) {
+      classementsVerifies = Date.now();
+      await corrigerClassements().catch(() => { classementsVerifies = 0; });
+    }
     if (recent) revalidatePath("/", "layout");
   });
   return Response.json({ lances: aFaire.length });

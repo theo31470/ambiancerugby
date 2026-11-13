@@ -13,7 +13,7 @@ const DAILY_CAP = 7000; // plan PRO : 7 500 / jour, on garde une marge
 const TIME_BUDGET_MS = 120_000;
 
 type Team = { id: string; slug: string; name: string; short_name: string | null; aliases: string[]; apisports_id: number | null; logo_url: string | null; stadium: string | null; founded: number | null; country: string | null };
-type Competition = { id: string; slug: string; name: string; short_name?: string | null; kind: string; current_season: string; standings_mode: string; apisports_id: number | null; apisports_season: number | null; active: boolean; logo_url: string | null };
+type Competition = { id: string; slug: string; name: string; short_name?: string | null; kind: string; current_season: string; standings_mode: string; apisports_id: number | null; apisports_season: number | null; active: boolean; logo_url: string | null; poules?: Record<string, string[]> | null };
 type ApiSeason = { season: number; current: boolean; start: string; end: string };
 
 const norm = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -273,12 +273,17 @@ async function syncStandings(db: SupabaseClient, api: Api, c: Competition, idx: 
     }));
   }
   if (!rows.length) return 0;
+  // poules fixées à la main (ex. Nations Championship : hémisphères Nord et Sud), prioritaires sur celles déduites des matchs
+  if (c.poules && Object.keys(c.poules).length) {
+    const pouleDe = new Map(Object.entries(c.poules).flatMap(([nom, ids]) => ids.map((id) => [id, nom] as [string, string])));
+    for (const r of rows) r.pool = pouleDe.get(r.team_id) ?? r.pool;
+  }
   // rang dans chaque poule
   const pools = new Map<string, Row[]>();
   for (const r of rows) pools.set(r.pool, [...(pools.get(r.pool) ?? []), r]);
   const out: Record<string, unknown>[] = [];
   for (const list of pools.values()) {
-    if (source === "calcul") list.sort((a, b) => b.points - a.points || (b.pf - b.pa) - (a.pf - a.pa) || b.pf - a.pf);
+    if (source === "calcul" || c.poules) list.sort((a, b) => b.points - a.points || (b.pf - b.pa) - (a.pf - a.pa) || b.pf - a.pf);
     list.forEach((r, i) => out.push({
       competition_id: c.id, season: label, team_id: r.team_id, pool: r.pool, rank: i + 1,
       played: r.played, won: r.won, drawn: r.drawn, lost: r.lost, points_for: r.pf, points_against: r.pa,
@@ -288,7 +293,11 @@ async function syncStandings(db: SupabaseClient, api: Api, c: Competition, idx: 
   await db.from("standings").delete().eq("competition_id", c.id).eq("season", label);
   const { error } = await db.from("standings").insert(out);
   if (error) throw error;
-  if (label === c.current_season) await db.from("competitions").update({ standings_source: source }).eq("id", c.id);
+  if (label === c.current_season) {
+    await db.from("competitions").update({ standings_source: source }).eq("id", c.id);
+    // le calcul ne connaît que le bonus défensif : on remet aussitôt les bonus offensifs (nombre d'essais des feuilles)
+    if (source === "calcul") await db.rpc("appliquer_bonus_offensif", { p_comp: c.id });
+  }
   return out.length;
 }
 
