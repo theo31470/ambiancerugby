@@ -50,7 +50,12 @@ export async function GET(req: Request) {
     .eq("status", "finished").gt("kickoff_at", new Date(Date.now() - 3 * 86400e3).toISOString()).lt("kickoff_at", new Date(Date.now() - 100 * 60e3).toISOString())
     .or(`feuille_resultat.is.null,feuille_resultat.like.direct*,and(feuille_tentee_at.lt.${new Date(Date.now() - 3600e3).toISOString()},feuille_resultat.not.like."wr *",feuille_resultat.not.like."lnr *",feuille_resultat.not.like."espn *")`)
     .order("kickoff_at", { ascending: false }).limit(10);
-  const prioritaires = [...(enDirect ?? []), ...(recents ?? [])].map((x) => x.id as string);
+  // homme du match officiel publié par World Rugby après le coup de sifflet final : on relit toutes les 20 minutes pendant 12 heures
+  const { data: sansHdm } = await db.from("matches").select("id")
+    .eq("status", "finished").not("wr_id", "is", null).is("homme_du_match", null)
+    .gt("kickoff_at", new Date(Date.now() - 12 * 3600e3).toISOString()).lt("feuille_tentee_at", new Date(Date.now() - 20 * 60e3).toISOString())
+    .limit(2);
+  const prioritaires = [...new Set([...(enDirect ?? []), ...(recents ?? []), ...(sansHdm ?? [])].map((x) => x.id as string))];
   // rattrapage des vieux matchs, à un rythme que l'offre gratuite Supabase supporte (budget disque limité) :
   // la nuit (0 h – 8 h) un créneau toutes les 3 minutes, le jour toutes les 4 minutes ; 1 feuille + 4 matchs World Rugby par créneau ;
   // jamais pendant un direct, et on saute le créneau si la base répond lentement
