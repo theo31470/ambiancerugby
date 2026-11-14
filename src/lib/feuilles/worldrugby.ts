@@ -180,7 +180,7 @@ function detail(x: Record<string, number>) {
     offloads: n("Offload"), turnovers_won: n("TurnoverWon"), penalties_conceded: n("PenDefs", "PenOffs"),
     defenders_beaten: n("DefendersBeaten"), try_assists: n("TryAssist"), passes: n("Passes"), kicks: n("KicksFromHand"), kick_metres: n("KickFromHandMetres"),
     dominant_tackles: n("DominantTackles"), lineouts_won: n("LineoutsWon"), lineouts_stolen: n("LineoutWonSteal"), rucks_won: n("RucksWon"),
-    handling_errors: n("HandlingError"), turnovers_conceded: n("TurnoversConceded"), stats_wr: x,
+    handling_errors: n("HandlingError"), turnovers_conceded: n("TurnoversConceded"),
   };
 }
 
