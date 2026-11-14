@@ -38,7 +38,7 @@ export async function GET(req: Request) {
   if (ok !== true) return new Response("accès refusé", { status: 401 });
 
   // la base choisit : matchs en direct d'abord, puis terminés sans stats (jamais tentés en premier)
-  const { data: ids, error } = await db.rpc("feuilles_a_traiter", { p_limite: 10 });
+  const { data: ids, error } = await db.rpc("feuilles_a_traiter", { p_limite: 6 });
   if (error) return Response.json({ erreur: error.message }, { status: 500 });
   const liste = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
   const { data: matchs } = liste.length ? await db.from("matches").select(`${SELECT_MATCH_FEUILLE}, feuille_resultat`).in("id", liste) : { data: [] };
@@ -93,6 +93,9 @@ export async function GET(req: Request) {
     };
     // rattrapage : feuilles ESPN remplacées par World Rugby ; feuilles LNR complétées (courses, mètres, défenseurs battus…)
     const rattrapage = async () => {
+      // EN PAUSE : la base (offre gratuite Supabase) saturait son budget de lecture/écriture disque.
+      // Remettre RATTRAPAGE_WR=1 sur Vercel pour relancer (au ralenti).
+      if (process.env.RATTRAPAGE_WR !== "1") return;
       const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 6 });
       const idsWr = ((wr ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { stats_wr_a_traiter: string }).stats_wr_a_traiter));
       if (!idsWr.length) return;
