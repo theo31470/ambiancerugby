@@ -6,6 +6,7 @@
   --vin: #934f5e;          /* couleur du logo */
   --bordeaux: #3e1621;     /* grands aplats, tableau d'affichage */
   --moutarde: #f2b53a;     /* scores, direct, accents */
+  --or: #c8901f;           /* moutarde foncé : barres et graphiques sur fond clair */
   --rose: #f6e4e8;         /* rosé pâle tiré du logo */
   --encre: #2a1419;        /* texte */
   --fond: #fcf7f8;
@@ -23,6 +24,7 @@
     --vin: #c98595;
     --bordeaux: #260d14;
     --moutarde: #f5c45a;
+    --or: #f5c45a;
     --rose: #3a1f27;
     --encre: #f6ecee;
     --fond: #170a0e;
@@ -41,6 +43,7 @@
     --vin: #c98595;
     --bordeaux: #260d14;
     --moutarde: #f5c45a;
+    --or: #f5c45a;
     --rose: #3a1f27;
     --encre: #f6ecee;
     --fond: #170a0e;
@@ -232,6 +235,16 @@ h1, h2, h3, .titre {
 @keyframes essai-ballon { from { transform: translate(-40vw, 30vh) rotate(0); } to { transform: translate(0, -18vh) rotate(720deg) scale(.6); } }
 .confetti { position: absolute; top: -10px; width: 10px; height: 16px; animation: confetti 2.6s ease-in forwards; animation-delay: var(--delai); }
 @keyframes confetti { to { transform: translateY(110vh) rotate(var(--rot)); } }
+
+/* fiche match : changement d'onglet, chiffre du score qui change, homme du match */
+.onglet-entree { animation: onglet-entree .28s ease-out; }
+@keyframes onglet-entree { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.score-saut { animation: score-saut 1.4s cubic-bezier(.2,.9,.2,1.2); }
+@keyframes score-saut { 0% { transform: scale(1); } 12% { transform: scale(1.35); background: var(--moutarde); color: var(--bordeaux); } 40% { transform: scale(1); } 100% { background: transparent; } }
+.apparition-hdm { animation: apparition-hdm .6s cubic-bezier(.2,.8,.2,1.1) both; }
+@keyframes apparition-hdm { from { opacity: 0; transform: translateY(16px) rotate(-.6deg); } to { opacity: 1; transform: none; } }
+.entree-score > * { animation: entree-score .7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * .08s); }
+@keyframes entree-score { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
 /* pas d'animations pour qui les a désactivées */
 @media (prefers-reduced-motion: reduce) {
