@@ -38,15 +38,21 @@ export async function GET(req: Request) {
   if (ok !== true) return new Response("accès refusé", { status: 401 });
 
   // priorité absolue : les matchs en direct et ceux des 3 derniers jours (dont la fin des directs)
+  const t0 = Date.now();
   const { data: enDirect } = await db.from("matches").select("id").in("status", ["live", "halftime"]);
+  // base lente (budget disque épuisé) : on saute le rattrapage pour la laisser récupérer
+  const baseLente = Date.now() - t0 > 1500;
   const { data: recents } = await db.from("matches").select("id")
     .eq("status", "finished").gt("kickoff_at", new Date(Date.now() - 3 * 86400e3).toISOString()).lt("kickoff_at", new Date(Date.now() - 100 * 60e3).toISOString())
     .or(`feuille_resultat.is.null,feuille_resultat.like.direct*,and(feuille_tentee_at.lt.${new Date(Date.now() - 3600e3).toISOString()},feuille_resultat.not.like."wr *",feuille_resultat.not.like."lnr *",feuille_resultat.not.like."espn *")`)
     .order("kickoff_at", { ascending: false }).limit(10);
   const prioritaires = [...(enDirect ?? []), ...(recents ?? [])].map((x) => x.id as string);
-  // rattrapage des vieux matchs au ralenti (offre gratuite Supabase : budget disque limité) :
-  // un créneau toutes les 10 minutes, jamais pendant un direct, 1 feuille + 2 matchs World Rugby par créneau
-  const creneau = process.env.RATTRAPAGE_WR !== "0" && new Date().getUTCMinutes() % 10 < 2 && !(enDirect ?? []).length;
+  // rattrapage des vieux matchs, à un rythme que l'offre gratuite Supabase supporte (budget disque limité) :
+  // la nuit (0 h – 8 h) un créneau toutes les 3 minutes, le jour toutes les 5 minutes ; 1 feuille + 3 matchs World Rugby par créneau ;
+  // jamais pendant un direct, et on saute le créneau si la base répond lentement
+  const heure = Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Paris" }).format(new Date()));
+  const pas = heure < 8 ? 3 : 5;
+  const creneau = process.env.RATTRAPAGE_WR !== "0" && Math.floor(Date.now() / 60e3) % pas < 2 && !(enDirect ?? []).length && !baseLente;
   const { data: ids } = creneau ? await db.rpc("feuilles_a_traiter", { p_limite: 6 }) : { data: [] };
   const file = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
   const liste = [...new Set([...prioritaires, ...file.filter((id) => !prioritaires.includes(id)).slice(0, 1)])].slice(0, 8);
@@ -103,7 +109,7 @@ export async function GET(req: Request) {
     // rattrapage : feuilles ESPN remplacées par World Rugby ; feuilles LNR complétées (courses, mètres, défenseurs battus…)
     const rattrapage = async () => {
       if (!creneau) return;
-      const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 2 });
+      const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 3 });
       const idsWr = ((wr ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { stats_wr_a_traiter: string }).stats_wr_a_traiter));
       if (!idsWr.length) return;
       const { data: ms } = await db.from("matches").select(`${SELECT_MATCH_WR}, competition:competitions(lnr_site)`).in("id", idsWr);
