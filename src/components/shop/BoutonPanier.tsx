@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePanier } from "@/lib/shop/panier";
 
 /** Sac de la boutique dans l'en-tête : saute quand on ajoute un article, affiche le nombre d'articles. */
-export default function BoutonPanier() {
+export default function BoutonPanier({ seulementSiPlein = false }: { seulementSiPlein?: boolean }) {
   const lignes = usePanier();
   const n = lignes.reduce((s, l) => s + l.quantite, 0);
   const [saut, setSaut] = useState(0);
@@ -14,6 +14,7 @@ export default function BoutonPanier() {
     window.addEventListener("ar:panier", f);
     return () => window.removeEventListener("ar:panier", f);
   }, []);
+  if (seulementSiPlein && !n) return null;
   return (
     <Link href={n ? "/boutique/panier" : "/boutique"} aria-label={n ? `Panier, ${n} article${n > 1 ? "s" : ""}` : "Boutique"}
       className="relative flex items-center gap-1.5 h-10 px-2.5 rounded-full hover:bg-white/10">

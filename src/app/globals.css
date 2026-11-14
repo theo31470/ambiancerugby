@@ -440,7 +440,17 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   }
   .entete { top: env(safe-area-inset-top); }
   .vestiaire { padding-top: env(safe-area-inset-top); }
-  footer > .bg-bordeaux { padding-bottom: env(safe-area-inset-bottom); }
   /* pas de sélection de texte accidentelle sur les éléments d'interface */
   header, nav, button, .bouton, .bouton-or { -webkit-user-select: none; user-select: none; }
 }
+
+/* ---------------- navigation façon app (mobile) ---------------- */
+:root { --barre-onglets: 0px; }
+@media (max-width: 1023.98px) { :root { --barre-onglets: calc(4rem + env(safe-area-inset-bottom)); } }
+@media (display-mode: standalone) and (min-width: 1024px) { footer > .bg-bordeaux { padding-bottom: env(safe-area-inset-bottom); } }
+.onglet { -webkit-tap-highlight-color: transparent; }
+.onglet-icone { display: inline-grid; place-items: center; transition: transform .18s cubic-bezier(.3,1.6,.5,1); }
+.onglet:active .onglet-icone { transform: scale(.82); }
+.onglet-icone[data-on] { animation: onglet-pop .45s cubic-bezier(.3,1.7,.5,1); }
+@keyframes onglet-pop { 0% { transform: scale(.7) rotate(-10deg); } 60% { transform: scale(1.12) rotate(4deg); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .onglet-icone[data-on] { animation: none; } }

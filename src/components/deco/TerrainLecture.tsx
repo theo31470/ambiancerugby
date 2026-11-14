@@ -40,7 +40,7 @@ export default function TerrainLecture({ cible }: { cible: string }) {
   const repere = [...REPERES].reverse().find((r) => p >= r.p)?.nom ?? "Coup d'envoi";
 
   return (
-    <div className={`fixed bottom-0 inset-x-0 z-30 transition-transform duration-500 ${p > 0.02 ? "translate-y-0" : "translate-y-full"}`} aria-hidden>
+    <div className={`fixed inset-x-0 z-30 transition-transform duration-500 ${p > 0.02 ? "translate-y-0" : "translate-y-[calc(100%+var(--barre-onglets))]"}`} style={{ bottom: "var(--barre-onglets)" }} aria-hidden>
       <div className="terrain-lecture relative h-9 border-t-2 border-white/70">
         {/* lignes */}
         <span className="absolute inset-y-0 left-[4%] w-0.5 bg-white/80" />

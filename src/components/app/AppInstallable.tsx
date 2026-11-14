@@ -113,7 +113,7 @@ export default function AppInstallable() {
       aria-label="Installer l'app Ambiance Rugby"
       data-sortie={sortie ? "" : undefined}
       className="invite-app fixed inset-x-3 z-[45] mx-auto max-w-md rounded-3xl bg-bordeaux text-white ring-1 ring-white/15 shadow-[0_18px_50px_-12px_rgba(42,20,25,.7)] overflow-hidden"
-      style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
+      style={{ bottom: "calc(max(var(--barre-onglets), env(safe-area-inset-bottom)) + 0.75rem)" }}
     >
       {/* lignes du terrain */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100" aria-hidden>
