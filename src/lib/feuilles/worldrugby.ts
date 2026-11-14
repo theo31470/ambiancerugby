@@ -394,7 +394,10 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
   const scores = s.match.scores ?? [];
   const dom = scores.length === 2 ? Number(scores[cible.inverse ? 1 : 0]) : pts("home");
   const ext = scores.length === 2 ? Number(scores[cible.inverse ? 0 : 1]) : pts("away");
-  const essais = (cote: "home" | "away") => faits.filter((e) => (e.type === "try" || e.type === "penalty_try") && e.cote === cote).length;
+  // essais : fil du match, ou à défaut la somme des essais des joueurs (fil absent chez World Rugby)
+  const essais = (cote: "home" | "away") => faits.length
+    ? faits.filter((e) => (e.type === "try" || e.type === "penalty_try") && e.cote === cote).length
+    : rows.filter((r) => r.team_id === (cote === "home" ? m.home_team_id : m.away_team_id)).reduce((t, r) => t + r.tries, 0);
   await db.from("matches").update({ home_tries: essais("home"), away_tries: essais("away") }).eq("id", m.id);
   if (m.competition_id) await db.rpc("appliquer_bonus_offensif", { p_comp: m.competition_id });
   if (live) {
