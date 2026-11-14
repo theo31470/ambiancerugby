@@ -416,8 +416,12 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
   const pts = (cote: "home" | "away") => rows.filter((r) => r.team_id === (cote === "home" ? m.home_team_id : m.away_team_id)).reduce((t, r) => t + r.points, 0)
     + faits.filter((e) => e.type === "penalty_try" && e.cote === cote).length * 7;
   const scores = s.match.scores ?? [];
-  const dom = scores.length === 2 ? Number(scores[cible.inverse ? 1 : 0]) : pts("home");
-  const ext = scores.length === 2 ? Number(scores[cible.inverse ? 0 : 1]) : pts("away");
+  const officiel = (i: 0 | 1) => (scores.length === 2 ? Number(scores[cible.inverse ? 1 - i : i]) : null);
+  // en direct, le score de l'API stats est en retard sur le fil (0-0 alors qu'un essai transformé est au fil) :
+  // on prend le plus haut des deux, et jamais moins que le score déjà affiché (un score ne redescend pas)
+  const enDirect = (i: 0 | 1, cote: "home" | "away", avant: number | null) => Math.max(officiel(i) ?? 0, pts(cote), avant ?? 0);
+  const dom = live ? enDirect(0, "home", m.home_score) : officiel(0) ?? pts("home");
+  const ext = live ? enDirect(1, "away", m.away_score) : officiel(1) ?? pts("away");
   // essais : fil du match, ou à défaut la somme des essais des joueurs (fil absent chez World Rugby)
   const essais = (cote: "home" | "away") => faits.length
     ? faits.filter((e) => (e.type === "try" || e.type === "penalty_try") && e.cote === cote).length
