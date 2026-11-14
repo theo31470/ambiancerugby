@@ -33,22 +33,34 @@ async function nextMatchday(): Promise<{ day: string | null; matches: MatchFull[
   return { day, matches: await getMatchesOfDay(day) };
 }
 
-/** Le match à suivre : un direct en priorité, sinon le prochain grand rendez-vous. */
+/** Ordre d'intérêt pour un public français (plus petit = plus important). */
+const INTERET = ["six-nations", "coupe-du-monde", "nations-championship", "top-14", "champions-cup", "tests-internationaux", "pro-d2", "urc", "premiership", "challenge-cup", "super-rugby", "nations-cup", "mondial-u20", "pacific-nations-cup", "premiership-rugby-cup", "npc", "champ-rugby", "nationale"];
+const interet = (m: MatchFull) => {
+  const i = INTERET.indexOf(m.competition.slug);
+  const france = [m.home, m.away].some((t) => /^france$/i.test(t.name)) ? -10 : 0;
+  return (i === -1 ? 50 : i) + france;
+};
+
+/**
+ * Le match à suivre : le plus grand rendez-vous parmi les directs et les matchs des 3 prochaines heures
+ * (un Galles–All Blacks à venir passe devant un match de 2e division anglaise en cours) ; à égalité, le direct puis le plus proche.
+ */
 async function matchAffiche(): Promise<MatchFull | null> {
   const db = publicClient();
-  const { data: live } = await db.from("matches").select(MATCH_SELECT).in("status", ["live", "halftime"]).order("kickoff_at").limit(1);
-  if (live?.length) return live[0] as unknown as MatchFull;
-  const { data } = await db.from("matches").select(MATCH_SELECT).eq("status", "scheduled").gte("kickoff_at", isoFromNow(-3600e3)).order("kickoff_at").limit(12);
-  const list = (data ?? []) as unknown as MatchFull[];
-  const ordre = ["top-14", "champions-cup", "six-nations", "pro-d2"];
-  const prio = (m: MatchFull) => {
-    const i = ordre.indexOf(m.competition.slug);
-    return i === -1 ? 99 : i;
-  };
-  // le plus proche dans le temps, puis la compétition la plus suivie
-  const premierJour = list[0] ? fmtDay(list[0].kickoff_at, { day: "numeric", month: "numeric" }) : null;
-  const memeJour = list.filter((m) => fmtDay(m.kickoff_at, { day: "numeric", month: "numeric" }) === premierJour);
-  return memeJour.sort((a, b) => prio(a) - prio(b) || a.kickoff_at.localeCompare(b.kickoff_at))[0] ?? null;
+  const [{ data: live }, { data: bientot }] = await Promise.all([
+    db.from("matches").select(MATCH_SELECT).in("status", ["live", "halftime"]).limit(20),
+    // un match « à venir » dont le coup d'envoi est passé depuis plus de 20 minutes n'est pas suivi en direct : on l'écarte
+    db.from("matches").select(MATCH_SELECT).eq("status", "scheduled").gte("kickoff_at", isoFromNow(-20 * 60e3)).order("kickoff_at").limit(40),
+  ]);
+  const enDirect = (live ?? []) as unknown as MatchFull[];
+  const avenir = (bientot ?? []) as unknown as MatchFull[];
+  const horizon = Date.now() + 3 * 3600e3;
+  const fenetre = [...enDirect, ...avenir.filter((m) => new Date(m.kickoff_at).getTime() <= horizon)];
+  const tri = (a: MatchFull, b: MatchFull) => interet(a) - interet(b) || Number(isLive(b.status)) - Number(isLive(a.status)) || a.kickoff_at.localeCompare(b.kickoff_at);
+  if (fenetre.length) return fenetre.sort(tri)[0];
+  // rien dans les 3 heures : le plus grand match de la prochaine journée
+  const premierJour = avenir[0] ? fmtDay(avenir[0].kickoff_at, { day: "numeric", month: "numeric" }) : null;
+  return avenir.filter((m) => fmtDay(m.kickoff_at, { day: "numeric", month: "numeric" }) === premierJour).sort(tri)[0] ?? null;
 }
 
 async function lastResults() {
