@@ -411,6 +411,23 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
   if (motm) await db.from("matches").update({ homme_du_match: motm }).eq("id", m.id).is("homme_du_match", null);
 
   await db.rpc("noter_matchs", { p_matchs: [m.id] });
+  // en direct, le fil de World Rugby a parfois une action de retard sur son score (transformation pas encore saisie) :
+  // on ajoute les points manquants pour que le fil colle toujours au score affiché ; la lecture suivante les remplace par les vrais
+  if (live && (s.match.scores ?? []).length === 2) {
+    const VAL: Record<string, number> = { try: 5, penalty_try: 7, conversion: 2, penalty: 3, drop: 3 };
+    const DECOUPE: Record<number, string[]> = { 2: ["conversion"], 3: ["penalty"], 5: ["try"], 7: ["try", "conversion"] };
+    (["home", "away"] as const).forEach((cote, i) => {
+      const officiel = Number(s.match.scores![cible.inverse ? 1 - i : i]);
+      const auFil = faits.filter((e) => e.cote === cote).reduce((t, e) => t + (VAL[e.type] ?? 0), 0);
+      const manque = DECOUPE[officiel - auFil];
+      if (!manque) return;
+      const teamId = cote === "home" ? m.home_team_id : m.away_team_id;
+      // le buteur de l'équipe d'après les stats (transformations + pénalités réussies)
+      const buteur = [...lignes.values()].filter((l) => l.team_id === teamId && (l.conversions ?? 0) + (l.penalty_goals ?? 0) > 0).sort((a, b) => (b.conversions ?? 0) + (b.penalty_goals ?? 0) - (a.conversions ?? 0) - (a.penalty_goals ?? 0))[0];
+      const minute = Math.max(fin, ...faits.map((e) => e.minute ?? 0));
+      for (const type of manque) faits.push({ minute, cote, player_id: type === "try" ? null : buteur?.player_id ?? null, nom: type === "try" ? "Essai (détail à venir)" : "", type });
+    });
+  }
   const nFil = faits.length ? await ecrireFil(db, m, faits, "wr") : 0;
 
   const pts = (cote: "home" | "away") => rows.filter((r) => r.team_id === (cote === "home" ? m.home_team_id : m.away_team_id)).reduce((t, r) => t + r.points, 0)
