@@ -8,8 +8,8 @@ import portraits from "../../../../public/portraits/index.json";
 
 // portraits détourés (GitHub Actions) : recopiés dans les fiches une fois par instance
 let portraitsSynchro = false;
-// base Supabase saturée (budget disque épuisé) le 14/11 au matin : toute la lecture des feuilles est suspendue
-const PAUSE_BASE = true;
+// coupe-circuit (base saturée le 14/11 au matin) : remettre à true pour suspendre toute la lecture des feuilles
+const PAUSE_BASE = false;
 let classementsVerifies = 0;
 
 export const maxDuration = 120;
