@@ -1,16 +1,12 @@
-import Link from "next/link";
+import TerrainCompo, { type EquipeCompo, type JoueurCompo } from "@/components/match/TerrainCompo";
 import type { TeamLite } from "@/lib/types";
 import { publicClient } from "@/lib/supabase/server";
 import { shopDb } from "@/lib/shop/admin";
 import { lireCompositionLnr } from "@/lib/feuilles/lnr";
 import { lireCompositionEspn, SELECT_MATCH_ESPN, type MatchLocal } from "@/lib/feuilles/espn";
 
-const POSTES: Record<number, string> = {
-  1: "Pilier gauche", 2: "Talonneur", 3: "Pilier droit", 4: "2e ligne", 5: "2e ligne", 6: "3e ligne aile", 7: "3e ligne aile", 8: "3e ligne centre",
-  9: "Demi de mêlée", 10: "Demi d'ouverture", 11: "Ailier", 12: "Centre", 13: "Centre", 14: "Ailier", 15: "Arrière",
-};
 
-type Ligne = { team_id: string; numero?: number | null; starter?: boolean | null; tries?: number | null; yellow?: number | null; red?: number | null; entre?: boolean; player: { slug: string | null; first_name: string; last_name: string } };
+type Ligne = { team_id: string; numero?: number | null; starter?: boolean | null; tries?: number | null; yellow?: number | null; red?: number | null; minutes?: number | null; rating?: number | string | null; motm?: boolean | null; entre?: boolean; player: { slug: string | null; first_name: string; last_name: string; photo_url?: string | null } };
 type Annonce = { numero: number; cle: string; prenom: string; nom: string };
 
 /** Les 23 annoncés (LNR ou ESPN) : sert à afficher tout le banc, même les remplaçants pas encore entrés. */
@@ -28,7 +24,6 @@ async function feuilleAnnoncee(matchId: string, lnrUrl: string | null): Promise<
   return e ? { dom: v(e.dom), ext: v(e.ext), par: "espn_id" } : null;
 }
 
-const court = (p: Ligne["player"]) => `${p.first_name.slice(0, 1)}. ${p.last_name}`;
 
 /** Compositions du match (pendant et après) : les 15 titulaires poste par poste, puis les remplaçants entrés. Visible par tous. */
 export default async function Compositions({ matchId, lnrUrl, lignes, home, away, live }: { matchId: string; lnrUrl: string | null; lignes: Ligne[]; home: TeamLite; away: TeamLite; live: boolean }) {
@@ -58,47 +53,26 @@ export default async function Compositions({ matchId, lnrUrl, lignes, home, away
   };
   const rh = remp(h, home.id, annonce?.dom), ra = remp(a, away.id, annonce?.ext);
   const nom = (t: TeamLite) => t.short_name ?? t.name;
+  const versCompo = (l: Ligne): JoueurCompo => {
+    const infos: string[] = [];
+    if (l.minutes) infos.push(`${l.minutes} min jouées`);
+    if (l.tries) infos.push(`${l.tries} essai${Number(l.tries) > 1 ? "s" : ""}`);
+    if (l.yellow) infos.push("Carton jaune");
+    if (l.red) infos.push("Carton rouge");
+    if (l.motm) infos.push("⭐ Homme du match");
+    return {
+      numero: Number(l.numero), prenom: l.player.first_name, nom: l.player.last_name, slug: l.player.slug, photo: l.player.photo_url ?? null,
+      note: l.rating == null ? null : Number(l.rating), entre: l.entre, infos,
+    };
+  };
+  const equipe = (t: TeamLite, tit: Map<number, Ligne>, remp: Ligne[]): EquipeCompo => ({
+    nom: nom(t), titulaires: [...tit.values()].filter((l) => Number(l.numero) <= 15).map(versCompo), remplacants: remp.map(versCompo),
+  });
 
   return (
-    <section aria-labelledby="h-compos" className="mt-10 max-w-3xl">
-      <div className="flex flex-wrap items-end justify-between gap-2 mb-3">
-        <h2 id="h-compos" className="groovy text-2xl text-vin">Les compositions</h2>
-        <p className="text-sm text-sourdine">{live ? "En gras : les remplaçants déjà entrés en jeu" : "En gras : les remplaçants entrés en jeu"}</p>
-      </div>
-      <div className="bg-surface border border-trait rounded-2xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-2 text-xs font-bold text-sourdine border-b border-trait">
-          <span>{nom(home)}</span><span className="text-center">Poste</span><span className="text-right">{nom(away)}</span>
-        </div>
-        <ol>
-          {Array.from({ length: 15 }, (_, i) => i + 1).map((n) => (
-            <li key={n} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-2 border-b border-trait last:border-0 text-sm">
-              <Nom l={H.get(n)} />
-              <span className="w-24 text-center text-xs text-sourdine leading-tight"><b className="block titre text-encre tnum">{n}</b>{POSTES[n]}</span>
-              <Nom l={A.get(n)} droite />
-            </li>
-          ))}
-        </ol>
-        {(rh.length > 0 || ra.length > 0) && (
-          <div className="grid grid-cols-2 gap-4 px-4 py-3 border-t border-trait text-sm">
-            {[rh, ra].map((r, i) => (
-              <div key={i} className={i ? "text-right" : ""}>
-                <p className="text-xs font-bold text-sourdine mb-1">Remplaçants</p>
-                <ul className="grid gap-1">
-                  {r.map((x) => <li key={x.numero}><span className="tnum text-sourdine mr-1">{x.numero}</span><Nom l={x} inline /></li>)}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+    <section aria-label="Les compositions" className="mt-2">
+      <TerrainCompo equipes={[equipe(home, H, rh), equipe(away, A, ra)]} titre="Les compositions"
+        source={live ? "Les remplaçants entrés en jeu sont marqués 🔁. Passez sur un joueur pour sa fiche." : "Passez sur un joueur pour voir sa note et son match."} />
     </section>
   );
-}
-
-function Nom({ l, droite, inline }: { l?: Ligne; droite?: boolean; inline?: boolean }) {
-  if (!l) return <span className={`text-sourdine ${droite ? "text-right" : ""}`}>–</span>;
-  const marques = `${"🏉".repeat(Number(l.tries) || 0)}${"🟨".repeat(Number(l.yellow) || 0)}${"🟥".repeat(Number(l.red) || 0)}`;
-  const classe = `${inline ? "" : "block truncate"} ${l.entre === false ? "font-normal text-sourdine" : "font-semibold"} hover:text-vin ${droite ? "text-right" : ""}`;
-  const contenu = <>{court(l.player)}{marques && <span className="ml-1 text-xs">{marques}</span>}</>;
-  return l.player.slug ? <Link href={`/joueurs/${l.player.slug}`} className={classe}>{contenu}</Link> : <span className={classe}>{contenu}</span>;
 }

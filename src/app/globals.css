@@ -243,6 +243,8 @@ h1, h2, h3, .titre {
 @keyframes score-saut { 0% { transform: scale(1); } 12% { transform: scale(1.35); background: var(--moutarde); color: var(--bordeaux); } 40% { transform: scale(1); } 100% { background: transparent; } }
 .apparition-hdm { animation: apparition-hdm .6s cubic-bezier(.2,.8,.2,1.1) both; }
 @keyframes apparition-hdm { from { opacity: 0; transform: translateY(16px) rotate(-.6deg); } to { opacity: 1; transform: none; } }
+.fiche-joueur { animation: fiche-joueur .18s ease-out; }
+@keyframes fiche-joueur { from { opacity: 0; transform: translate(-50%, 4px) scale(.96); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 .entree-score > * { animation: entree-score .7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * .08s); }
 @keyframes entree-score { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 

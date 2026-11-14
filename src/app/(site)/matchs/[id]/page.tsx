@@ -79,7 +79,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     getForms(ids),
     getViewer(),
     publicClient().from("rating_history").select("team_id,delta,rating").eq("match_id", m.id),
-    publicClient().from("player_match_stats").select("*, player:players(slug,first_name,last_name,position)").eq("match_id", m.id).order("rating", { ascending: false, nullsFirst: false }),
+    publicClient().from("player_match_stats").select("*, player:players(slug,first_name,last_name,position,photo_url)").eq("match_id", m.id).order("rating", { ascending: false, nullsFirst: false }),
   ]);
   const prono = m.status === "finished" ? null : pronostic(ratings.get(m.home_team_id)?.rating, ratings.get(m.away_team_id)?.rating);
   const deltaOf = (teamId: string) => (hist ?? []).find((h) => h.team_id === teamId)?.delta as number | undefined;
@@ -376,7 +376,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
         </>
       )}
 
-      {m.status !== "cancelled" && <TribuneLive matchId={m.id} enDirect={live} home={m.home} away={m.away} totaux={totauxTribune} favori={viewer?.favorite_team_id} />}
+      {live && <TribuneLive matchId={m.id} enDirect={live} home={m.home} away={m.away} totaux={totauxTribune} favori={viewer?.favorite_team_id} />}
 
       <Comments matchId={m.id} path={`/matchs/${m.id}`} />
     </article>

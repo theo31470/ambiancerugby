@@ -1,15 +1,11 @@
-/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { publicClient } from "@/lib/supabase/server";
 import { shopDb } from "@/lib/shop/admin";
 import { lireCompositionLnr, trouverMatchLnr, type JoueurCompo } from "@/lib/feuilles/lnr";
 import { lireCompositionEspn, SELECT_MATCH_ESPN, type MatchLocal } from "@/lib/feuilles/espn";
 import type { TeamLite } from "@/lib/types";
+import TerrainCompo, { type EquipeCompo as EquipeTerrain, type JoueurCompo as JoueurTerrain } from "@/components/match/TerrainCompo";
 
-const POSTES: Record<number, string> = {
-  1: "Pilier gauche", 2: "Talonneur", 3: "Pilier droit", 4: "2e ligne", 5: "2e ligne", 6: "3e ligne aile", 7: "3e ligne aile", 8: "3e ligne centre",
-  9: "Demi de mêlée", 10: "Demi d'ouverture", 11: "Ailier", 12: "Centre", 13: "Centre", 14: "Ailier", 15: "Arrière",
-};
 type Joueur = { id: string; slug: string | null; first_name: string; last_name: string; photo_url: string | null };
 type Titulaire = { joueur: Joueur; note: number | null; matchs: number };
 type Buteur = { joueur: Joueur; points: number; essais: number };
@@ -53,7 +49,8 @@ async function profil(teamId: string) {
 
 type MatchAvant = { id: string; kickoff_at: string; lnr_url?: string | null; round?: string | null; season?: string | null; competition_id: string };
 
-type Compo = { source: "LNR" | "ESPN"; dom: Map<number, Titulaire>; ext: Map<number, Titulaire> };
+type Banc = { numero: number; joueur: Joueur }[];
+type Compo = { source: "LNR" | "ESPN"; dom: Map<number, Titulaire>; ext: Map<number, Titulaire>; bancDom: Banc; bancExt: Banc };
 
 /** Composition officielle : feuille LNR (Top 14, Pro D2), sinon ESPN (autres compétitions), dans les 4 jours avant le match. */
 async function compositionOfficielle(m: MatchAvant, home: TeamLite, away: TeamLite, notes: { h: Map<string, number>; a: Map<string, number> }): Promise<Compo | null> {
@@ -73,7 +70,11 @@ async function compositionOfficielle(m: MatchAvant, home: TeamLite, away: TeamLi
       const joueur: Joueur = p ? { id: p.id, slug: p.slug, first_name: p.first_name, last_name: p.last_name, photo_url: p.photo_url } : { id: j.espnId, slug: null, first_name: j.prenom, last_name: j.nom, photo_url: null };
       return [j.numero, { joueur, note: p ? n.get(p.id) ?? null : null, matchs: 0 }];
     }));
-    return { source: "ESPN", dom: vers(e.dom, notes.h), ext: vers(e.ext, notes.a) };
+    const banc = (l: typeof e.dom): Banc => l.filter((j) => j.numero > 15).sort((x, y) => x.numero - y.numero).map((j) => {
+      const p = parEspn.get(j.espnId);
+      return { numero: j.numero, joueur: p ? { id: p.id, slug: p.slug, first_name: p.first_name, last_name: p.last_name, photo_url: p.photo_url } : { id: j.espnId, slug: null, first_name: j.prenom, last_name: j.nom, photo_url: null } };
+    });
+    return { source: "ESPN", dom: vers(e.dom, notes.h), ext: vers(e.ext, notes.a), bancDom: banc(e.dom), bancExt: banc(e.ext) };
   }
   let url = m.lnr_url ?? null;
   if (!url) {
@@ -85,20 +86,23 @@ async function compositionOfficielle(m: MatchAvant, home: TeamLite, away: TeamLi
   }
   if (!url) return null;
   const l = await lireCompositionLnr(url);
-  return l ? { source: "LNR", dom: await versTitulaires(l.dom, notes.h), ext: await versTitulaires(l.ext, notes.a) } : null;
+  if (!l) return null;
+  const [d, x] = await Promise.all([versTitulaires(l.dom, notes.h), versTitulaires(l.ext, notes.a)]);
+  return { source: "LNR", dom: d.tit, ext: x.tit, bancDom: d.banc, bancExt: x.banc };
 }
 
 async function versTitulaires(liste: JoueurCompo[], notes: Map<string, number>) {
   const { data } = await publicClient().from("players").select("id,slug,first_name,last_name,photo_url,lnr_id").in("lnr_id", liste.map((j) => j.lnrId));
   const parLnr = new Map((data ?? []).map((p) => [p.lnr_id as string, p]));
-  const out = new Map<number, Titulaire>();
+  const tit = new Map<number, Titulaire>();
+  const banc: Banc = [];
   for (const j of liste) {
-    if (j.numero > 15) continue;
     const p = parLnr.get(j.lnrId);
     const joueur: Joueur = p ? { id: p.id, slug: p.slug, first_name: p.first_name, last_name: p.last_name, photo_url: p.photo_url } : { id: j.lnrId, slug: null, first_name: j.prenom, last_name: j.nom, photo_url: null };
-    out.set(j.numero, { joueur, note: p ? notes.get(p.id) ?? null : null, matchs: 0 });
+    if (j.numero > 15) banc.push({ numero: j.numero, joueur });
+    else tit.set(j.numero, { joueur, note: p ? notes.get(p.id) ?? null : null, matchs: 0 });
   }
-  return out;
+  return { tit, banc: banc.sort((a, b) => a.numero - b.numero) };
 }
 
 const court = (j: Joueur) => `${j.first_name.slice(0, 1)}. ${j.last_name}`;
@@ -110,7 +114,6 @@ export default async function AvantMatch({ match, home, away, full }: { match: M
   if (compo) { h.titulaires = compo.dom; a.titulaires = compo.ext; }
   const numeros = Array.from({ length: 15 }, (_, i) => i + 1).filter((n) => h.titulaires.has(n) || a.titulaires.has(n));
   if (numeros.length < 8) return null;
-  const visibles = full ? numeros : numeros.slice(0, 3);
   const avantage = { h: 0, a: 0 };
   for (const n of numeros) {
     const x = h.titulaires.get(n)?.note, y = a.titulaires.get(n)?.note;
@@ -118,42 +121,26 @@ export default async function AvantMatch({ match, home, away, full }: { match: M
   }
   const nom = (t: TeamLite) => t.short_name ?? t.name;
 
+  const versCompo = (n: number, t: Titulaire): JoueurTerrain => ({
+    numero: n, prenom: t.joueur.first_name, nom: t.joueur.last_name, slug: t.joueur.slug, photo: t.joueur.photo_url,
+    note: full ? t.note : null,
+    infos: [
+      ...(t.note != null && !full ? ["Note moyenne : réservée aux Supporters"] : t.note != null ? ["Note moyenne sur ses 5 derniers matchs"] : []),
+      ...(t.matchs ? [`Titulaire à ce poste ${t.matchs} fois sur les 5 derniers matchs`] : []),
+    ],
+  });
+  const equipe = (t: TeamLite, tit: Map<number, Titulaire>, banc: Banc): EquipeTerrain => ({
+    nom: nom(t), titulaires: [...tit.entries()].map(([n, x]) => versCompo(n, x)),
+    remplacants: banc.map((b) => ({ numero: b.numero, prenom: b.joueur.first_name, nom: b.joueur.last_name, slug: b.joueur.slug, photo: b.joueur.photo_url })),
+  });
+
   return (
-    <section aria-labelledby="h-avant" className="mt-10 max-w-3xl">
-      <div className="flex flex-wrap items-end justify-between gap-2 mb-3">
-        <h2 id="h-avant" className="groovy text-2xl text-vin">L&apos;avant-match</h2>
-        <p className="text-sm text-sourdine">{compo ? <><b className="text-ok">Composition officielle</b> ({compo.source === "LNR" ? "feuille de match LNR" : "ESPN"}), note moyenne sur les 5 derniers matchs</> : "Titulaires habituels sur les 5 derniers matchs (la composition officielle s'affiche dès sa publication), note moyenne sur 10"}</p>
-      </div>
-      <div className="bg-surface border border-trait rounded-2xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-2 text-xs font-bold text-sourdine border-b border-trait">
-          <span>{nom(home)}</span><span className="text-center">Duels</span><span className="text-right">{nom(away)}</span>
-        </div>
-        <ol className="relative">
-          {visibles.map((n) => {
-            const x = h.titulaires.get(n), y = a.titulaires.get(n);
-            const gagneH = x?.note != null && y?.note != null && x.note - y.note >= 0.3;
-            const gagneA = x?.note != null && y?.note != null && y.note - x.note >= 0.3;
-            return (
-              <li key={n} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-2 border-b border-trait last:border-0 text-sm">
-                <Joueur t={x} gagne={gagneH} />
-                <span className="w-24 text-center text-xs text-sourdine leading-tight"><b className="block titre text-encre tnum">{n}</b>{POSTES[n]}</span>
-                <Joueur t={y} gagne={gagneA} droite />
-              </li>
-            );
-          })}
-        </ol>
-        {!full && (
-          <div className="relative border-t border-trait">
-            <div aria-hidden className="blur-sm select-none pointer-events-none opacity-60 px-4 py-3 grid gap-2">
-              {[0, 1, 2].map((i) => <div key={i} className="h-6 rounded bg-teinte" />)}
-            </div>
-            <div className="absolute inset-0 grid place-items-center text-center px-4">
-              <p className="text-sm font-semibold">Les 15 duels, les buteurs en forme et le bilan sont réservés aux Supporters. <Link href="/abonnement" className="text-vin underline underline-offset-4">Devenir Supporter</Link></p>
-            </div>
-          </div>
-        )}
-      </div>
-      {full && (
+    <section aria-labelledby="h-avant" className="mt-10">
+      <h2 id="h-avant" className="sr-only">L&apos;avant-match</h2>
+      <TerrainCompo equipes={[equipe(home, h.titulaires, compo?.bancDom ?? []), equipe(away, a.titulaires, compo?.bancExt ?? [])]}
+        titre={compo ? "Les compositions" : "Les XV probables"}
+        source={compo ? `Composition officielle (${compo.source === "LNR" ? "feuille de match LNR" : "ESPN"}). Passez sur un joueur pour sa fiche.` : "Titulaires habituels sur les 5 derniers matchs ; la composition officielle s'affiche dès sa publication."} />
+      {full ? (
         <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr]">
           {([[home, h.buteurs], [away, a.buteurs]] as const).map(([t, bs]) => (
             <div key={t.id} className="bg-surface border border-trait rounded-2xl p-4">
@@ -169,28 +156,13 @@ export default async function AvantMatch({ match, home, away, full }: { match: M
             </div>
           ))}
           <p className="sm:col-span-2 text-sm">
-            Bilan des duels : <b>{nom(home)} {avantage.h}</b> – <b>{avantage.a} {nom(away)}</b>
+            Duels poste par poste (note moyenne) : <b>{nom(home)} {avantage.h}</b> – <b>{avantage.a} {nom(away)}</b>
             {avantage.h !== avantage.a && <> : avantage {avantage.h > avantage.a ? nom(home) : nom(away)} sur le papier.</>}
           </p>
         </div>
+      ) : (
+        <p className="mt-3 text-sm">Notes moyennes des joueurs, duels poste par poste et buteurs en forme : réservés aux Supporters. <Link href="/abonnement" className="font-semibold text-vin underline underline-offset-4">Devenir Supporter</Link></p>
       )}
     </section>
-  );
-}
-
-function Joueur({ t, gagne, droite }: { t?: Titulaire; gagne: boolean; droite?: boolean }) {
-  if (!t) return <span className={`text-sourdine ${droite ? "text-right" : ""}`}>–</span>;
-  const Cadre = ({ children, className }: { children: React.ReactNode; className: string }) =>
-    t.joueur.slug ? <Link href={`/joueurs/${t.joueur.slug}`} className={className}>{children}</Link> : <span className={className}>{children}</span>;
-  return (
-    <Cadre className={`flex items-center gap-2 min-w-0 hover:text-vin ${droite ? "flex-row-reverse text-right" : ""}`}>
-      {t.joueur.photo_url
-        ? <img src={t.joueur.photo_url} alt="" loading="lazy" className="w-8 h-8 rounded-full object-cover object-top bg-teinte shrink-0" />
-        : <span className="w-8 h-8 rounded-full bg-teinte shrink-0" aria-hidden />}
-      <span className="min-w-0">
-        <span className={`block truncate ${gagne ? "font-bold" : "font-semibold"}`}>{court(t.joueur)}</span>
-        {t.note != null && <span className={`text-xs tnum ${gagne ? "text-ok font-bold" : "text-sourdine"}`}>{t.note.toFixed(1)}/10{gagne ? " ▲" : ""}</span>}
-      </span>
-    </Cadre>
   );
 }
