@@ -6,10 +6,15 @@ import { cache } from "react";
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
+/** Requêtes vers Supabase limitées à 10 s : une base saturée fait échouer la requête au lieu de bloquer la page 5 minutes. */
+export const fetchBorne: typeof fetch = (input, init) =>
+  fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(10_000) });
+
 /** Client lié à la session de l'utilisateur (cookies). */
 export async function createClient() {
   const cookieStore = await cookies();
   return createServerClient(URL, KEY, {
+    global: { fetch: fetchBorne },
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -27,7 +32,7 @@ export async function createClient() {
 
 /** Client anonyme pour les données publiques (pas de cookies). */
 export function publicClient() {
-  return createPlainClient(URL, KEY, { auth: { persistSession: false } });
+  return createPlainClient(URL, KEY, { auth: { persistSession: false }, global: { fetch: fetchBorne } });
 }
 
 export type Viewer = {
@@ -53,7 +58,11 @@ export type Viewer = {
 /** Utilisateur connecté + profil, mémorisé pour la requête. */
 export const getViewer = cache(async (): Promise<Viewer | null> => {
   const supabase = await createClient();
-  const { data: claims } = await supabase.auth.getClaims();
+  // service de connexion lent ou en panne : au bout de 3 s, la page s'affiche en visiteur plutôt que d'attendre
+  const { data: claims } = await Promise.race([
+    supabase.auth.getClaims(),
+    new Promise<{ data: null }>((ok) => setTimeout(() => ok({ data: null }), 3000)),
+  ]).catch(() => ({ data: null }));
   const sub = claims?.claims?.sub;
   if (!sub) return null;
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", sub).single();

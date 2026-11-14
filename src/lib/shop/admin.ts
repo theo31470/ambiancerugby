@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 export function shopDb() {
   const cle = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!cle) throw new Error("La clé SUPABASE_SERVICE_ROLE_KEY n'est pas encore configurée sur Vercel.");
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, cle, { auth: { persistSession: false } });
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, cle, { auth: { persistSession: false }, global: { fetch: (i, o) => fetch(i, { ...o, signal: o?.signal ?? AbortSignal.timeout(25_000) }) } });
 }
 
 export type Commande = {

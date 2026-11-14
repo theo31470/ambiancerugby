@@ -22,7 +22,11 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  const { data } = await supabase.auth.getClaims();
+  // si le service de connexion Supabase ne répond pas, on n'attend pas plus de 3 s : la page s'affiche en visiteur
+  const { data } = await Promise.race([
+    supabase.auth.getClaims(),
+    new Promise<{ data: null }>((ok) => setTimeout(() => ok({ data: null }), 3000)),
+  ]).catch(() => ({ data: null }));
   // seul le domaine principal est indexé (les adresses vercel.app et de prévisualisation ne le sont pas)
   const hote = request.headers.get("host") ?? "";
   if (!/(^|\.)ambiance-rugby\.fr$/i.test(hote.replace(/:\d+$/, ""))) response.headers.set("X-Robots-Tag", "noindex");
