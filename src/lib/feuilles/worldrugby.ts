@@ -409,7 +409,8 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
     ? faits.filter((e) => (e.type === "try" || e.type === "penalty_try") && e.cote === cote).length
     : rows.filter((r) => r.team_id === (cote === "home" ? m.home_team_id : m.away_team_id)).reduce((t, r) => t + r.tries, 0);
   await db.from("matches").update({ home_tries: essais("home"), away_tries: essais("away") }).eq("id", m.id);
-  if (m.competition_id) await db.rpc("appliquer_bonus_offensif", { p_comp: m.competition_id });
+  // le classement n'est recalculé que pour un match récent (un vieux match ne change pas le classement en cours)
+  if (m.competition_id && Date.now() - new Date(m.kickoff_at).getTime() < 60 * 86400e3) await db.rpc("appliquer_bonus_offensif", { p_comp: m.competition_id });
   if (live) {
     const horloge = s.match.clock?.label ? `${Math.floor((s.match.clock.secs ?? 0) / 60)}'` : null;
     await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: new Date().toISOString(), ...(horloge ? { clock: horloge } : {}) }).eq("id", m.id);

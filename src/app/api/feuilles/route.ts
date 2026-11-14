@@ -48,10 +48,10 @@ export async function GET(req: Request) {
     .order("kickoff_at", { ascending: false }).limit(10);
   const prioritaires = [...(enDirect ?? []), ...(recents ?? [])].map((x) => x.id as string);
   // rattrapage des vieux matchs, à un rythme que l'offre gratuite Supabase supporte (budget disque limité) :
-  // la nuit (0 h – 8 h) un créneau toutes les 3 minutes, le jour toutes les 5 minutes ; 1 feuille + 3 matchs World Rugby par créneau ;
+  // la nuit (0 h – 8 h) un créneau toutes les 3 minutes, le jour toutes les 4 minutes ; 1 feuille + 4 matchs World Rugby par créneau ;
   // jamais pendant un direct, et on saute le créneau si la base répond lentement
   const heure = Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Paris" }).format(new Date()));
-  const pas = heure < 8 ? 3 : 5;
+  const pas = heure < 8 ? 3 : 4;
   const creneau = process.env.RATTRAPAGE_WR !== "0" && Math.floor(Date.now() / 60e3) % pas < 2 && !(enDirect ?? []).length && !baseLente;
   const { data: ids } = creneau ? await db.rpc("feuilles_a_traiter", { p_limite: 6 }) : { data: [] };
   const file = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
@@ -109,14 +109,14 @@ export async function GET(req: Request) {
     // rattrapage : feuilles ESPN remplacées par World Rugby ; feuilles LNR complétées (courses, mètres, défenseurs battus…)
     const rattrapage = async () => {
       if (!creneau) return;
-      const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 3 });
+      const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 4 });
       const idsWr = ((wr ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { stats_wr_a_traiter: string }).stats_wr_a_traiter));
       if (!idsWr.length) return;
       const { data: ms } = await db.from("matches").select(`${SELECT_MATCH_WR}, competition:competitions(lnr_site)`).in("id", idsWr);
       for (const m of (ms ?? []) as unknown as (MatchWr & { competition: { lnr_site: string | null } | null })[]) {
         if (Date.now() - debut > 100_000) break;
         // rattrapage au ralenti : la base (offre gratuite) a un budget d'écriture limité
-        await new Promise((ok) => setTimeout(ok, 4000));
+        await new Promise((ok) => setTimeout(ok, 2500));
         const r = await importerFeuilleWr(db, m, { completer: !!m.competition?.lnr_site }).catch((e: Error) => ({ ok: false as const, raison: `erreur : ${e.message}`.slice(0, 200) }));
         const res = r.ok ? `wr ${r.joueurs} joueurs${r.detail ? "" : " (sans détail)"}` : r.raison;
         // introuvable chez World Rugby : on n'y revient pas avant longtemps ; sinon nouvel essai dans 3 heures
