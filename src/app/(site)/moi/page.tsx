@@ -71,7 +71,7 @@ export default async function MoiPage() {
         {viewer && (
           club ? (
             <Link href={`/clubs/${club.slug}`} className="flex items-center gap-4 rounded-3xl p-4 text-white relative overflow-hidden"
-              style={{ background: `linear-gradient(120deg, ${club.color ?? "var(--vin)"} 0%, color-mix(in oklab, ${club.color ?? "var(--vin)"} 55%, #12060a) 100%)` }}>
+              style={{ background: `linear-gradient(120deg, color-mix(in oklab, ${club.color ?? "var(--vin)"} 72%, #12060a) 0%, color-mix(in oklab, ${club.color ?? "var(--vin)"} 42%, #12060a) 100%)` }}>
               <span className="w-14 h-14 rounded-2xl bg-white grid place-items-center shrink-0"><TeamBadge team={club} size="md" /></span>
               <span className="min-w-0 flex-1">
                 <span className="text-xs uppercase tracking-wider font-bold text-white/70">Mon club</span>

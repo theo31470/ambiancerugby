@@ -13,11 +13,12 @@ import Reveal from "@/components/deco/Reveal";
 import Prono from "@/components/algo/Prono";
 import Forme from "@/components/algo/Forme";
 import { Ballon, Beret, Echarpe, Pinte, Poteaux, Trompette } from "@/components/deco/Icones";
-import { getArticles, getCompetition, getMatchesOfDay, getStandings, MATCH_SELECT } from "@/lib/queries";
+import AccueilMobile, { type MonClub } from "@/components/accueil/AccueilMobile";
+import { getArticles, getCompetition, getMatchesOfDay, getStandings, MATCH_SELECT, TEAM_LITE } from "@/lib/queries";
 import { getPowerRanking, getRatings, pronostic } from "@/lib/algo";
-import { getViewer, publicClient } from "@/lib/supabase/server";
+import { getViewer, hasBadge, publicClient } from "@/lib/supabase/server";
 import { fmtDay, fmtRelative, fmtTime, isLive, parisToday, isoFromNow } from "@/lib/format";
-import type { MatchFull } from "@/lib/types";
+import type { MatchFull, TeamLite } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,26 @@ async function derniersCommentaires() {
   return (data ?? []) as unknown as { id: string; body: string; created_at: string; author: { display_name: string | null; plan: string; plan_until: string | null } | null; article: { slug: string; title: string } | null; match: { id: string } | null }[];
 }
 
+/** Le club de cœur du membre : prochain match, dernier résultat et ses actus (accueil mobile). */
+async function monClub(teamId: string | null | undefined): Promise<MonClub | null> {
+  if (!teamId) return null;
+  const db = publicClient();
+  const sien = `home_team_id.eq.${teamId},away_team_id.eq.${teamId}`;
+  const [t, prochain, dernier, actus] = await Promise.all([
+    db.from("teams").select(TEAM_LITE).eq("id", teamId).maybeSingle(),
+    db.from("matches").select(MATCH_SELECT).or(sien).in("status", ["scheduled", "live", "halftime"]).gte("kickoff_at", isoFromNow(-4 * 3600e3)).order("kickoff_at").limit(1),
+    db.from("matches").select(MATCH_SELECT).or(sien).eq("status", "finished").order("kickoff_at", { ascending: false }).limit(1),
+    getArticles({ teamId, limit: 3 }),
+  ]);
+  if (!t.data) return null;
+  return {
+    team: t.data as unknown as TeamLite,
+    prochain: ((prochain.data ?? [])[0] as unknown as MatchFull) ?? null,
+    dernier: ((dernier.data ?? [])[0] as unknown as MatchFull) ?? null,
+    actus,
+  };
+}
+
 const TITRE = ["Le", "rugby,", "côté", "tribune."];
 
 export const metadata: Metadata = {
@@ -83,7 +104,10 @@ export default async function Home() {
     derniersCommentaires(),
     getViewer(),
   ]);
-  const standings = top14 ? await getStandings(top14.id, top14.current_season) : [];
+  const [standings, club] = await Promise.all([
+    top14 ? getStandings(top14.id, top14.current_season) : Promise.resolve([]),
+    monClub(viewer?.favorite_team_id),
+  ]);
   const ratings = affiche ? await getRatings([affiche.home_team_id, affiche.away_team_id]) : new Map();
   const prono = affiche ? pronostic(ratings.get(affiche.home_team_id)?.rating, ratings.get(affiche.away_team_id)?.rating) : null;
   const [hero, ...others] = articles;
@@ -98,6 +122,22 @@ export default async function Home() {
       ])} />
       <LiveRefresh />
 
+      {/* ================= TÉLÉPHONES : accueil façon app ================= */}
+      <AccueilMobile
+        prenom={viewer?.display_name?.split(" ")[0] ?? null}
+        connecte={!!viewer}
+        supporter={hasBadge(viewer)}
+        jour={upcoming.day}
+        aujourdhui={isToday}
+        matchs={upcoming.matches}
+        resultats={results}
+        articles={articles}
+        classement={standings}
+        club={club}
+      />
+
+      {/* ================= ORDINATEUR (et grandes tablettes) ================= */}
+      <div className="hidden lg:block">
       {/* ================= EN-TÊTE ================= */}
       <section className="pleine-largeur relative overflow-hidden bg-bordeaux text-white -mt-6 sm:-mt-10" aria-labelledby="h-une">
         <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100" aria-hidden>
@@ -312,6 +352,7 @@ export default async function Home() {
             </ul>
           </div>
         </section>
+      </div>
       </div>
     </div>
   );
