@@ -52,7 +52,9 @@ export async function GET(req: Request) {
   // jamais pendant un direct, et on saute le créneau si la base répond lentement
   const heure = Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Paris" }).format(new Date()));
   const pas = heure < 8 ? 3 : 4;
-  const creneau = process.env.RATTRAPAGE_WR !== "0" && Math.floor(Date.now() / 60e3) % pas < 2 && !(enDirect ?? []).length && !baseLente;
+  // le jour, le rattrapage ne tourne que si la base a récupéré (RATTRAPAGE_JOUR=1) : elle doit d'abord tenir les matchs du jour
+  const jourOk = heure < 9 || process.env.RATTRAPAGE_JOUR === "1";
+  const creneau = process.env.RATTRAPAGE_WR !== "0" && jourOk && Math.floor(Date.now() / 60e3) % pas < 2 && !(enDirect ?? []).length && !baseLente;
   const { data: ids } = creneau ? await db.rpc("feuilles_a_traiter", { p_limite: 6 }) : { data: [] };
   const file = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
   const liste = [...new Set([...prioritaires, ...file.filter((id) => !prioritaires.includes(id)).slice(0, 1)])].slice(0, 8);
