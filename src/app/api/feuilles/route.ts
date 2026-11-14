@@ -103,7 +103,7 @@ export async function GET(req: Request) {
         const res = r.ok ? `wr ${r.joueurs} joueurs${r.detail ? "" : " (sans détail)"}` : r.raison;
         // introuvable chez World Rugby : on n'y revient pas avant longtemps ; sinon nouvel essai dans 3 heures
         const vieux = Date.now() - new Date(m.kickoff_at).getTime() > 3 * 86400e3;
-        const quand = r.ok ? new Date() : r.raison.startsWith("match introuvable") ? new Date(Date.now() + 365 * 86400e3) : vieux ? new Date(Date.now() + 30 * 86400e3) : new Date();
+        const quand = r.ok || r.raison.includes("réseau") ? new Date() : r.raison.startsWith("match introuvable") ? new Date(Date.now() + 365 * 86400e3) : vieux ? new Date(Date.now() + 30 * 86400e3) : new Date();
         await db.from("matches").update({ stats_wr_at: quand.toISOString(), stats_wr_resultat: res }).eq("id", m.id);
         marquer(m.kickoff_at, r.ok);
         bilan.push(res);

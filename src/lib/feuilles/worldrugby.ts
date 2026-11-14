@@ -59,9 +59,17 @@ export type MatchWr = {
 };
 export const SELECT_MATCH_WR = "id, kickoff_at, status, competition_id, home_team_id, away_team_id, home_score, away_score, wr_id, home:teams!matches_home_team_id_fkey(id,name,short_name,abbreviation,aliases,wr_id,is_national), away:teams!matches_away_team_id_fkey(id,name,short_name,abbreviation,aliases,wr_id,is_national)";
 
+/** Dernière lecture ratée pour une raison réseau (limite de débit, serveur, délai) : à retenter bientôt, pas « pas de données ». */
+let panneReseau = false;
 async function lire<T>(chemin: string): Promise<T | null> {
-  const r = await fetch(`${API}${chemin}`, { cache: "no-store", signal: AbortSignal.timeout(20_000), headers: { "user-agent": "AmbianceRugby/1.0", accept: "application/json" } }).catch(() => null);
-  return r?.ok ? ((await r.json()) as T) : null;
+  for (let essai = 0; essai < 3; essai++) {
+    const r = await fetch(`${API}${chemin}`, { cache: "no-store", signal: AbortSignal.timeout(20_000), headers: { "user-agent": "AmbianceRugby/1.0", accept: "application/json" } }).catch(() => null);
+    if (r?.ok) { try { return (await r.json()) as T; } catch { /* réponse coupée : on retente */ } }
+    else if (r && r.status === 404) return null;
+    panneReseau = true;
+    await new Promise((ok) => setTimeout(ok, 800 * (essai + 1)));
+  }
+  return null;
 }
 
 /** 2 = même identifiant World Rugby, 1 = noms qui se ressemblent, 0 = rien, -5 = identifiant différent. */
@@ -183,14 +191,16 @@ export type ResultatWr = { ok: true; joueurs: number; crees: number; fil: number
  * fil du match, homme du match officiel ; en direct, score et chrono. Remplace une feuille ESPN précédente.
  */
 export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { remplacer?: boolean; completer?: boolean } = {}): Promise<ResultatWr> {
+  panneReseau = false;
   const cible = await trouver(m);
-  if (!cible) return { ok: false, raison: "match introuvable chez World Rugby" };
+  if (!cible) return { ok: false, raison: panneReseau ? "erreur réseau World Rugby" : "match introuvable chez World Rugby" };
   const [s, resume, fil] = await Promise.all([
     lire<Stats>(`/match/${cible.id}/stats`),
     lire<Resume>(`/match/${cible.id}/summary`),
     lire<{ timeline?: Evt[] }>(`/match/${cible.id}/timeline`),
   ]);
-  if (!s?.teamStats?.length) return { ok: false, raison: "feuille pas encore publiée chez World Rugby" };
+  if (!s) return { ok: false, raison: panneReseau ? "erreur réseau World Rugby" : "feuille pas encore publiée chez World Rugby" };
+  if (!s.teamStats?.length) return { ok: false, raison: "feuille pas encore publiée chez World Rugby" };
   const statut = (s.match.status ?? "").toUpperCase();
   const live = statut.startsWith("L");
   const fini = statut === "C";
