@@ -1,5 +1,5 @@
 "use server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/app/actions";
@@ -40,7 +40,7 @@ export async function enregistrerProfil(_: FormState, form: FormData): Promise<F
     if (form.get("retirer_avatar") === "1") patch.avatar_url = null;
     const { error } = await db.from("profiles").update(patch).eq("id", uid);
     if (error) return { error: error.code === "23505" ? "Ce pseudo est déjà pris." : error.message };
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     return { ok: "Profil enregistré." };
   } catch (e) {
     return { error: (e as Error).message };
@@ -63,7 +63,7 @@ export async function enregistrerPreferences(_: FormState, form: FormData): Prom
     };
     const { error } = await db.from("profiles").update({ prefs, profil_public: coche("profil_public") }).eq("id", uid);
     if (error) return { error: error.message };
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     return { ok: "Préférences enregistrées." };
   } catch (e) {
     return { error: (e as Error).message };
@@ -107,7 +107,7 @@ export async function changerMotDePasse(_: FormState, form: FormData): Promise<F
 export async function deconnecterPartout() {
   const { db } = await moi();
   await db.auth.signOut({ scope: "global" });
-  revalidatePath("/", "layout");
+  { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
   redirect("/connexion?ok=deconnecte");
 }
 
@@ -118,6 +118,6 @@ export async function supprimerCompte(_: FormState, form: FormData): Promise<For
   const { error } = await db.rpc("supprimer_mon_compte");
   if (error) return { error: error.message };
   await db.auth.signOut();
-  revalidatePath("/", "layout");
+  { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
   redirect("/?ok=compte-supprime");
 }

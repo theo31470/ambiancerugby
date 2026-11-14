@@ -1,5 +1,5 @@
 "use server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { EVENT_POINTS, parisLocalToIso, slugify } from "@/lib/format";
@@ -81,7 +81,7 @@ export async function saveArticle(form: FormData) {
       const { error } = await db.from("articles").insert({ ...row, author_id: viewer.id });
       fail(error, "Création de l'article");
     }
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/articles?ok=${status === "published" ? "publie" : "brouillon"}`);
   });
 }
@@ -91,7 +91,7 @@ export async function deleteArticle(form: FormData) {
     const { db } = await staff();
     const { error } = await db.from("articles").delete().eq("id", String(form.get("id")));
     fail(error, "Suppression");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect("/studio/articles?ok=supprime");
   });
 }
@@ -141,7 +141,7 @@ export async function saveTeam(form: FormData) {
         await db.from("team_competitions").delete().eq("team_id", teamId!).eq("competition_id", c.id).eq("season", c.current_season);
       }
     }
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/clubs/${teamId}?ok=enregistre`);
   });
 }
@@ -187,7 +187,7 @@ export async function savePlayer(form: FormData) {
       const { error } = await db.from("players").insert(row);
       fail(error, "Création du joueur");
     }
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(id ? `/studio/joueurs/${id}?ok=enregistre` : `/studio/joueurs?ok=enregistre${row.team_id ? `&club=${row.team_id}` : ""}`);
   });
 }
@@ -197,7 +197,7 @@ export async function deletePlayer(form: FormData) {
     const { db } = await staff();
     const { error } = await db.from("players").delete().eq("id", String(form.get("id")));
     fail(error, "Suppression");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect("/studio/joueurs?ok=supprime");
   });
 }
@@ -239,7 +239,7 @@ export async function saveMatch(form: FormData) {
       fail(error, "Création du match");
       matchId = data!.id;
     }
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/matchs/${matchId}?ok=enregistre`);
   });
 }
@@ -249,7 +249,7 @@ export async function deleteMatch(form: FormData) {
     const { db } = await staff();
     const { error } = await db.from("matches").delete().eq("id", String(form.get("id")));
     fail(error, "Suppression");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect("/studio/matchs?ok=supprime");
   });
 }
@@ -283,7 +283,7 @@ export async function addEvent(form: FormData) {
       if (minute != null) patch.clock = `${minute}'`;
       await db.from("matches").update(patch).eq("id", matchId);
     }
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/matchs/${matchId}`);
   });
 }
@@ -308,7 +308,7 @@ export async function deleteEvent(form: FormData) {
         }
       }
     }
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/matchs/${matchId}`);
   });
 }
@@ -327,7 +327,7 @@ export async function setMatchStatus(form: FormData) {
     if (status === "finished" || status === "halftime") patch.clock = null;
     const { error } = await db.from("matches").update(patch).eq("id", matchId);
     fail(error, "Changement de statut");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/matchs/${matchId}`);
   });
 }
@@ -351,7 +351,7 @@ export async function setCurrentSeason(form: FormData) {
     const { db } = await staff();
     const { error } = await db.from("competitions").update({ current_season: String(form.get("season")).trim() }).eq("id", String(form.get("id")));
     fail(error, "Saison");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect("/studio/donnees?ok=saison");
   });
 }
@@ -388,7 +388,7 @@ export async function setPlan(form: FormData) {
     }
     const { error } = await db.from("profiles").update(patch).eq("id", String(form.get("id")));
     fail(error, "Abonnement");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect("/studio/utilisateurs?ok=enregistre");
   });
 }
@@ -422,7 +422,7 @@ export async function saveStats(form: FormData) {
     // l'homme du match choisi ici est l'officiel : les notes recalculées (import ESPN, LNR) le respectent
     await db.from("matches").update({ homme_du_match: motm && ids.includes(motm) ? motm : null }).eq("id", matchId);
     await db.rpc("noter_matchs", { p_matchs: [matchId] });
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/matchs/${matchId}/stats?ok=enregistre`);
   });
 }
@@ -474,7 +474,7 @@ export async function saveJournee(form: FormData) {
     if (rows.length) del = del.not("player_id", "in", `(${rows.map((r) => r.player_id).join(",")})`);
     const { error: e2 } = await del;
     fail(e2, "Saisie du match");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     const back = String(form.get("_back"));
     const [chemin, ancre] = back.split("#");
     redirect(`${chemin}${chemin.includes("?") ? "&" : "?"}ok=enregistre${ancre ? `#${ancre}` : ""}`);
@@ -509,7 +509,7 @@ export async function saveBase(form: FormData) {
       fail(error, "Stats de départ");
     }
     if (vides.length) await db.from("player_season_base").delete().eq("competition_id", competitionId).eq("season", season).in("player_id", vides);
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     const back = String(form.get("_back"));
     redirect(`${back}${back.includes("?") ? "&" : "?"}ok=enregistre`);
   });
@@ -550,7 +550,7 @@ export async function importBase(form: FormData) {
       const { error } = await db.from("player_season_base").upsert(rows, { onConflict: "player_id,competition_id,season" });
       fail(error, "Import des stats de départ");
     }
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     const back = String(form.get("_back"));
     const msg = inconnus.length ? `&erreur=${encodeURIComponent(`${rows.length} joueurs importés. Introuvables dans l'effectif : ${inconnus.slice(0, 12).join(", ")}${inconnus.length > 12 ? "…" : ""}`)}` : "&ok=importe";
     redirect(`${back}${back.includes("?") ? "" : "?"}${msg}`);
@@ -589,7 +589,7 @@ export async function toggleCompetition(form: FormData) {
     const { db } = await staff();
     const { error } = await db.from("competitions").update({ active: form.get("active") === "1" }).eq("id", String(form.get("id")));
     fail(error, "Compétition");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect("/studio/donnees?ok=enregistre");
   });
 }
@@ -687,7 +687,7 @@ export async function saveMembre(form: FormData) {
     }).eq("id", String(form.get("id")));
     if (error?.code === "23505") throw new Error("Ce pseudo est déjà pris.");
     fail(error, "Profil");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     retour(form, "enregistre");
   });
 }
@@ -700,7 +700,7 @@ export async function setAbonnement(form: FormData) {
     const patch = plan === "free" ? { plan: "free", plan_until: null } : { plan: "supporter", plan_until: fin ? new Date(`${fin}T23:59:59`).toISOString() : null };
     const { error } = await db.from("profiles").update(patch).eq("id", String(form.get("id")));
     fail(error, "Abonnement");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     retour(form, "enregistre");
   });
 }
@@ -726,7 +726,7 @@ export async function supprimerMembre(form: FormData) {
     if (form.get("confirme") !== "on") throw new Error("Cochez la case de confirmation pour supprimer ce compte.");
     const { error } = await db.rpc("admin_supprimer_membre", { p_id: String(form.get("id")) });
     fail(error, "Suppression du compte");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect("/studio/utilisateurs?ok=supprime");
   });
 }
@@ -736,7 +736,7 @@ export async function supprimerCommentaire(form: FormData) {
     const { db } = await staff();
     const { error } = await db.from("comments").delete().eq("id", String(form.get("id")));
     fail(error, "Suppression du commentaire");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     retour(form, "supprime");
   });
 }
@@ -756,7 +756,7 @@ export async function saveCompetition(form: FormData) {
       active: form.get("active") === "on", is_featured: form.get("is_featured") === "on",
     }).eq("id", id);
     fail(error, "Compétition");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/competitions/${id}?ok=enregistre`);
   });
 }
@@ -769,7 +769,7 @@ export async function supprimerCommentaires(form: FormData) {
     if (!ids.length) throw new Error("Cochez au moins un commentaire.");
     const { error } = await db.from("comments").delete().in("id", ids);
     fail(error, "Suppression des commentaires");
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     retour(form, "supprime");
   });
 }
@@ -792,7 +792,7 @@ export async function saveParcours(form: FormData) {
     if (rows.length) { const { error } = await db.from("player_career").insert(rows); fail(error, "Parcours"); }
     // parcours corrigé à la main : la synchro ne le remplace plus
     await db.from("players").update({ verrou: true }).eq("id", playerId);
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect(`/studio/joueurs/${playerId}?ok=enregistre#parcours`);
   });
 }

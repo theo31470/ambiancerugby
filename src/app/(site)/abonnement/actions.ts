@@ -1,5 +1,5 @@
 "use server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { headers } from "next/headers";
 import { getViewer, hasBadge } from "@/lib/supabase/server";
 import { stripe } from "@/lib/shop/stripe";
@@ -133,7 +133,7 @@ export async function verifierAbonnement(abonnement: string, revalider = true): 
     if (sub.metadata?.user_id !== viewer.id) return { ok: false, message: "Abonnement introuvable." };
     await synchroniser(sub);
     if (sub.latest_invoice && typeof sub.latest_invoice !== "string") await enregistrerFacture(sub.latest_invoice);
-    if (revalider) revalidatePath("/", "layout");
+    if (revalider) { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     return { ok: true, actif: ["active", "trialing"].includes(sub.status) };
   } catch (e) {
     return { ok: false, message: (e as Error).message };

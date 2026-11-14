@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { cleMatch } from "./seo";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -8,20 +9,20 @@ import { parisDayRange } from "./format";
 export const TEAM_LITE = "id,slug,name,short_name,abbreviation,logo_url,color";
 export const MATCH_SELECT = `*, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}), competition:competitions(id,slug,name,short_name,color,logo_url)`;
 
-export async function getCompetitions(opts: { all?: boolean } = {}): Promise<Competition[]> {
+async function getCompetitionsBrut(opts: { all?: boolean } = {}): Promise<Competition[]> {
   let q = publicClient().from("competitions").select("*").order("sort_order");
   if (!opts.all) q = q.eq("active", true);
   const { data } = await q;
   return (data ?? []) as Competition[];
 }
 
-export async function getCompetition(slug: string): Promise<Competition | null> {
+async function getCompetitionBrut(slug: string): Promise<Competition | null> {
   const { data } = await publicClient().from("competitions").select("*").eq("slug", slug).maybeSingle();
   return data as Competition | null;
 }
 
 /** Matchs d'une journée (heure de Paris), triés par compétition puis horaire. */
-export async function getMatchesOfDay(day: string, competitionId?: string): Promise<MatchFull[]> {
+async function getMatchesOfDayBrut(day: string, competitionId?: string): Promise<MatchFull[]> {
   const { start, end } = parisDayRange(day);
   let q = publicClient().from("matches").select(MATCH_SELECT).gte("kickoff_at", start).lt("kickoff_at", end).order("kickoff_at");
   if (competitionId) q = q.eq("competition_id", competitionId);
@@ -34,7 +35,7 @@ export async function getMatchesOfDay(day: string, competitionId?: string): Prom
  * Bandeau des scores : les matchs en direct, puis ceux qui commencent dans les 24 h, puis les derniers résultats,
  * puis les prochaines affiches. Hors direct, seules les grandes compétitions (et la Pro D2) y figurent.
  */
-export async function getTickerMatches(): Promise<MatchFull[]> {
+async function getTickerMatchesBrut(): Promise<MatchFull[]> {
   const db = publicClient();
   const now = Date.now();
   const sel = MATCH_SELECT.replace("competition:competitions(", "competition:competitions(niveau,");
@@ -55,16 +56,16 @@ export async function getTickerMatches(): Promise<MatchFull[]> {
 }
 
 /** Un match, par identifiant complet ou par adresse lisible (« …-2026-11-15-dd27821d »). Mémorisé pour la requête. */
-export const getMatch = cache(async (param: string): Promise<MatchFull | null> => {
+export const getMatch = cache(unstable_cache(async (param: string): Promise<MatchFull | null> => {
   const cle = cleMatch(param);
   if (!cle) return null;
   let q = publicClient().from("matches").select(MATCH_SELECT);
   q = "id" in cle ? q.eq("id", cle.id) : q.gte("id", `${cle.prefixe}-0000-0000-0000-000000000000`).lte("id", `${cle.prefixe}-ffff-ffff-ffff-ffffffffffff`);
   const { data } = await q.limit(1).maybeSingle();
   return data as unknown as MatchFull | null;
-});
+}, ["getMatch"], { revalidate: 20, tags: ["donnees"] }));
 
-export async function getCompetitionMatches(competitionId: string, season: string, opts: { upcoming?: boolean; limit?: number } = {}) {
+async function getCompetitionMatchesBrut(competitionId: string, season: string, opts: { upcoming?: boolean; limit?: number } = {}) {
   let q = publicClient().from("matches").select(MATCH_SELECT).eq("competition_id", competitionId).eq("season", season);
   if (opts.upcoming === true) q = q.in("status", ["scheduled", "live", "halftime", "postponed"]).order("kickoff_at");
   else if (opts.upcoming === false) q = q.eq("status", "finished").order("kickoff_at", { ascending: false });
@@ -73,7 +74,7 @@ export async function getCompetitionMatches(competitionId: string, season: strin
   return (data ?? []) as unknown as MatchFull[];
 }
 
-export async function getTeamMatches(teamId: string, opts: { upcoming: boolean; limit: number }) {
+async function getTeamMatchesBrut(teamId: string, opts: { upcoming: boolean; limit: number }) {
   let q = publicClient().from("matches").select(MATCH_SELECT).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`);
   q = opts.upcoming
     ? q.in("status", ["scheduled", "live", "halftime"]).order("kickoff_at")
@@ -82,7 +83,7 @@ export async function getTeamMatches(teamId: string, opts: { upcoming: boolean; 
   return (data ?? []) as unknown as MatchFull[];
 }
 
-export async function getStandings(competitionId: string, season: string): Promise<StandingRow[]> {
+async function getStandingsBrut(competitionId: string, season: string): Promise<StandingRow[]> {
   const { data } = await publicClient()
     .from("standings")
     .select(`pool,rank,played,won,drawn,lost,points_for,points_against,tries_for,tries_against,bonus,points,form, team:teams(${TEAM_LITE})`)
@@ -93,32 +94,32 @@ export async function getStandings(competitionId: string, season: string): Promi
   return (data ?? []) as unknown as StandingRow[];
 }
 
-export async function getSeasons(competitionId: string): Promise<string[]> {
+async function getSeasonsBrut(competitionId: string): Promise<string[]> {
   const { data } = await publicClient().from("team_competitions").select("season").eq("competition_id", competitionId);
   return [...new Set((data ?? []).map((r) => r.season as string))].sort().reverse();
 }
 
-export async function getCompetitionTeams(competitionId: string, season: string): Promise<Team[]> {
+async function getCompetitionTeamsBrut(competitionId: string, season: string): Promise<Team[]> {
   const { data } = await publicClient().from("team_competitions").select("team:teams(*)").eq("competition_id", competitionId).eq("season", season);
   return ((data ?? []).map((r) => r.team) as unknown as Team[]).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
 
-export async function getTeam(slug: string): Promise<Team | null> {
+async function getTeamBrut(slug: string): Promise<Team | null> {
   const { data } = await publicClient().from("teams").select("*").eq("slug", slug).maybeSingle();
   return data as Team | null;
 }
 
-export async function getTeamCompetitions(teamId: string) {
+async function getTeamCompetitionsBrut(teamId: string) {
   const { data } = await publicClient().from("team_competitions").select("season, competition:competitions(*)").eq("team_id", teamId);
   return (data ?? []) as unknown as { season: string; competition: Competition }[];
 }
 
-export async function getSquad(teamId: string): Promise<Player[]> {
+async function getSquadBrut(teamId: string): Promise<Player[]> {
   const { data } = await publicClient().from("players").select("*").eq("team_id", teamId).eq("in_squad", true).order("last_name");
   return (data ?? []) as Player[];
 }
 
-export async function getPlayer(slug: string) {
+async function getPlayerBrut(slug: string) {
   const { data } = await publicClient().from("players").select(`*, team:teams(${TEAM_LITE})`).eq("slug", slug).maybeSingle();
   return data as (Player & { team: Team | null }) | null;
 }
@@ -133,7 +134,7 @@ export async function searchPlayers(q: string, position?: string, limit = 60) {
 
 export const ARTICLE_LIST = "id,slug,title,excerpt,cover_url,category,published_at,team_id,competition_id,premium";
 
-export async function getArticles(opts: { limit?: number; category?: string; teamId?: string; competitionId?: string } = {}) {
+async function getArticlesBrut(opts: { limit?: number; category?: string; teamId?: string; competitionId?: string } = {}) {
   let q = publicClient().from("articles").select(ARTICLE_LIST).eq("status", "published").lte("published_at", new Date().toISOString()).order("published_at", { ascending: false });
   if (opts.category) q = q.eq("category", opts.category);
   if (opts.teamId) q = q.eq("team_id", opts.teamId);
@@ -179,3 +180,19 @@ export function groupByCompetition(matches: MatchFull[]) {
   }
   return [...groups.values()];
 }
+
+// données publiques mises en cache (lectures partagées entre visiteurs : la base gratuite est épargnée)
+export const getCompetitions = unstable_cache(getCompetitionsBrut, ["getCompetitions"], { revalidate: 600, tags: ["donnees"] });
+export const getCompetition = unstable_cache(getCompetitionBrut, ["getCompetition"], { revalidate: 600, tags: ["donnees"] });
+export const getMatchesOfDay = unstable_cache(getMatchesOfDayBrut, ["getMatchesOfDay"], { revalidate: 60, tags: ["donnees"] });
+export const getTickerMatches = unstable_cache(getTickerMatchesBrut, ["getTickerMatches"], { revalidate: 30, tags: ["donnees"] });
+export const getCompetitionMatches = unstable_cache(getCompetitionMatchesBrut, ["getCompetitionMatches"], { revalidate: 120, tags: ["donnees"] });
+export const getTeamMatches = unstable_cache(getTeamMatchesBrut, ["getTeamMatches"], { revalidate: 120, tags: ["donnees"] });
+export const getStandings = unstable_cache(getStandingsBrut, ["getStandings"], { revalidate: 300, tags: ["donnees"] });
+export const getSeasons = unstable_cache(getSeasonsBrut, ["getSeasons"], { revalidate: 3600, tags: ["donnees"] });
+export const getCompetitionTeams = unstable_cache(getCompetitionTeamsBrut, ["getCompetitionTeams"], { revalidate: 3600, tags: ["donnees"] });
+export const getTeam = unstable_cache(getTeamBrut, ["getTeam"], { revalidate: 600, tags: ["donnees"] });
+export const getTeamCompetitions = unstable_cache(getTeamCompetitionsBrut, ["getTeamCompetitions"], { revalidate: 3600, tags: ["donnees"] });
+export const getSquad = unstable_cache(getSquadBrut, ["getSquad"], { revalidate: 600, tags: ["donnees"] });
+export const getPlayer = unstable_cache(getPlayerBrut, ["getPlayer"], { revalidate: 600, tags: ["donnees"] });
+export const getArticles = unstable_cache(getArticlesBrut, ["getArticles"], { revalidate: 120, tags: ["donnees"] });

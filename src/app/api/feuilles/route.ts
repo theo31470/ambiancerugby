@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { shopDb } from "@/lib/shop/admin";
 import { importerFeuilleEspn, type MatchLocal } from "@/lib/feuilles/espn";
@@ -139,7 +139,7 @@ export async function GET(req: Request) {
       classementsVerifies = Date.now();
       await corrigerClassements().catch(() => { classementsVerifies = 0; });
     }
-    if (recent) revalidatePath("/", "layout");
+    if (recent) { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
   });
   return Response.json({ lances: aFaire.length });
 }

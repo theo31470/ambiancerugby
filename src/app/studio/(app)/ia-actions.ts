@@ -1,5 +1,5 @@
 "use server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient, getViewer } from "@/lib/supabase/server";
 import { analyserFeuille, chercherFeuille, IA_MODELE, IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { fmtDay } from "@/lib/format";
@@ -50,7 +50,7 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
         const r = await importerFeuilleLnr(db, ml, { remplacer });
         await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: r.ok ? `lnr ${r.dom}-${r.ext}` : r.raison }).eq("id", matchId);
         if (r.ok) {
-          revalidatePath("/", "layout");
+          { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
           const detail = `${r.joueurs} joueurs (minutes, points, plaquages, cartons)${r.crees ? `, ${r.crees} nouveaux joueurs créés` : ""}${r.fil ? `, ${r.fil} faits de jeu` : ""}`;
           return r.conforme
             ? { matchId, etat: "valide", message: `Feuille LNR : ${detail}. ${r.dom}–${r.ext}, conforme au score.` }
@@ -70,7 +70,7 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
         const r = mw ? await importerFeuilleWr(db, mw as unknown as MatchWr, { remplacer }) : { ok: false as const, raison: "match introuvable" };
         if (r.ok) {
           await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: `wr ${r.dom}-${r.ext}`, stats_wr_at: new Date().toISOString(), stats_wr_resultat: `wr ${r.joueurs} joueurs` }).eq("id", matchId);
-          revalidatePath("/", "layout");
+          { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
           const detail = `${r.joueurs} joueurs (compositions, minutes, points, cartons et toutes les stats détaillées)${r.crees ? `, ${r.crees} nouveaux joueurs créés` : ""}${r.fil ? `, ${r.fil} faits de jeu` : ""}`;
           return r.conforme
             ? { matchId, etat: "valide", message: `Feuille World Rugby : ${detail}. ${r.dom}–${r.ext}, conforme au score.` }
@@ -89,7 +89,7 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
         const r = await importerFeuilleEspn(db, me as unknown as MatchLocal, { remplacer });
         await db.from("matches").update({ feuille_tentee_at: new Date().toISOString(), feuille_resultat: r.ok ? `espn ${r.dom}-${r.ext}` : r.raison }).eq("id", matchId);
         if (r.ok) {
-          revalidatePath("/", "layout");
+          { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
           const detail = `${r.joueurs} joueurs (compositions, minutes, points, cartons)${r.crees ? `, ${r.crees} nouveaux joueurs créés` : ""}${r.fil ? `, ${r.fil} faits de jeu` : ""}`;
           return r.conforme
             ? { matchId, etat: "valide", message: `Feuille ESPN : ${detail}. ${r.dom}–${r.ext}, conforme au score.` }
@@ -161,7 +161,7 @@ export async function chercherMatchIA(matchId: string, auto: boolean, remplacer 
       const { error } = await db.from("player_match_stats").upsert(rows, { onConflict: "match_id,player_id" });
       if (error) return { matchId, etat: "erreur", message: error.message };
       const nFil = await ecrireFil(db, m, filDepuisIA(r.evenements, refs));
-      revalidatePath("/", "layout");
+      { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
       return { matchId, etat: "valide", message: `${rows.length} joueurs enregistrés, ${totalDom}–${totalExt} conforme au score${nFil ? `, fil du match : ${nFil} faits de jeu` : ""}.` };
     }
     const { data: prop, error } = await db.from("ia_propositions").insert({ match_id: matchId, created_by: viewer.id, lignes, inconnus, evenements: filDepuisIA(r.evenements, refs), remarques: r.remarques || null }).select("id").single();

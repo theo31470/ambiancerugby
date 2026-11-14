@@ -1,5 +1,5 @@
 "use server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +32,7 @@ export async function signIn(_: FormState, form: FormData): Promise<FormState> {
     password: String(form.get("password") ?? ""),
   });
   if (error) return { error: authMsg(error.message) };
-  revalidatePath("/", "layout");
+  { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
   redirect(safeNext(form.get("suite")));
 }
 
@@ -50,7 +50,7 @@ export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   });
   if (error) return { error: authMsg(error.message) };
   if (data.session) {
-    revalidatePath("/", "layout");
+    { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
     redirect("/compte");
   }
   return { ok: "Compte créé. Ouvrez le lien reçu par e-mail pour l'activer, puis connectez-vous." };
@@ -59,7 +59,7 @@ export async function signUp(_: FormState, form: FormData): Promise<FormState> {
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  revalidatePath("/", "layout");
+  { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
   redirect("/");
 }
 
@@ -79,7 +79,7 @@ export async function updateProfile(_: FormState, form: FormData): Promise<FormS
     })
     .eq("id", uid);
   if (error) return { error: error.code === "23505" ? "Ce pseudo est déjà pris." : error.message };
-  revalidatePath("/", "layout");
+  { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
   return { ok: "Profil enregistré." };
 }
 
@@ -139,7 +139,7 @@ export async function toutLu() {
   const uid = claims?.claims?.sub;
   if (!uid) return;
   await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("user_id", uid).is("read_at", null);
-  revalidatePath("/", "layout");
+  { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
 }
 
 export async function viderAlertes() {
@@ -148,7 +148,7 @@ export async function viderAlertes() {
   const uid = claims?.claims?.sub;
   if (!uid) return;
   await supabase.from("notifications").delete().eq("user_id", uid);
-  revalidatePath("/", "layout");
+  { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
 }
 
 /** Mot de passe oublié : Supabase envoie (via notre hook) un lien qui ouvre la page du nouveau mot de passe. Même réponse que l'adresse existe ou non. */
@@ -169,6 +169,6 @@ export async function definirMotDePasse(_: FormState, form: FormData): Promise<F
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password: nouveau });
   if (error) return { error: /different from the old/i.test(error.message) ? "Choisissez un mot de passe différent de l'ancien." : error.message };
-  revalidatePath("/", "layout");
+  { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
   redirect("/compte?mdp=ok");
 }
