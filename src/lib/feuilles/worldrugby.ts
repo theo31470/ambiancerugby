@@ -430,11 +430,32 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
   // le classement n'est recalculé que pour un match récent (un vieux match ne change pas le classement en cours)
   if (m.competition_id && Date.now() - new Date(m.kickoff_at).getTime() < 60 * 86400e3) await db.rpc("appliquer_bonus_offensif", { p_comp: m.competition_id });
   if (live) {
-    // chrono : l'API stats a parfois quelques minutes de retard, le fil est plus frais ; on garde le plus avancé des deux
-    const secs = Math.max(s.match.clock?.secs ?? 0, ...(fil?.timeline ?? []).map((e) => e.time?.secs ?? 0));
-    const horloge = secs > 0 ? `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}` : null;
-    const maintenant = new Date().toISOString();
-    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: maintenant, ...(horloge ? { clock: horloge, clock_at: maintenant } : {}) }).eq("id", m.id);
+    // chrono : World Rugby ne donne pas d'horloge qui tourne (son « clock » reste figé) ; on date nous-mêmes le début de
+    // chaque mi-temps, au plus tôt compatible avec le dernier fait de jeu de la période (une relecture par minute)
+    const maintenant = Date.now();
+    const evts = fil?.timeline ?? [];
+    const dernier = (phase: string) => Math.max(0, ...evts.filter((e) => (e.phase ?? "").toUpperCase() === phase).map((e) => e.time?.secs ?? 0));
+    const { data: p } = await db.from("matches").select("periode1_debut, periode1_fin, periode2_debut").eq("id", m.id).single();
+    const plusTot = (avant: string | null | undefined, candidat: number) => {
+      const c = new Date(candidat).toISOString();
+      return !avant || new Date(avant).getTime() > candidat ? c : avant;
+    };
+    const chrono: Record<string, string> = {};
+    const mt = statut.includes("HT");
+    const deuxieme = statut === "L2" || dernier("L2") > 0;
+    if (!deuxieme) {
+      if (!mt) chrono.periode1_debut = plusTot(p?.periode1_debut, maintenant - dernier("L1") * 1000);
+      if (mt && !p?.periode1_fin) chrono.periode1_fin = new Date(maintenant).toISOString();
+    } else {
+      chrono.periode2_debut = plusTot(p?.periode2_debut, maintenant - Math.max(0, dernier("L2") - 2400) * 1000);
+      if (!p?.periode1_debut) chrono.periode1_debut = new Date(new Date(m.kickoff_at).getTime()).toISOString();
+      if (!p?.periode1_fin) chrono.periode1_fin = chrono.periode2_debut;
+    }
+    for (const [k, v] of Object.entries(chrono)) if (v === (p as Record<string, string | null> | null)?.[k]) delete chrono[k];
+    const secs = Math.max(...evts.map((e) => e.time?.secs ?? 0), 0);
+    const horloge = secs > 0 ? `${Math.floor(secs / 60)}'` : null;
+    const iso = new Date(maintenant).toISOString();
+    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: iso, ...chrono, ...(horloge ? { clock: horloge, clock_at: iso } : {}) }).eq("id", m.id);
   }
   const detailOk = rows.some((r) => (r.tackles ?? 0) > 0);
   return { ok: true, joueurs: rows.length, crees, fil: nFil, dom, ext, conforme: dom === m.home_score && ext === m.away_score, detail: detailOk, live };
