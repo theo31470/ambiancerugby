@@ -44,7 +44,9 @@ export async function GET(req: Request) {
   // pendant la pause du rattrapage : seulement les matchs en direct et ceux des 3 derniers jours (dont la fin des directs)
   const { data: recents } = await db.from("matches").select("id")
     .eq("status", "finished").gt("kickoff_at", new Date(Date.now() - 3 * 86400e3).toISOString()).lt("kickoff_at", new Date(Date.now() - 100 * 60e3).toISOString())
-    .or("feuille_resultat.is.null,feuille_resultat.like.direct%,feuille_tentee_at.is.null").limit(10);
+    .or(`feuille_resultat.is.null,feuille_resultat.like.direct%,feuille_tentee_at.is.null,feuille_tentee_at.lt.${new Date(Date.now() - 3600e3).toISOString()}`)
+    .not("feuille_resultat", "like", "wr %").not("feuille_resultat", "like", "lnr %").not("feuille_resultat", "like", "espn %")
+    .order("kickoff_at", { ascending: false }).limit(10);
   const { data: enDirect } = await db.from("matches").select("id").in("status", ["live", "halftime"]);
   const prioritaires = [...(enDirect ?? []), ...(recents ?? [])].map((x) => x.id as string);
   const file = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
