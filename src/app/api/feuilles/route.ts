@@ -38,9 +38,17 @@ export async function GET(req: Request) {
   if (ok !== true) return new Response("accès refusé", { status: 401 });
 
   // la base choisit : matchs en direct d'abord, puis terminés sans stats (jamais tentés en premier)
-  const { data: ids, error } = await db.rpc("feuilles_a_traiter", { p_limite: 6 });
+  const { data: ids, error } = await db.rpc("feuilles_a_traiter", { p_limite: 30 });
   if (error) return Response.json({ erreur: error.message }, { status: 500 });
-  const liste = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
+  const rattrapageActif = process.env.RATTRAPAGE_WR === "1";
+  // pendant la pause du rattrapage : seulement les matchs en direct et ceux des 3 derniers jours (dont la fin des directs)
+  const { data: recents } = await db.from("matches").select("id")
+    .eq("status", "finished").gt("kickoff_at", new Date(Date.now() - 3 * 86400e3).toISOString()).lt("kickoff_at", new Date(Date.now() - 100 * 60e3).toISOString())
+    .or("feuille_resultat.is.null,feuille_resultat.like.direct%,feuille_tentee_at.is.null").limit(10);
+  const { data: enDirect } = await db.from("matches").select("id").in("status", ["live", "halftime"]);
+  const prioritaires = [...(enDirect ?? []), ...(recents ?? [])].map((x) => x.id as string);
+  const file = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
+  const liste = [...new Set([...prioritaires, ...(rattrapageActif ? file : file.filter((id) => prioritaires.includes(id)))])].slice(0, 8);
   const { data: matchs } = liste.length ? await db.from("matches").select(`${SELECT_MATCH_FEUILLE}, feuille_resultat`).in("id", liste) : { data: [] };
   type M = MatchLocal & { id: string; status: string; round: string | null; season: string | null; lnr_url: string | null; competition: { espn_league: string | null; lnr_site: string | null; wr_ok: boolean } };
   const aFaire = ((matchs ?? []) as unknown as M[])
