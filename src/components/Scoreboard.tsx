@@ -91,7 +91,7 @@ function Case({ m }: { m: MatchFull }) {
   const winner = done && m.home_score != null && m.away_score != null ? (m.home_score > m.away_score ? "h" : m.away_score > m.home_score ? "a" : null) : null;
   const nom = (t: MatchFull["home"]) => t.short_name ?? t.name;
   const etat = live
-    ? (m.status === "halftime" ? "Mi-temps" : m.clock && /^\d/.test(m.clock) ? m.clock : "En direct")
+    ? (m.status === "halftime" ? "Mi-temps" : m.clock && /^\d/.test(m.clock) ? m.clock.replace(/^(\d+):\d{2}$/, "$1'") : "En direct")
     : done ? "Terminé"
     : memeJour(m.kickoff_at) ? `Aujourd'hui ${fmtTime(m.kickoff_at)}` : `${fmtDay(m.kickoff_at, { weekday: "short", day: "numeric" })} ${fmtTime(m.kickoff_at)}`;
   return (

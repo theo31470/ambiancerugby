@@ -247,6 +247,9 @@ h1, h2, h3, .titre {
 @keyframes fiche-joueur { from { opacity: 0; transform: translate(-50%, 4px) scale(.96); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 .entree-score > * { animation: entree-score .7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * .08s); }
 @keyframes entree-score { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+/* fil du match : chaque nouveau fait de jeu glisse en place */
+.fil-entree { animation: fil-entree .45s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes fil-entree { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
 /* pas d'animations pour qui les a désactivées */
 @media (prefers-reduced-motion: reduce) {

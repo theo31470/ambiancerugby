@@ -430,8 +430,11 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
   // le classement n'est recalculé que pour un match récent (un vieux match ne change pas le classement en cours)
   if (m.competition_id && Date.now() - new Date(m.kickoff_at).getTime() < 60 * 86400e3) await db.rpc("appliquer_bonus_offensif", { p_comp: m.competition_id });
   if (live) {
-    const horloge = s.match.clock?.label ? `${Math.floor((s.match.clock.secs ?? 0) / 60)}'` : null;
-    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: new Date().toISOString(), ...(horloge ? { clock: horloge } : {}) }).eq("id", m.id);
+    // chrono : l'API stats a parfois quelques minutes de retard, le fil est plus frais ; on garde le plus avancé des deux
+    const secs = Math.max(s.match.clock?.secs ?? 0, ...(fil?.timeline ?? []).map((e) => e.time?.secs ?? 0));
+    const horloge = secs > 0 ? `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}` : null;
+    const maintenant = new Date().toISOString();
+    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: maintenant, ...(horloge ? { clock: horloge, clock_at: maintenant } : {}) }).eq("id", m.id);
   }
   const detailOk = rows.some((r) => (r.tackles ?? 0) > 0);
   return { ok: true, joueurs: rows.length, crees, fil: nFil, dom, ext, conforme: dom === m.home_score && ext === m.away_score, detail: detailOk, live };
