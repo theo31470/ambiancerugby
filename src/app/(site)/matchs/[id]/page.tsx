@@ -186,7 +186,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           <div style={{ ["--i" as string]: 0 }}><TeamSide team={m.home} align="end" /></div>
           <div className="text-center" style={{ ["--i" as string]: 1 }}>
             {showScore ? (
-              <ScoreAnime dom={m.home_score ?? 0} ext={m.away_score ?? 0} live={live} compter={fini} />
+              <ScoreAnime dom={m.home_score ?? 0} ext={m.away_score ?? 0} live={live} />
             ) : (
               <>
                 <p className="text-sm text-white/70 first-letter:uppercase">{fmtDay(m.kickoff_at)}</p>
@@ -208,12 +208,12 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           <div style={{ ["--i" as string]: 2 }}><TeamSide team={m.away} align="start" /></div>
         </div>
         {avant && avantProche && <div className="mt-6"><CompteARebours kickoff={m.kickoff_at} /></div>}
-        <ul className="mt-6 pt-4 border-t border-white/10 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-white/80">
+        {(m.venue || mx.arbitre || m.tv || !showScore) && <ul className="mt-6 pt-4 border-t border-white/10 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-white/80">
           {m.venue && <li><span aria-hidden>🏟️ </span>{m.venue}{mx.stade_ville ? `, ${mx.stade_ville}` : ""}</li>}
           {mx.arbitre && <li><span aria-hidden>🧑‍⚖️ </span>Arbitre : {mx.arbitre}</li>}
           {m.tv && <li><span aria-hidden>📺 </span>{m.tv}</li>}
           {!showScore && <li><span aria-hidden>🗓️ </span><span className="first-letter:uppercase inline-block">{fmtDay(m.kickoff_at)}</span>, {fmtTime(m.kickoff_at)}</li>}
-        </ul>
+        </ul>}
       </section>
 
       {/* ---------- 1. avant le match ---------- */}

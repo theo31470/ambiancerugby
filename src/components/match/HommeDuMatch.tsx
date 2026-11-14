@@ -18,14 +18,14 @@ export default function HommeDuMatch({ h, sup }: { h: Hdm; sup?: { joueur: Joueu
   return (
     <section aria-labelledby="h-hdm" className="mt-8 grid gap-4 md:grid-cols-[1fr_auto]">
       <div className="relative overflow-hidden rounded-2xl bg-bordeaux text-white p-5 sm:p-6 flex gap-5 items-end apparition-hdm">
-        <div className="relative w-28 sm:w-36 shrink-0 self-stretch">
+        <div className="relative w-20 sm:w-36 shrink-0 self-stretch">
           {h.joueur.photo_url
             ? <img src={h.joueur.photo_url} alt="" className="absolute bottom-0 left-0 w-full h-[120%] object-contain object-bottom" />
             : <span className="absolute inset-x-0 bottom-0 aspect-square rounded-full bg-white/10 grid place-items-center groovy text-5xl text-moutarde">{h.joueur.first_name[0]}{h.joueur.last_name[0]}</span>}
         </div>
-        <div className="min-w-0 py-1">
+        <div className="min-w-0 py-1 pr-14 sm:pr-20">
           <h2 id="h-hdm" className="text-sm font-semibold text-moutarde">⭐ Homme du match</h2>
-          <p className="groovy text-3xl sm:text-4xl leading-none mt-1">
+          <p className="groovy text-2xl sm:text-4xl leading-none mt-1">
             <Link href={`/joueurs/${h.joueur.slug}`} className="hover:underline underline-offset-4">{h.joueur.first_name} {h.joueur.last_name}</Link>
           </p>
           <p className="text-sm text-white/70 mt-1">{h.equipe} · {h.officiel ? "désigné officiellement" : "désigné par l'algorithme"}</p>
@@ -36,8 +36,8 @@ export default function HommeDuMatch({ h, sup }: { h: Hdm; sup?: { joueur: Joueu
           )}
         </div>
         {h.note != null && (
-          <div className="absolute top-4 right-4 w-16 h-16 rounded-full bg-moutarde text-bordeaux grid place-items-center rotate-[-6deg]">
-            <span className="groovy text-2xl tnum leading-none">{h.note.toFixed(1)}</span>
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-moutarde text-bordeaux grid place-items-center rotate-[-6deg]">
+            <span className="groovy text-xl sm:text-2xl tnum leading-none">{h.note.toFixed(1)}</span>
           </div>
         )}
       </div>
