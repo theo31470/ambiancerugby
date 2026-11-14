@@ -73,9 +73,11 @@ export default function TerrainCompo({ equipes, titre, source }: { equipes: [Equ
               const num = Number(n);
               const haut = y < 45;
               return (
-                <li key={n} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${x}%`, top: `${y}%`, zIndex: ouvert === num ? 30 : 1 }}>
-                  <button type="button" onClick={() => setOuvert(ouvert === num ? null : num)} onMouseEnter={() => setOuvert(num)} onMouseLeave={() => setOuvert(null)}
-                    onFocus={() => setOuvert(num)} onBlur={() => setOuvert(null)} aria-expanded={ouvert === num}
+                <li key={n} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${x}%`, top: `${y}%`, zIndex: ouvert === num ? 30 : 1 }}
+                  // la fiche reste ouverte tant que la souris est sur le joueur OU sur sa fiche (pour pouvoir cliquer le lien)
+                  onMouseEnter={() => setOuvert(num)} onMouseLeave={() => setOuvert((o) => (o === num ? null : o))}
+                  onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOuvert((o) => (o === num ? null : o)); }}>
+                  <button type="button" onClick={() => setOuvert(ouvert === num ? null : num)} onFocus={() => setOuvert(num)} aria-expanded={ouvert === num}
                     className={`group flex flex-col items-center gap-1 text-white transition-all duration-500 ease-out ${vu ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-3 scale-90"}`}
                     style={{ transitionDelay: `${i * 45}ms` }}>
                     <span className={`relative w-10 h-10 sm:w-14 sm:h-14 rounded-full ring-2 overflow-hidden bg-white/15 grid place-items-center transition-transform group-hover:scale-110 ${ouvert === num ? "ring-moutarde scale-110" : "ring-white/80"}`}>
@@ -87,12 +89,14 @@ export default function TerrainCompo({ equipes, titre, source }: { equipes: [Equ
                     </span>
                   </button>
                   {ouvert === num && (
-                    <div role="tooltip" className={`absolute left-1/2 -translate-x-1/2 w-52 rounded-xl bg-surface text-encre shadow-xl border border-trait p-3 text-left fiche-joueur ${haut ? "top-full mt-1" : "bottom-full mb-1"}`}>
+                    <div role="tooltip" className={`absolute left-1/2 -translate-x-1/2 w-52 fiche-joueur ${haut ? "top-full pt-1.5" : "bottom-full pb-1.5"}`}>
+                      <div className="rounded-xl bg-surface text-encre shadow-xl border border-trait p-3 text-left">
                       <p className="text-xs text-sourdine">{num}. {POSTE[num]}</p>
                       <p className="titre font-bold leading-tight">{j.prenom} {j.nom}</p>
                       {j.note != null && <p className="mt-1 text-sm"><span className="rounded-full bg-moutarde text-bordeaux titre font-extrabold px-2 py-0.5 tnum">{j.note.toFixed(1)}</span></p>}
                       {j.infos?.map((t) => <p key={t} className="text-xs text-sourdine mt-1">{t}</p>)}
                       {j.slug && <Link href={`/joueurs/${j.slug}`} className="mt-2 inline-block text-xs font-semibold text-vin underline underline-offset-2">Voir sa fiche</Link>}
+                      </div>
                     </div>
                   )}
                 </li>
