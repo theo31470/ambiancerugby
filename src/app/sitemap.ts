@@ -2,7 +2,8 @@ import type { MetadataRoute } from "next";
 import { publicClient } from "@/lib/supabase/server";
 import { SITE, urlMatch } from "@/lib/seo";
 
-export const revalidate = 3600;
+// généré à la demande (pas au build : un build ne doit jamais dépendre de la base)
+export const dynamic = "force-dynamic";
 
 /** Lit toutes les lignes d'une requête, par pages de 1 000 (limite de l'API). */
 async function tout<T>(requete: (de: number, a: number) => PromiseLike<{ data: T[] | null }>) {
