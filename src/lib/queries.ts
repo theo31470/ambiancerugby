@@ -56,14 +56,14 @@ async function getTickerMatchesBrut(): Promise<MatchFull[]> {
 }
 
 /** Un match, par identifiant complet ou par adresse lisible (« …-2026-11-15-dd27821d »). Mémorisé pour la requête. */
-export const getMatch = cache(unstable_cache(async (param: string): Promise<MatchFull | null> => {
+export const getMatch = cache(enCache(async (param: string): Promise<MatchFull | null> => {
   const cle = cleMatch(param);
   if (!cle) return null;
   let q = publicClient().from("matches").select(MATCH_SELECT);
   q = "id" in cle ? q.eq("id", cle.id) : q.gte("id", `${cle.prefixe}-0000-0000-0000-000000000000`).lte("id", `${cle.prefixe}-ffff-ffff-ffff-ffffffffffff`);
   const { data } = await q.limit(1).maybeSingle();
   return data as unknown as MatchFull | null;
-}, ["getMatch"], { revalidate: 20, tags: ["donnees"] }));
+}, "getMatch", 20));
 
 async function getCompetitionMatchesBrut(competitionId: string, season: string, opts: { upcoming?: boolean; limit?: number } = {}) {
   let q = publicClient().from("matches").select(MATCH_SELECT).eq("competition_id", competitionId).eq("season", season);
@@ -181,18 +181,27 @@ export function groupByCompetition(matches: MatchFull[]) {
   return [...groups.values()];
 }
 
-// données publiques mises en cache (lectures partagées entre visiteurs : la base gratuite est épargnée)
-export const getCompetitions = unstable_cache(getCompetitionsBrut, ["getCompetitions"], { revalidate: 600, tags: ["donnees"] });
-export const getCompetition = unstable_cache(getCompetitionBrut, ["getCompetition"], { revalidate: 600, tags: ["donnees"] });
-export const getMatchesOfDay = unstable_cache(getMatchesOfDayBrut, ["getMatchesOfDay"], { revalidate: 60, tags: ["donnees"] });
-export const getTickerMatches = unstable_cache(getTickerMatchesBrut, ["getTickerMatches"], { revalidate: 30, tags: ["donnees"] });
-export const getCompetitionMatches = unstable_cache(getCompetitionMatchesBrut, ["getCompetitionMatches"], { revalidate: 120, tags: ["donnees"] });
-export const getTeamMatches = unstable_cache(getTeamMatchesBrut, ["getTeamMatches"], { revalidate: 120, tags: ["donnees"] });
-export const getStandings = unstable_cache(getStandingsBrut, ["getStandings"], { revalidate: 300, tags: ["donnees"] });
-export const getSeasons = unstable_cache(getSeasonsBrut, ["getSeasons"], { revalidate: 3600, tags: ["donnees"] });
-export const getCompetitionTeams = unstable_cache(getCompetitionTeamsBrut, ["getCompetitionTeams"], { revalidate: 3600, tags: ["donnees"] });
-export const getTeam = unstable_cache(getTeamBrut, ["getTeam"], { revalidate: 600, tags: ["donnees"] });
-export const getTeamCompetitions = unstable_cache(getTeamCompetitionsBrut, ["getTeamCompetitions"], { revalidate: 3600, tags: ["donnees"] });
-export const getSquad = unstable_cache(getSquadBrut, ["getSquad"], { revalidate: 600, tags: ["donnees"] });
-export const getPlayer = unstable_cache(getPlayerBrut, ["getPlayer"], { revalidate: 600, tags: ["donnees"] });
-export const getArticles = unstable_cache(getArticlesBrut, ["getArticles"], { revalidate: 120, tags: ["donnees"] });
+// données publiques mises en cache (lectures partagées entre visiteurs : la base gratuite est épargnée).
+// Un résultat vide ou absent n'est jamais gardé en cache (il peut venir d'une base en panne) : on relit directement.
+function enCache<A extends unknown[], R>(fn: (...a: A) => Promise<R>, cle: string, revalidate: number) {
+  const garde = unstable_cache(async (...a: A) => {
+    const r = await fn(...a);
+    if (r == null || (Array.isArray(r) && r.length === 0)) throw new Error("vide");
+    return r;
+  }, [cle], { revalidate, tags: ["donnees"] });
+  return async (...a: A): Promise<R> => { try { return await garde(...a); } catch { return fn(...a); } };
+}
+export const getCompetitions = enCache(getCompetitionsBrut, "getCompetitions", 600);
+export const getCompetition = enCache(getCompetitionBrut, "getCompetition", 600);
+export const getMatchesOfDay = enCache(getMatchesOfDayBrut, "getMatchesOfDay", 60);
+export const getTickerMatches = enCache(getTickerMatchesBrut, "getTickerMatches", 30);
+export const getCompetitionMatches = enCache(getCompetitionMatchesBrut, "getCompetitionMatches", 120);
+export const getTeamMatches = enCache(getTeamMatchesBrut, "getTeamMatches", 120);
+export const getStandings = enCache(getStandingsBrut, "getStandings", 300);
+export const getSeasons = enCache(getSeasonsBrut, "getSeasons", 3600);
+export const getCompetitionTeams = enCache(getCompetitionTeamsBrut, "getCompetitionTeams", 3600);
+export const getTeam = enCache(getTeamBrut, "getTeam", 600);
+export const getTeamCompetitions = enCache(getTeamCompetitionsBrut, "getTeamCompetitions", 3600);
+export const getSquad = enCache(getSquadBrut, "getSquad", 600);
+export const getPlayer = enCache(getPlayerBrut, "getPlayer", 600);
+export const getArticles = enCache(getArticlesBrut, "getArticles", 120);
