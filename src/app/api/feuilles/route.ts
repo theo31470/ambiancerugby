@@ -8,6 +8,8 @@ import portraits from "../../../../public/portraits/index.json";
 
 // portraits détourés (GitHub Actions) : recopiés dans les fiches une fois par instance
 let portraitsSynchro = false;
+// base Supabase saturée (budget disque épuisé) le 14/11 au matin : toute la lecture des feuilles est suspendue
+const PAUSE_BASE = true;
 let classementsVerifies = 0;
 
 export const maxDuration = 120;
@@ -33,6 +35,8 @@ async function corrigerClassements() {
 }
 
 export async function GET(req: Request) {
+  // coupe-circuit : la base est saturée, on la laisse respirer (aucune requête tant que PAUSE_BASE est vrai)
+  if (process.env.FEUILLES_PAUSE !== "0" && PAUSE_BASE) return Response.json({ pause: true });
   const db = shopDb();
   const { data: ok } = await db.rpc("cron_secret_ok", { p_secret: req.headers.get("x-sync-secret") });
   if (ok !== true) return new Response("accès refusé", { status: 401 });
