@@ -170,6 +170,12 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
     existants.push(...(page ?? []));
     if (!page || page.length < 1000) break;
   }
+  // club où chaque joueur a réellement joué ces 90 derniers jours : un effectif Wikipédia ne le déplace pas ailleurs
+  const { data: recents } = await db.rpc("club_recent_joueurs", { p_jours: 90 });
+  const clubRecent = new Map(((recents ?? []) as { player_id: string; team_id: string }[]).map((r) => [r.player_id, r.team_id]));
+  // pages déjà attribuées à un autre club : une recherche qui retombe dessus s'est trompée de club
+  const { data: titresPris } = await db.from("teams").select("id, wiki_title").not("wiki_title", "is", null);
+  const pageDe = new Map(((titresPris ?? []) as { id: string; wiki_title: string }[]).map((x) => [x.wiki_title, x.id]));
   const slugs = new Set(existants.map((p) => p.slug));
   const parCle = new Map(existants.filter((p) => p.name_key).map((p) => [p.name_key, p]));
   const lignes: string[] = [];
@@ -180,7 +186,11 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
     try {
       let page: { titre: string; texte: string } | null | undefined = null;
       if (t.wiki_title) page = (await contenus([t.wiki_title]))(t.wiki_title);
-      if (!page && !t.wiki_title) page = await trouverPage(t);
+      if (!page && !t.wiki_title) {
+        page = await trouverPage(t);
+        // liste historique (« List of … players ») ou page d'un autre club : ce n'est pas l'effectif de ce club
+        if (page && (/^list of/i.test(page.titre) || /players of/i.test(page.titre) || (pageDe.has(page.titre) && pageDe.get(page.titre) !== t.id))) page = null;
+      }
       await sleep(300);
       const joueurs = page ? lireEffectif(page.texte) : [];
       if (!page || joueurs.length < 12) {
@@ -198,12 +208,14 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
         if (ex) {
           if (ex.verrou) continue;
           const patch: Record<string, unknown> = { in_squad: true, synced_at: new Date().toISOString() };
-          if (ex.team_id !== t.id) patch.team_id = t.id; // transfert
+          // transfert, sauf si le joueur vient de jouer pour un autre club (page Wikipédia en retard ou mal attribuée)
+          const recent = clubRecent.get(ex.id);
+          if (ex.team_id !== t.id && (!recent || recent === t.id)) patch.team_id = t.id;
           if (j.poste) patch.position = j.poste;
           if (j.pays) patch.nationality = j.pays;
           if (j.wiki && ex.wiki_title !== j.wiki) { patch.wiki_title = j.wiki; patch.career_checked_at = null; }
           await db.from("players").update(patch).eq("id", ex.id);
-          ex.team_id = t.id;
+          if (patch.team_id) ex.team_id = t.id;
           maj++;
         } else {
           let slug = slugify(j.complet) || `joueur-${crypto.randomUUID().slice(0, 6)}`;
@@ -224,6 +236,7 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
       // joueurs partis du club (seulement ceux venus de Wikipédia et non verrouillés)
       const partis = existants.filter((p) => p.team_id === t.id && p.source === "wikipedia" && !p.verrou && p.name_key && !vus.has(p.name_key)).map((p) => p.id);
       if (partis.length) await db.from("players").update({ in_squad: false }).in("id", partis);
+      pageDe.set(page.titre, t.id);
       await db.from("teams").update({ wiki_title: page.titre, wiki_checked_at: new Date().toISOString(), squad_synced_at: new Date().toISOString(), squad_count: joueurs.length }).eq("id", t.id);
     } catch (e) {
       lignes.push(`${t.name} : ERREUR ${(e as Error).message}`);
