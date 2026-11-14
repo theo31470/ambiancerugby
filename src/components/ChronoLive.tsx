@@ -32,7 +32,8 @@ export default function ChronoLive({ kickoff, clock, updatedAt, status, periodes
   const minuteConnue = clock?.match(/^(\d+)/)?.[1];
   const deuxieme = /2e|2nd|second/i.test(clock ?? "");
   let s: number;
-  if (minuteConnue && updatedAt) s = Number(minuteConnue) * 60 + Math.max(0, (now - new Date(updatedAt).getTime()) / 1000);
+  const secondes = Number(clock?.match(/^\d+:(\d{2})/)?.[1] ?? 0);
+  if (minuteConnue && updatedAt) s = Number(minuteConnue) * 60 + secondes + Math.max(0, (now - new Date(updatedAt).getTime()) / 1000);
   else if (deuxieme) s = 40 * 60 + Math.max(0, (now - new Date(kickoff).getTime()) / 1000 - 55 * 60);
   else s = Math.max(0, (now - new Date(kickoff).getTime()) / 1000);
   const premiere = !deuxieme && (!minuteConnue || Number(minuteConnue) <= 40);

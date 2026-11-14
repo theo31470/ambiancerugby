@@ -195,7 +195,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
             )}
             <p className="mt-3 text-sm font-semibold inline-flex items-center gap-2">
               {live && <span className="pastille" aria-hidden />}
-              {live ? <>En direct, <ChronoLive kickoff={m.kickoff_at} clock={m.clock} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} /></> : STATUS_LABEL[m.status]}
+              {live ? <>En direct, <ChronoLive kickoff={m.kickoff_at} clock={m.clock} updatedAt={(m as { clock_at?: string | null; updated_at?: string }).clock_at ?? (m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} /></> : STATUS_LABEL[m.status]}
             </p>
             {showScore && (linescores?.[0] || m.home_tries != null) && (
               <p className="mt-1 text-xs text-white/60 tnum">
@@ -289,7 +289,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           { id: "direct", label: "Direct", contenu: (
             <div className="grid gap-8">
               {events && events.length > 0
-                ? <FilDuMatch events={events as never} home={m.home} away={m.away} live={live} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} />
+                ? <FilDuMatch events={events as never} home={m.home} away={m.away} live={live} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { clock_at?: string | null; updated_at?: string }).clock_at ?? (m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} />
                 : <p className="text-sourdine">Le fil du match s&apos;affiche au premier fait de jeu.</p>}
               {events && events.length > 1 && <CourbeAscendant full={full} events={events as never} home={m.home} away={m.away} minuteActuelle={minute} />}
             </div>
@@ -357,7 +357,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
             ) },
             { id: "joueurs", label: "Joueurs et notes", badge: joueurs.length || null, contenu: joueurs.length ? <StatsJoueurs joueurs={joueurs} dom={hn} ext={an} full={full} fini matchId={m.id} /> : null },
             { id: "fil", label: "Fil du match", badge: events?.filter((e) => ["try", "penalty_try"].includes(e.kind)).length || null, contenu: events && events.length > 0
-              ? <FilDuMatch events={events as never} home={m.home} away={m.away} live={false} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} /> : null },
+              ? <FilDuMatch events={events as never} home={m.home} away={m.away} live={false} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { clock_at?: string | null; updated_at?: string }).clock_at ?? (m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} /> : null },
             { id: "compos", label: "Compositions", contenu: <Compositions matchId={m.id} lnrUrl={(m as { lnr_url?: string | null }).lnr_url ?? null} lignes={notes as never} home={m.home} away={m.away} live={false} /> },
             { id: "infos", label: "Infos et historique", contenu: (
               <div className="grid gap-6">
@@ -378,7 +378,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
 
       {live && <TribuneLive matchId={m.id} enDirect={live} home={m.home} away={m.away} totaux={totauxTribune} favori={viewer?.favorite_team_id} />}
 
-      <Comments matchId={m.id} path={`/matchs/${m.id}`} />
+      <Comments matchId={m.id} path={canonique} />
     </article>
   );
 }

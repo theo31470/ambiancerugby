@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
-import { cleMatch } from "./seo";
+import { cleMatch, memeAdresse } from "./seo";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicClient } from "./supabase/server";
 import type { Article, Competition, MatchFull, Player, StandingRow, Team } from "./types";
@@ -59,6 +59,13 @@ async function getTickerMatchesBrut(): Promise<MatchFull[]> {
 export const getMatch = cache(enCache(async (param: string): Promise<MatchFull | null> => {
   const cle = cleMatch(param);
   if (!cle) return null;
+  if ("jour" in cle) {
+    // adresse « equipe-equipe-jour » : les matchs de ce jour (heure de Paris, d'où la marge), puis la même adresse
+    const debut = new Date(new Date(`${cle.jour}T00:00:00Z`).getTime() - 3 * 3600e3).toISOString();
+    const fin = new Date(new Date(`${cle.jour}T00:00:00Z`).getTime() + 27 * 3600e3).toISOString();
+    const { data: jour } = await publicClient().from("matches").select(MATCH_SELECT).gte("kickoff_at", debut).lt("kickoff_at", fin).limit(300);
+    return memeAdresse((jour ?? []) as unknown as MatchFull[], cle.chemin);
+  }
   let q = publicClient().from("matches").select(MATCH_SELECT);
   q = "id" in cle ? q.eq("id", cle.id) : q.gte("id", `${cle.prefixe}-0000-0000-0000-000000000000`).lte("id", `${cle.prefixe}-ffff-ffff-ffff-ffffffffffff`);
   const { data } = await q.limit(1).maybeSingle();

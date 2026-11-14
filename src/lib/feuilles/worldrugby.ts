@@ -50,6 +50,20 @@ export async function completerAvantMatch(db: SupabaseClient, m: MatchWr & { ven
   }).eq("id", m.id);
   return o.arbitre ? { arbitre: o.arbitre, arbitre_pays: o.arbitre_pays } : null;
 }
+export type JoueurAnnonceWr = { numero: number; wrId: string; prenom: string; nom: string };
+/** Composition annoncée chez World Rugby (les 23, publiée 2 jours avant le match), dans l'ordre domicile / extérieur du site. */
+export async function lireCompositionWr(m: MatchWr): Promise<{ dom: JoueurAnnonceWr[]; ext: JoueurAnnonceWr[] } | null> {
+  const cible = await trouver(m);
+  if (!cible) return null;
+  const r = await lire<Resume>(`/match/${cible.id}/summary`);
+  const listes = (r?.teams ?? []).slice(0, 2).map((t) => (t.teamList?.list ?? [])
+    .filter((p) => p.player?.id && p.number != null && (!p.player.role || p.player.role === "Player"))
+    .map((p) => ({ numero: Number(p.number), wrId: p.player.id, prenom: prenomDe(p.player.name), nom: nomDe(p.player.name) }))
+    .filter((p) => p.numero >= 1 && p.numero <= 30));
+  if (listes.length < 2 || listes.some((l) => l.filter((p) => p.numero <= 15).length < 15)) return null;
+  return cible.inverse ? { dom: listes[1], ext: listes[0] } : { dom: listes[0], ext: listes[1] };
+}
+
 type Evt = { phase?: string; time?: { secs?: number }; type?: string; typeLabel?: string; group?: string; points?: number; playerId?: string | null; playerAltId?: string | null; teamIndex?: number };
 
 type EquipeLocale = { id: string; name: string; short_name?: string | null; abbreviation?: string | null; aliases?: string[] | null; wr_id?: string | null; is_national?: boolean | null };
@@ -402,8 +416,12 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
   const pts = (cote: "home" | "away") => rows.filter((r) => r.team_id === (cote === "home" ? m.home_team_id : m.away_team_id)).reduce((t, r) => t + r.points, 0)
     + faits.filter((e) => e.type === "penalty_try" && e.cote === cote).length * 7;
   const scores = s.match.scores ?? [];
-  const dom = scores.length === 2 ? Number(scores[cible.inverse ? 1 : 0]) : pts("home");
-  const ext = scores.length === 2 ? Number(scores[cible.inverse ? 0 : 1]) : pts("away");
+  const officiel = (i: 0 | 1) => (scores.length === 2 ? Number(scores[cible.inverse ? 1 - i : i]) : null);
+  // en direct, le score de l'API stats est en retard sur le fil (0-0 alors qu'un essai transformé est au fil) :
+  // on prend le plus haut des deux, et jamais moins que le score déjà affiché (un score ne redescend pas)
+  const enDirect = (i: 0 | 1, cote: "home" | "away", avant: number | null) => Math.max(officiel(i) ?? 0, pts(cote), avant ?? 0);
+  const dom = live ? enDirect(0, "home", m.home_score) : officiel(0) ?? pts("home");
+  const ext = live ? enDirect(1, "away", m.away_score) : officiel(1) ?? pts("away");
   // essais : fil du match, ou à défaut la somme des essais des joueurs (fil absent chez World Rugby)
   const essais = (cote: "home" | "away") => faits.length
     ? faits.filter((e) => (e.type === "try" || e.type === "penalty_try") && e.cote === cote).length
@@ -412,8 +430,11 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
   // le classement n'est recalculé que pour un match récent (un vieux match ne change pas le classement en cours)
   if (m.competition_id && Date.now() - new Date(m.kickoff_at).getTime() < 60 * 86400e3) await db.rpc("appliquer_bonus_offensif", { p_comp: m.competition_id });
   if (live) {
-    const horloge = s.match.clock?.label ? `${Math.floor((s.match.clock.secs ?? 0) / 60)}'` : null;
-    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: new Date().toISOString(), ...(horloge ? { clock: horloge } : {}) }).eq("id", m.id);
+    // chrono : l'API stats a parfois quelques minutes de retard, le fil est plus frais ; on garde le plus avancé des deux
+    const secs = Math.max(s.match.clock?.secs ?? 0, ...(fil?.timeline ?? []).map((e) => e.time?.secs ?? 0));
+    const horloge = secs > 0 ? `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}` : null;
+    const maintenant = new Date().toISOString();
+    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: maintenant, ...(horloge ? { clock: horloge, clock_at: maintenant } : {}) }).eq("id", m.id);
   }
   const detailOk = rows.some((r) => (r.tackles ?? 0) > 0);
   return { ok: true, joueurs: rows.length, crees, fil: nFil, dom, ext, conforme: dom === m.home_score && ext === m.away_score, detail: detailOk, live };

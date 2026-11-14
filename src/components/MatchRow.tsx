@@ -17,7 +17,7 @@ export default function MatchRow({ m, showDate = false }: { m: MatchFull; showDa
         {live ? (
           <span className="inline-flex items-center gap-1.5 font-bold text-vin">
             <span className="pastille" aria-hidden />
-            {m.status === "halftime" ? "Mi-temps" : m.clock ?? "Direct"}
+            {m.status === "halftime" ? "Mi-temps" : (m.clock ? m.clock.replace(/^(\d+):\d{2}$/, "$1'") : "Direct")}
           </span>
         ) : (
           <>
