@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ambiance Rugby — hors ligne</title>
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: #3e1621; color: #fcf7f8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
+      box-sizing: border-box;
+    }
+    .ballon {
+      width: 84px; height: 54px; margin: 0 auto 28px; border-radius: 50%;
+      border: 3px solid #f2b53a; position: relative;
+      animation: rebond 1.4s ease-in-out infinite;
+    }
+    .ballon::after {
+      content: ""; position: absolute; left: 50%; top: 50%; width: 34px; height: 3px;
+      background: #f2b53a; transform: translate(-50%, -50%);
+    }
+    @keyframes rebond {
+      0%, 100% { transform: translateY(0) rotate(-12deg); }
+      50% { transform: translateY(-14px) rotate(12deg); }
+    }
+    h1 { font-size: 24px; margin: 0 0 10px; }
+    p { margin: 0 0 28px; color: #f6e4e8; opacity: .85; line-height: 1.45; }
+    a {
+      display: inline-block; background: #f2b53a; color: #2a1419; font-weight: 700;
+      padding: 14px 26px; border-radius: 999px; text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="ballon" aria-hidden="true"></div>
+    <h1>Ballon perdu en touche</h1>
+    <p>Pas de connexion pour l'instant.<br />Vérifie ton réseau et on relance le jeu.</p>
+    <a href="https://ambiance-rugby.fr">Réessayer</a>
+  </main>
+</body>
+</html>

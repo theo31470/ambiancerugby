@@ -1,0 +1,26 @@
+{
+  "name": "ambiance-rugby-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App iOS / Android d'Ambiance Rugby (Capacitor) — charge le site en ligne",
+  "scripts": {
+    "sync": "cap sync",
+    "assets": "capacitor-assets generate --iconBackgroundColor '#3e1621' --iconBackgroundColorDark '#3e1621' --splashBackgroundColor '#3e1621' --splashBackgroundColorDark '#3e1621' --ios --android",
+    "android": "cap open android",
+    "ios": "cap open ios",
+    "run:android": "cap run android",
+    "run:ios": "cap run ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/ios": "^8.6.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.2",
+    "typescript": "^5"
+  }
+}
