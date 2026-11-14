@@ -50,6 +50,20 @@ export async function completerAvantMatch(db: SupabaseClient, m: MatchWr & { ven
   }).eq("id", m.id);
   return o.arbitre ? { arbitre: o.arbitre, arbitre_pays: o.arbitre_pays } : null;
 }
+export type JoueurAnnonceWr = { numero: number; wrId: string; prenom: string; nom: string };
+/** Composition annoncée chez World Rugby (les 23, publiée 2 jours avant le match), dans l'ordre domicile / extérieur du site. */
+export async function lireCompositionWr(m: MatchWr): Promise<{ dom: JoueurAnnonceWr[]; ext: JoueurAnnonceWr[] } | null> {
+  const cible = await trouver(m);
+  if (!cible) return null;
+  const r = await lire<Resume>(`/match/${cible.id}/summary`);
+  const listes = (r?.teams ?? []).slice(0, 2).map((t) => (t.teamList?.list ?? [])
+    .filter((p) => p.player?.id && p.number != null && (!p.player.role || p.player.role === "Player"))
+    .map((p) => ({ numero: Number(p.number), wrId: p.player.id, prenom: prenomDe(p.player.name), nom: nomDe(p.player.name) }))
+    .filter((p) => p.numero >= 1 && p.numero <= 30));
+  if (listes.length < 2 || listes.some((l) => l.filter((p) => p.numero <= 15).length < 15)) return null;
+  return cible.inverse ? { dom: listes[1], ext: listes[0] } : { dom: listes[0], ext: listes[1] };
+}
+
 type Evt = { phase?: string; time?: { secs?: number }; type?: string; typeLabel?: string; group?: string; points?: number; playerId?: string | null; playerAltId?: string | null; teamIndex?: number };
 
 type EquipeLocale = { id: string; name: string; short_name?: string | null; abbreviation?: string | null; aliases?: string[] | null; wr_id?: string | null; is_national?: boolean | null };

@@ -3,6 +3,7 @@ import { publicClient } from "@/lib/supabase/server";
 import { shopDb } from "@/lib/shop/admin";
 import { lireCompositionLnr, trouverMatchLnr, type JoueurCompo } from "@/lib/feuilles/lnr";
 import { lireCompositionEspn, SELECT_MATCH_ESPN, type MatchLocal } from "@/lib/feuilles/espn";
+import { lireCompositionWr, SELECT_MATCH_WR, type JoueurAnnonceWr, type MatchWr } from "@/lib/feuilles/worldrugby";
 import type { TeamLite } from "@/lib/types";
 import TerrainCompo, { type EquipeCompo as EquipeTerrain, type JoueurCompo as JoueurTerrain } from "@/components/match/TerrainCompo";
 
@@ -50,13 +51,32 @@ async function profil(teamId: string) {
 type MatchAvant = { id: string; kickoff_at: string; lnr_url?: string | null; round?: string | null; season?: string | null; competition_id: string };
 
 type Banc = { numero: number; joueur: Joueur }[];
-type Compo = { source: "LNR" | "ESPN"; dom: Map<number, Titulaire>; ext: Map<number, Titulaire>; bancDom: Banc; bancExt: Banc };
+type Compo = { source: "LNR" | "ESPN" | "World Rugby"; dom: Map<number, Titulaire>; ext: Map<number, Titulaire>; bancDom: Banc; bancExt: Banc };
 
 /** Composition officielle : feuille LNR (Top 14, Pro D2), sinon ESPN (autres compétitions), dans les 4 jours avant le match. */
 async function compositionOfficielle(m: MatchAvant, home: TeamLite, away: TeamLite, notes: { h: Map<string, number>; a: Map<string, number> }): Promise<Compo | null> {
   if (new Date(m.kickoff_at).getTime() - Date.now() > 4 * 86400e3) return null;
   const db = shopDb();
-  const { data: c } = await db.from("competitions").select("lnr_site, espn_league").eq("id", m.competition_id).maybeSingle();
+  const { data: c } = await db.from("competitions").select("lnr_site, espn_league, wr_ok").eq("id", m.competition_id).maybeSingle();
+  if (!c?.lnr_site && c?.wr_ok) {
+    // World Rugby d'abord : les 23 officiels, publiés avant ESPN
+    const { data: mw } = await db.from("matches").select(SELECT_MATCH_WR).eq("id", m.id).maybeSingle();
+    const w = mw ? await lireCompositionWr(mw as unknown as MatchWr).catch(() => null) : null;
+    if (w) {
+      const { data } = await publicClient().from("players").select("id,slug,first_name,last_name,photo_url,wr_id").in("wr_id", [...w.dom, ...w.ext].map((j) => j.wrId));
+      const parWr = new Map((data ?? []).map((p) => [p.wr_id as string, p]));
+      const joueur = (j: JoueurAnnonceWr): Joueur => {
+        const p = parWr.get(j.wrId);
+        return p ? { id: p.id, slug: p.slug, first_name: p.first_name, last_name: p.last_name, photo_url: p.photo_url } : { id: j.wrId, slug: null, first_name: j.prenom, last_name: j.nom, photo_url: null };
+      };
+      const vers = (l: JoueurAnnonceWr[], n: Map<string, number>) => new Map(l.filter((j) => j.numero <= 15).map((j) => {
+        const jj = joueur(j);
+        return [j.numero, { joueur: jj, note: jj.slug ? n.get(jj.id) ?? null : null, matchs: 0 }];
+      }));
+      const banc = (l: JoueurAnnonceWr[]): Banc => l.filter((j) => j.numero > 15).sort((x, y) => x.numero - y.numero).map((j) => ({ numero: j.numero, joueur: joueur(j) }));
+      return { source: "World Rugby", dom: vers(w.dom, notes.h), ext: vers(w.ext, notes.a), bancDom: banc(w.dom), bancExt: banc(w.ext) };
+    }
+  }
   if (!c?.lnr_site) {
     if (!c?.espn_league) return null;
     const { data: ml } = await db.from("matches").select(SELECT_MATCH_ESPN).eq("id", m.id).maybeSingle();
@@ -139,7 +159,7 @@ export default async function AvantMatch({ match, home, away, full }: { match: M
       <h2 id="h-avant" className="sr-only">L&apos;avant-match</h2>
       <TerrainCompo equipes={[equipe(home, h.titulaires, compo?.bancDom ?? []), equipe(away, a.titulaires, compo?.bancExt ?? [])]}
         titre={compo ? "Les compositions" : "Les XV probables"}
-        source={compo ? `Composition officielle (${compo.source === "LNR" ? "feuille de match LNR" : "ESPN"}). Passez sur un joueur pour sa fiche.` : "Titulaires habituels sur les 5 derniers matchs ; la composition officielle s'affiche dès sa publication."} />
+        source={compo ? `Composition officielle (${compo.source === "LNR" ? "feuille de match LNR" : compo.source}). Passez sur un joueur pour sa fiche.` : "Titulaires habituels sur les 5 derniers matchs ; la composition officielle s'affiche dès sa publication."} />
       {full ? (
         <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr]">
           {([[home, h.buteurs], [away, a.buteurs]] as const).map(([t, bs]) => (
