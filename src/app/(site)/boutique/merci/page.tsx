@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { stripe } from "@/lib/shop/stripe";
 import ViderPanier from "@/components/shop/ViderPanier";
+import EtapesCommande from "@/components/shop/EtapesCommande";
 import { Ballon, Poteaux } from "@/components/deco/Icones";
 
 export const metadata: Metadata = { title: "Merci !", robots: { index: false } };
@@ -16,6 +17,7 @@ export default async function Merci({ searchParams }: PageProps<"/boutique/merci
   const email = session?.customer_details?.email ?? session?.customer_email ?? "";
   return (
     <div className="max-w-2xl mx-auto text-center py-6">
+      {paye && <div className="flex justify-center"><EtapesCommande actuelle={3} /></div>}
       {paye && <ViderPanier />}
       <div className="relative h-40 mx-auto w-64" aria-hidden>
         <Poteaux className="absolute left-1/2 -translate-x-1/2 bottom-0 h-40 w-auto text-vin" />

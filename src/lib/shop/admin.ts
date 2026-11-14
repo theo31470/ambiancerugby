@@ -15,6 +15,7 @@ export type Commande = {
   stripe_session_id: string | null; printful_order_id: number | null; transporteur: string | null; suivi_numero: string | null; suivi_url: string | null;
   facture_numero: string | null; facture_date: string | null; mode_test: boolean; created_at: string;
   paye_at: string | null; fabrication_at: string | null; expedie_at: string | null; livre_at: string | null;
+  remise_cents?: number; code_promo?: string | null;
 };
 export type ArticleCommande = { variant_id: string; sync_variant_id: number | null; catalogue_id?: number | null; nom: string; detail: string; image: string | null; prix_cents: number; quantite: number };
 export type Statut = "en_attente" | "payee" | "en_fabrication" | "expediee" | "livree" | "annulee" | "remboursee" | "probleme";

@@ -282,6 +282,8 @@ export type BoutiqueInput = {
   suiviUrl?: string | null;
   montantRembourseCents?: number;
   factureNumero?: string | null;
+  remiseCents?: number;
+  codePromo?: string | null;
   avoir?: string | null;
 };
 const RAISON_BOUTIQUE = "Vous recevez cet e-mail suite à votre commande sur la boutique Ambiance Rugby.";
@@ -299,6 +301,7 @@ export function boutiqueEmail(template: BoutiqueTemplate, i: BoutiqueInput, site
           { type: "p", text: "Merci pour votre commande. Les articles sont fabriqués à la demande : comptez **2 à 5 jours** avant l'expédition. Nous vous écrivons dès que le colis part." },
           { type: "lignes", rows: [
             ...i.articles.map((a) => ({ label: a.nom, detail: [a.detail, `x${a.quantite}`].filter(Boolean).join(" · "), valeur: euros(a.prixCents * a.quantite) })),
+            ...(i.remiseCents ? [{ label: `Remise${i.codePromo ? ` (${i.codePromo})` : ""}`, valeur: `−${euros(i.remiseCents)}` }] : []),
             { label: "Livraison", valeur: i.livraisonCents ? euros(i.livraisonCents) : "Offerte" },
           ], total: { label: "Total", valeur: euros(i.totalCents) } },
           ...(i.adresse ? [{ type: "note" as const, text: `**Livraison :** ${i.adresse}` }] : []),
@@ -336,4 +339,68 @@ export function boutiqueEmail(template: BoutiqueTemplate, i: BoutiqueInput, site
         reason: RAISON_BOUTIQUE,
       }, site);
   }
+}
+
+// ------------------------------------------------------------------ boutique : livraison et service après-vente
+
+export function livreeEmail(i: { name?: string | null; numero: string; email: string }, siteUrl: string): BuiltEmail {
+  const site = siteUrl.replace(/\/$/, "");
+  const suivre = `${site}/suivi/${encodeURIComponent(i.numero)}?e=${encodeURIComponent(i.email)}`;
+  return build("Votre commande est arrivée", {
+    preheader: `Commande n° ${i.numero} livrée. Bon match !`,
+    heading: "Essai aplati : c'est livré !",
+    blocks: [
+      { type: "p", text: bonjour(i.name) },
+      { type: "p", text: `Votre commande **n° ${i.numero}** est livrée. On espère qu'elle vous plaît et qu'elle verra beaucoup de tribunes.` },
+      { type: "note", text: "Un souci avec un article, ou envie de le retourner ? Vous avez **14 jours** pour changer d'avis : faites la demande depuis la page de votre commande." },
+      { type: "button", label: "Voir ma commande", url: suivre },
+    ],
+    reason: RAISON_BOUTIQUE,
+  }, site);
+}
+
+export type SavEmail = { name?: string | null; numero: string; email: string; sav: string; motif: string; reponse?: string | null; statut?: string };
+
+export function savRecueEmail(i: SavEmail, siteUrl: string): BuiltEmail {
+  const site = siteUrl.replace(/\/$/, "");
+  return build(`Demande ${i.sav} bien reçue`, {
+    preheader: `Nous revenons vers vous sous 48 heures ouvrées.`,
+    heading: "Demande bien reçue",
+    blocks: [
+      { type: "p", text: bonjour(i.name) },
+      { type: "p", text: `Nous avons bien reçu votre demande **${i.sav}** (${i.motif.toLowerCase()}) pour la commande **n° ${i.numero}**. Nous l'étudions et revenons vers vous par e-mail sous 48 heures ouvrées.` },
+      { type: "note", text: "Merci de garder l'article et son emballage tant que nous ne vous avons pas répondu." },
+      { type: "button", label: "Suivre ma demande", url: `${site}/suivi/${encodeURIComponent(i.numero)}?e=${encodeURIComponent(i.email)}#sav` },
+    ],
+    reason: RAISON_BOUTIQUE,
+  }, site);
+}
+
+export function savReponseEmail(i: SavEmail, siteUrl: string): BuiltEmail {
+  const site = siteUrl.replace(/\/$/, "");
+  const titre = i.statut === "acceptee" ? "Votre demande est acceptée" : i.statut === "refusee" ? "Réponse à votre demande" : `Du nouveau sur votre demande ${i.sav}`;
+  return build(`${titre} (${i.sav})`, {
+    preheader: `Commande n° ${i.numero}`,
+    heading: titre,
+    blocks: [
+      { type: "p", text: bonjour(i.name) },
+      ...(i.reponse ? [{ type: "p" as const, text: i.reponse }] : []),
+      { type: "button", label: "Voir ma demande", url: `${site}/suivi/${encodeURIComponent(i.numero)}?e=${encodeURIComponent(i.email)}#sav` },
+    ],
+    reason: RAISON_BOUTIQUE,
+  }, site);
+}
+
+export function savAlerteEmail(i: SavEmail & { message: string; photos: number }, siteUrl: string, lien: string): BuiltEmail {
+  const site = siteUrl.replace(/\/$/, "");
+  return build(`Nouvelle demande ${i.sav} (${i.motif})`, {
+    preheader: `Commande n° ${i.numero}, ${i.email}`,
+    heading: `Nouvelle demande de service après-vente`,
+    blocks: [
+      { type: "lignes", rows: [{ label: "Demande", valeur: i.sav }, { label: "Commande", valeur: i.numero }, { label: "Motif", valeur: i.motif }, { label: "Client", valeur: i.email }, { label: "Photos", valeur: String(i.photos) }] },
+      { type: "p", text: i.message },
+      { type: "button", label: "Traiter dans le studio", url: lien },
+    ],
+    reason: "Vous recevez cet e-mail car vous gérez la boutique Ambiance Rugby.",
+  }, site);
 }

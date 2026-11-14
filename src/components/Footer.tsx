@@ -45,6 +45,13 @@ export default function Footer() {
           <div className="content-start">
             <p className="text-white font-semibold mb-1">À consommer avec modération</p>
             <p className="text-white/60 text-xs">La troisième mi-temps se vit avec modération. Données de match fournies par des services tiers ; certaines compétitions sont saisies par la rédaction.</p>
+            <p className="text-white font-semibold mt-4 mb-1">La boutique</p>
+            <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <Link href="/boutique" className="hover:text-white">Le vestiaire</Link>
+              <Link href="/suivi" className="hover:text-white">Suivre une commande</Link>
+              <Link href="/boutique/aide" className="hover:text-white">Livraison et retours</Link>
+              <Link href="/boutique/cgv" className="hover:text-white">CGV</Link>
+            </p>
           </div>
         </div>
       </div>

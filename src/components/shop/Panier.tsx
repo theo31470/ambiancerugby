@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { panier, usePanier } from "@/lib/shop/panier";
 import { detaillerPanier, type LigneDetaillee } from "@/app/(site)/boutique/actions";
 import { euros } from "@/lib/shop/format";
+import JaugeLivraison from "./JaugeLivraison";
 
 /** Contenu du panier, recalculé par le serveur à chaque changement. */
-export default function Panier() {
+export default function Panier({ seuil }: { seuil: number | null }) {
   const lignes = usePanier();
   const [detail, setDetail] = useState<LigneDetaillee[] | null>(null);
   useEffect(() => {
@@ -47,13 +48,17 @@ export default function Panier() {
           </li>
         ))}
       </ul>
-      <aside className="bg-bordeaux text-white rounded-2xl p-5 h-fit lg:sticky lg:top-24">
+      <aside className="h-fit lg:sticky lg:top-24 grid gap-3">
+        <JaugeLivraison sousTotal={sousTotal} seuil={seuil} />
+        <div className="bg-bordeaux text-white rounded-2xl p-5">
         <dl className="grid gap-2">
           <div className="flex justify-between"><dt>Sous-total</dt><dd className="tnum font-semibold">{euros(sousTotal)}</dd></div>
-          <div className="flex justify-between text-white/70 text-sm"><dt>Livraison</dt><dd>calculée à l&apos;étape suivante</dd></div>
+          <div className="flex justify-between text-white/70 text-sm"><dt>Livraison</dt><dd>{seuil && sousTotal >= seuil ? "Offerte" : "selon l'adresse"}</dd></div>
         </dl>
         <Link href="/boutique/paiement" className="bouton-or w-full justify-center mt-5">Passer commande</Link>
         <Link href="/boutique" className="block text-center mt-3 text-sm text-white/80 underline underline-offset-2">Continuer mes achats</Link>
+        </div>
+        <p className="text-xs text-sourdine px-1">Code promo à saisir à l&apos;étape suivante.</p>
       </aside>
     </div>
   );

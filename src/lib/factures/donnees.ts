@@ -39,6 +39,7 @@ export function clientCommande(c: Commande): Client {
 export function lignesCommande(c: Commande): LigneDoc[] {
   return [
     ...c.items.map((a) => ({ label: a.nom, detail: a.detail || null, quantite: a.quantite, unite_cents: a.prix_cents, total_cents: a.prix_cents * a.quantite })),
+    ...(c.remise_cents ? [{ label: `Remise${c.code_promo ? ` (code ${c.code_promo})` : ""}`, detail: null, quantite: 1, unite_cents: -c.remise_cents, total_cents: -c.remise_cents }] : []),
     ...(c.livraison_cents ? [{ label: "Livraison", detail: c.livraison_methode === "STANDARD" || !c.livraison_methode ? "Envoi standard" : c.livraison_methode, quantite: 1, unite_cents: c.livraison_cents, total_cents: c.livraison_cents }] : []),
   ];
 }

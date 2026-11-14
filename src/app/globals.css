@@ -457,3 +457,22 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .onglet-icone[data-on] { animation: onglet-pop .45s cubic-bezier(.3,1.7,.5,1); }
 @keyframes onglet-pop { 0% { transform: scale(.7) rotate(-10deg); } 60% { transform: scale(1.12) rotate(4deg); } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .onglet-icone[data-on] { animation: none; } }
+
+/* ---------- boutique ---------- */
+/* panier en tiroir : glisse depuis la droite */
+.tiroir[open] { animation: tiroir-entree .35s cubic-bezier(.2,.8,.2,1); }
+.tiroir[open]::backdrop { animation: voile-entree .3s ease-out; }
+@keyframes tiroir-entree { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes voile-entree { from { opacity: 0; } to { opacity: 1; } }
+/* l'article qu'on vient d'ajouter s'allume une fois */
+.tiroir-ajout { animation: tiroir-ajout 1.6s ease-out; }
+@keyframes tiroir-ajout { 0%, 30% { background: color-mix(in srgb, var(--moutarde) 28%, transparent); } 100% { background: transparent; } }
+/* les maillots de la vitrine arrivent un à un sur leur cintre */
+.vitrine-entree > li { animation: vitrine-entree .7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 120ms + 100ms); }
+@keyframes vitrine-entree { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+/* casier : le numéro tourne au survol */
+.casier:hover .casier-numero { transform: rotate(-12deg) scale(1.08); }
+.casier-numero { transition: transform .3s cubic-bezier(.3,.7,.4,1.4); }
+@media (prefers-reduced-motion: reduce) {
+  .tiroir[open], .tiroir[open]::backdrop, .tiroir-ajout, .vitrine-entree > li { animation: none; }
+}

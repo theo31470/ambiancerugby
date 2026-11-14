@@ -8,6 +8,7 @@ const maj = (id: string, patch: Record<string, unknown>) => shopDb().rpc("shop_m
 export async function commandePayee(c: Commande, paymentIntent: string | null) {
   if (c.statut !== "en_attente") return; // déjà traitée (Stripe peut renvoyer l'événement)
   await maj(c.id, { statut: "payee", stripe_payment_intent: paymentIntent, message: "Paiement reçu, facture émise." });
+  if (c.code_promo) await shopDb().rpc("shop_utiliser_code", { p_code: c.code_promo });
   await mailCommande("commande_confirmee", c);
   try {
     const pf = await creerCommandePrintful({

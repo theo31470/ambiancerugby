@@ -10,6 +10,8 @@ import { COLLECTION, visuelPour } from "@/lib/shop/collection";
 import { stripe } from "@/lib/shop/stripe";
 import { commandePayee, synchroniserPrintful } from "@/lib/shop/traitement";
 import { slugify } from "@/lib/format";
+import { sendEmail, siteUrl } from "@/lib/email/send";
+import { livreeEmail, savReponseEmail } from "@/lib/email/templates";
 
 async function run(form: FormData, fn: () => Promise<void>) {
   try { await fn(); } catch (e) {
@@ -34,8 +36,13 @@ export async function changerStatut(form: FormData) {
     const id = String(form.get("id"));
     const statut = String(form.get("statut"));
     if (!["en_fabrication", "expediee", "livree", "annulee", "probleme"].includes(statut)) throw new Error("Statut inconnu.");
+    const avant = await lire(id);
     const { error } = await shopDb().rpc("shop_maj_commande", { p_secret: null, p_id: id, p_patch: { statut, message: s(form, "message") ?? undefined } });
     if (error) throw new Error(error.message);
+    // Printful ne signale pas la livraison : c'est la rédaction qui la confirme, et le client est prévenu
+    if (statut === "livree" && avant && avant.statut !== "livree") {
+      await sendEmail({ to: avant.email, kind: "boutique", template: "commande_livree", email: livreeEmail({ name: avant.livraison_nom, numero: avant.numero, email: avant.email }, siteUrl()) }, { idempotencyKey: `commande_livree-${id}` });
+    }
     revalidatePath("/studio/boutique", "layout");
     ok(form);
   });
@@ -50,8 +57,14 @@ export async function rembourser(form: FormData) {
     if (!c) throw new Error("Commande introuvable.");
     const { data } = await shopDb().from("shop_orders").select("stripe_payment_intent").eq("id", c.id).single();
     if (!data?.stripe_payment_intent) throw new Error("Paiement Stripe introuvable pour cette commande.");
-    await stripe().refunds.create({ payment_intent: data.stripe_payment_intent });
-    await shopDb().rpc("shop_maj_commande", { p_secret: null, p_id: c.id, p_patch: { statut: "remboursee", message: "Remboursement effectué." } });
+    // montant partiel (retour d'un seul article, geste commercial) ou commande entière
+    const partiel = s(form, "montant") ? Math.round(Number(String(s(form, "montant")).replace(",", ".")) * 100) : null;
+    if (partiel != null && (!(partiel > 0) || partiel > c.total_cents)) throw new Error("Montant de remboursement invalide.");
+    await stripe().refunds.create({ payment_intent: data.stripe_payment_intent, ...(partiel && partiel < c.total_cents ? { amount: partiel } : {}) });
+    const total = !partiel || partiel >= c.total_cents;
+    await shopDb().rpc("shop_maj_commande", { p_secret: null, p_id: c.id, p_patch: total
+      ? { statut: "remboursee", message: "Remboursement effectué." }
+      : { message: `Remboursement partiel de ${(partiel! / 100).toFixed(2).replace(".", ",")} €.` } });
     revalidatePath("/studio/boutique", "layout");
     ok(form);
   });
@@ -304,7 +317,7 @@ export async function saveReglagesBoutique(form: FormData) {
     if (viewer.role !== "admin") throw new Error("Réservé aux administrateurs.");
     const { error } = await db.from("shop_settings").update({
       vendeur_nom: s(form, "vendeur_nom"), vendeur_titulaire: s(form, "vendeur_titulaire"), vendeur_adresse: s(form, "vendeur_adresse"), vendeur_siret: s(form, "vendeur_siret"),
-      vendeur_email: s(form, "vendeur_email"), mention_tva: s(form, "mention_tva") ?? "TVA non applicable, art. 293 B du CGI", updated_at: new Date().toISOString(),
+      vendeur_email: s(form, "vendeur_email"), mediateur: s(form, "mediateur"), mention_tva: s(form, "mention_tva") ?? "TVA non applicable, art. 293 B du CGI", updated_at: new Date().toISOString(),
     }).eq("id", 1);
     if (error) throw new Error(error.message);
     ok(form);
@@ -331,6 +344,91 @@ export async function ouvrirBoutique(form: FormData) {
     const { error } = await db.from("shop_settings").update({ mode_test: !ouvrir, updated_at: new Date().toISOString() }).eq("id", 1);
     if (error) throw new Error(error.message);
     revalidatePath("/boutique", "layout");
+    ok(form);
+  });
+}
+
+// ---------- vente : livraison offerte, codes promo, paiement mobile ----------
+const euroEnCents = (v: string | null) => (v ? Math.round(Number(v.replace(",", ".")) * 100) : null);
+
+export async function saveVente(form: FormData) {
+  return run(form, async () => {
+    const { viewer, db } = await staff();
+    if (viewer.role !== "admin") throw new Error("Réservé aux administrateurs.");
+    const seuil = euroEnCents(s(form, "livraison_offerte"));
+    if (seuil != null && (!Number.isFinite(seuil) || seuil < 0)) throw new Error("Montant de livraison offerte invalide.");
+    const { error } = await db.from("shop_settings").update({ livraison_offerte_cents: seuil || null, updated_at: new Date().toISOString() }).eq("id", 1);
+    if (error) throw new Error(error.message);
+    revalidatePath("/boutique", "layout");
+    ok(form);
+  });
+}
+
+/** Déclare le domaine du site chez Stripe : Apple Pay et Google Pay s'affichent alors dans le formulaire de paiement. */
+export async function activerPaiementMobile(form: FormData) {
+  return run(form, async () => {
+    const { viewer } = await staff();
+    if (viewer.role !== "admin") throw new Error("Réservé aux administrateurs.");
+    const h = await headers();
+    const hote = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? `https://${h.get("host")}`).hostname;
+    for (const d of [hote, hote.startsWith("www.") ? hote.slice(4) : `www.${hote}`]) {
+      const existant = (await stripe().paymentMethodDomains.list({ domain_name: d, limit: 1 })).data[0];
+      const dom = existant ?? await stripe().paymentMethodDomains.create({ domain_name: d, enabled: true });
+      if (existant && !existant.enabled) await stripe().paymentMethodDomains.update(existant.id, { enabled: true });
+      await stripe().paymentMethodDomains.validate(dom.id).catch(() => null);
+    }
+    ok(form, "lance");
+  });
+}
+
+export async function saveCode(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const code = (s(form, "code") ?? "").toUpperCase().replace(/\s+/g, "");
+    if (!/^[A-Z0-9_-]{3,30}$/.test(code)) throw new Error("Le code fait 3 à 30 caractères : lettres, chiffres, tiret.");
+    const type = s(form, "type") ?? "pourcentage";
+    const valeur = type === "pourcentage" ? Number(s(form, "valeur") ?? 0) : type === "montant" ? euroEnCents(s(form, "valeur")) ?? 0 : 0;
+    if (type === "pourcentage" && (!(valeur > 0) || valeur > 90)) throw new Error("Pourcentage entre 1 et 90.");
+    if (type === "montant" && !(valeur > 0)) throw new Error("Indiquez le montant de la remise.");
+    const max = s(form, "max_utilisations");
+    const { error } = await db.from("shop_codes").upsert({
+      code, type, valeur: Math.round(valeur), minimum_cents: euroEnCents(s(form, "minimum")) ?? 0,
+      debut: s(form, "debut"), fin: s(form, "fin") ? `${s(form, "fin")}T23:59:59+01:00` : null,
+      max_utilisations: max ? Number(max) : null, note: s(form, "note"), actif: true,
+    }, { onConflict: "code" });
+    if (error) throw new Error(error.message);
+    ok(form);
+  });
+}
+
+export async function basculerCode(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const { error } = await db.from("shop_codes").update({ actif: form.get("actif") === "1" }).eq("id", String(form.get("id")));
+    if (error) throw new Error(error.message);
+    ok(form);
+  });
+}
+
+// ---------- service après-vente ----------
+const MOTIFS: Record<string, string> = { retractation: "Rétractation", defaut: "Défaut de fabrication", erreur: "Erreur de commande", non_recu: "Colis non reçu", autre: "Autre demande" };
+
+export async function repondreSav(form: FormData) {
+  return run(form, async () => {
+    const { db } = await staff();
+    const id = String(form.get("id"));
+    const statut = String(form.get("statut"));
+    if (!["ouverte", "en_cours", "acceptee", "refusee", "cloturee"].includes(statut)) throw new Error("Statut inconnu.");
+    const reponse = s(form, "reponse");
+    const { data: d, error } = await db.from("shop_sav").update({ statut, ...(reponse ? { reponse } : {}) }).eq("id", id)
+      .select("numero, motif, email, order:shop_orders(numero, livraison_nom)").single();
+    if (error) throw new Error(error.message);
+    const o = d.order as unknown as { numero: string; livraison_nom: string | null };
+    if (reponse && form.get("prevenir") === "on") {
+      await sendEmail({ to: d.email, kind: "boutique", template: "sav_reponse",
+        email: savReponseEmail({ name: o.livraison_nom, numero: o.numero, email: d.email, sav: d.numero, motif: MOTIFS[d.motif] ?? d.motif, reponse, statut }, siteUrl()) });
+    }
+    revalidatePath("/studio/boutique", "layout");
     ok(form);
   });
 }

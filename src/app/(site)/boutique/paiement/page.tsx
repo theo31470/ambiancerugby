@@ -9,7 +9,7 @@ export default async function PaiementPage() {
   const viewer = await getViewer();
   return (
     <div>
-      <h1 className="groovy text-5xl text-vin mb-8">Commande</h1>
+      <h1 className="sr-only">Commande</h1>
       <Paiement email={viewer?.email ?? null} />
     </div>
   );

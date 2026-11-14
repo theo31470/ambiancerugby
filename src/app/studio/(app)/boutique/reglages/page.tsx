@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import PageHeader from "@/components/admin/PageHeader";
 import Notice from "@/components/admin/Notice";
 import { Field, Area } from "@/components/admin/Field";
-import { connecterPrintful, ouvrirBoutique, saveReglagesBoutique } from "../actions";
+import { activerPaiementMobile, connecterPrintful, ouvrirBoutique, saveReglagesBoutique, saveVente } from "../actions";
 
 export default async function ReglagesBoutique({ searchParams }: PageProps<"/studio/boutique/reglages">) {
   const sp = await searchParams;
@@ -56,6 +56,21 @@ export default async function ReglagesBoutique({ searchParams }: PageProps<"/stu
             <button className={r?.mode_test === false ? "bouton-discret" : "bouton"}>{r?.mode_test === false ? "Fermer la boutique" : "Ouvrir la boutique"}</button>
           </form>
         </section>
+        <section className="bg-surface border border-trait rounded-2xl p-5 grid gap-4 content-start">
+          <h2 className="font-bold text-lg">Vente</h2>
+          <form action={saveVente} className="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="_back" value="/studio/boutique/reglages" />
+            <Field name="livraison_offerte" label="Livraison offerte dès (€)" type="number" step="0.01" defaultValue={r?.livraison_offerte_cents ? (r.livraison_offerte_cents / 100).toFixed(2) : ""}
+              hint="Vide : les frais de port sont toujours payés par le client. Au-delà du seuil, c'est vous qui les payez à Printful." className="flex-1 min-w-56" />
+            <button className="bouton-discret">Enregistrer</button>
+          </form>
+          <form action={activerPaiementMobile}>
+            <input type="hidden" name="_back" value="/studio/boutique/reglages" />
+            <button className="bouton-discret" disabled={!sk}>Activer Apple Pay et Google Pay</button>
+            <p className="text-xs text-sourdine mt-1">À faire une fois : déclare le site chez Stripe pour que ces boutons s&apos;affichent au paiement.</p>
+          </form>
+          <Link href="/studio/boutique/codes" className="bouton-discret w-fit">Gérer les codes promo</Link>
+        </section>
         <form action={saveReglagesBoutique} className="bg-surface border border-trait rounded-2xl p-5 grid gap-4">
           <input type="hidden" name="_back" value="/studio/boutique/reglages" />
           <h2 className="font-bold text-lg">Factures</h2>
@@ -64,6 +79,8 @@ export default async function ReglagesBoutique({ searchParams }: PageProps<"/stu
           <Area name="vendeur_adresse" label="Adresse" rows={3} defaultValue={r?.vendeur_adresse} />
           <Field name="vendeur_siret" label="SIRET" defaultValue={r?.vendeur_siret} />
           <Field name="vendeur_email" label="E-mail de contact" type="email" defaultValue={r?.vendeur_email} />
+          <Area name="mediateur" label="Médiateur de la consommation (CGV)" rows={2} defaultValue={r?.mediateur} />
+          <p className="text-xs text-sourdine -mt-3">Obligatoire pour vendre aux particuliers : nom, site et adresse du médiateur auquel vous avez adhéré (ex. CM2C, Medicys). Affiché dans les conditions générales de vente.</p>
           <Field name="mention_tva" label="Mention TVA" defaultValue={r?.mention_tva} hint="Micro-entreprise : « TVA non applicable, art. 293 B du CGI »." />
           <div><button className="bouton">Enregistrer</button></div>
         </form>

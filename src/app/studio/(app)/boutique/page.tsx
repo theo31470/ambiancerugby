@@ -5,6 +5,7 @@ import Notice from "@/components/admin/Notice";
 import { STATUTS, type Commande, type Statut } from "@/lib/shop/admin";
 import { euros } from "@/lib/shop/format";
 import { isoFromNow } from "@/lib/format";
+import { MOTIFS_SAV, type MotifSav } from "@/lib/shop/sav";
 
 const COULEUR: Record<Statut, string> = {
   en_attente: "bg-teinte text-sourdine", payee: "bg-moutarde/30 text-encre", en_fabrication: "bg-moutarde/30 text-encre", expediee: "bg-vin/10 text-vin",
@@ -19,9 +20,10 @@ export default async function AdminCommandes({ searchParams }: PageProps<"/studi
   if (statut === "a-traiter") req = req.in("statut", ["payee", "probleme"]);
   else if (statut) req = req.eq("statut", statut);
   else req = req.neq("statut", "en_attente");
-  const [{ data }, { data: mois }] = await Promise.all([
+  const [{ data }, { data: mois }, { data: savs }] = await Promise.all([
     req,
     db.from("shop_orders").select("total_cents,statut,mode_test").gte("created_at", isoFromNow(-30 * 86400e3)).in("statut", ["payee", "en_fabrication", "expediee", "livree"]),
+    db.from("shop_sav").select("id,numero,motif,created_at,order_id,order:shop_orders(numero)").in("statut", ["ouverte", "en_cours"]).order("created_at"),
   ]);
   const commandes = (data ?? []) as Pick<Commande, "id" | "numero" | "email" | "livraison_nom" | "statut" | "total_cents" | "created_at" | "mode_test" | "items">[];
   const reel = (mois ?? []).filter((m) => !m.mode_test);
@@ -29,15 +31,27 @@ export default async function AdminCommandes({ searchParams }: PageProps<"/studi
     ["Ventes sur 30 jours", euros(reel.reduce((s, m) => s + m.total_cents, 0))],
     ["Commandes sur 30 jours", String(reel.length)],
     ["À traiter", String(commandes.filter((c) => c.statut === "payee" || c.statut === "probleme").length)],
+    ["Demandes SAV ouvertes", String((savs ?? []).length)],
   ];
   return (
     <div>
       <PageHeader titre="Commandes" description="Les commandes payées partent seules chez Printful et le suivi revient seul. Ici, vous surveillez, corrigez et remboursez."
-        actions={<><Link href="/studio/boutique/produits" className="bouton-discret">Produits</Link><Link href="/studio/boutique/reglages" className="bouton-discret">Réglages</Link></>} />
+        actions={<><Link href="/studio/boutique/produits" className="bouton-discret">Produits</Link><Link href="/studio/boutique/codes" className="bouton-discret">Codes promo</Link><Link href="/studio/boutique/reglages" className="bouton-discret">Réglages</Link></>} />
       <Notice sp={sp} />
-      <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {kpis.map(([k, v]) => <div key={k} className="bg-surface border border-trait rounded-2xl p-4"><dt className="text-sm text-sourdine">{k}</dt><dd className="titre text-3xl font-extrabold tnum">{v}</dd></div>)}
       </dl>
+      {(savs ?? []).length > 0 && (
+        <section className="mb-6 rounded-2xl border-2 border-moutarde bg-moutarde/10 p-4">
+          <h2 className="font-bold">Service après-vente à traiter</h2>
+          <ul className="mt-2 grid gap-1 text-sm">
+            {(savs ?? []).map((d) => (
+              <li key={d.id}><Link href={`/studio/boutique/commandes/${d.order_id}#sav`} className="font-semibold underline underline-offset-2">{d.numero}</Link>
+                {" "}· commande {(d.order as unknown as { numero: string } | null)?.numero} · {MOTIFS_SAV[d.motif as MotifSav]?.titre ?? d.motif} · {new Date(d.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" })}</li>
+            ))}
+          </ul>
+        </section>
+      )}
       <nav aria-label="Filtrer" className="flex flex-wrap gap-1 mb-4">
         {[["", "Toutes"], ["a-traiter", "À traiter"], ["en_fabrication", "En fabrication"], ["expediee", "Expédiées"], ["livree", "Livrées"], ["probleme", "Problèmes"], ["remboursee", "Remboursées"]].map(([v, l]) => (
           <Link key={v} href={v ? `/studio/boutique?statut=${v}` : "/studio/boutique"} aria-current={statut === v ? "page" : undefined}

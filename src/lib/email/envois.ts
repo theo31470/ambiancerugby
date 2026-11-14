@@ -104,7 +104,7 @@ function entree(c: Commande) {
   return {
     name: c.livraison_nom, numero: c.numero, email: c.email,
     articles: c.items.map((a) => ({ nom: a.nom, detail: a.detail, quantite: a.quantite, prixCents: a.prix_cents })),
-    livraisonCents: c.livraison_cents, totalCents: c.total_cents,
+    livraisonCents: c.livraison_cents, totalCents: c.total_cents, remiseCents: c.remise_cents ?? 0, codePromo: c.code_promo ?? null,
     adresse: [c.livraison_nom, [c.livraison_adresse1, c.livraison_adresse2].filter(Boolean).join(", "), [c.livraison_cp, c.livraison_ville].filter(Boolean).join(" ")].filter(Boolean).join(", "),
     transporteur: c.transporteur, suiviNumero: c.suivi_numero, suiviUrl: c.suivi_url,
   };
