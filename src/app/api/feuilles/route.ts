@@ -38,7 +38,7 @@ export async function GET(req: Request) {
   if (ok !== true) return new Response("accès refusé", { status: 401 });
 
   // la base choisit : matchs en direct d'abord, puis terminés sans stats (jamais tentés en premier)
-  const { data: ids, error } = await db.rpc("feuilles_a_traiter", { p_limite: 25 });
+  const { data: ids, error } = await db.rpc("feuilles_a_traiter", { p_limite: 10 });
   if (error) return Response.json({ erreur: error.message }, { status: 500 });
   const liste = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
   const { data: matchs } = liste.length ? await db.from("matches").select(`${SELECT_MATCH_FEUILLE}, feuille_resultat`).in("id", liste) : { data: [] };
@@ -93,12 +93,14 @@ export async function GET(req: Request) {
     };
     // rattrapage : feuilles ESPN remplacées par World Rugby ; feuilles LNR complétées (courses, mètres, défenseurs battus…)
     const rattrapage = async () => {
-      const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 30 });
+      const { data: wr } = await db.rpc("stats_wr_a_traiter", { p_limite: 6 });
       const idsWr = ((wr ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { stats_wr_a_traiter: string }).stats_wr_a_traiter));
       if (!idsWr.length) return;
       const { data: ms } = await db.from("matches").select(`${SELECT_MATCH_WR}, competition:competitions(lnr_site)`).in("id", idsWr);
       for (const m of (ms ?? []) as unknown as (MatchWr & { competition: { lnr_site: string | null } | null })[]) {
         if (Date.now() - debut > 100_000) break;
+        // rattrapage au ralenti : la base (offre gratuite) a un budget d'écriture limité
+        await new Promise((ok) => setTimeout(ok, 4000));
         const r = await importerFeuilleWr(db, m, { completer: !!m.competition?.lnr_site }).catch((e: Error) => ({ ok: false as const, raison: `erreur : ${e.message}`.slice(0, 200) }));
         const res = r.ok ? `wr ${r.joueurs} joueurs${r.detail ? "" : " (sans détail)"}` : r.raison;
         // introuvable chez World Rugby : on n'y revient pas avant longtemps ; sinon nouvel essai dans 3 heures
