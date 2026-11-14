@@ -3,6 +3,7 @@ import Link from "next/link";
 import Defile from "./deco/Defile";
 import { Supporter } from "./deco/Icones";
 import TenteLeDrop from "./deco/TenteLeDrop";
+import BoutonInstaller from "./app/BoutonInstaller";
 
 const TRIBUNE = ["#f2b53a", "#ffffff", "#c98595", "#f2b53a", "#f6e4e8", "#934f5e"];
 
@@ -39,6 +40,7 @@ export default function Footer() {
             <Link href="/actus" className="hover:text-white">Actus</Link>
             <Link href="/abonnement" className="hover:text-white">Devenir Supporter</Link>
             <Link href="/inscription" className="hover:text-white">Créer un compte</Link>
+            <BoutonInstaller className="text-left text-moutarde hover:text-white font-semibold" />
           </nav>
           <div className="content-start">
             <p className="text-white font-semibold mb-1">À consommer avec modération</p>

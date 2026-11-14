@@ -17,6 +17,12 @@ const texte = localFont({
   ],
 });
 
+// écrans de démarrage de l'app iPhone : [largeur, hauteur, densité] de chaque modèle (images dans public/splash)
+const DEMARRAGE: [number, number, number][] = [
+  [440, 956, 3], [430, 932, 3], [420, 912, 3], [402, 874, 3], [393, 852, 3], [390, 844, 3],
+  [428, 926, 3], [375, 812, 3], [414, 896, 3], [414, 896, 2], [375, 667, 2], [320, 568, 2],
+];
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://ambiance-rugby.fr"),
   title: { default: "Ambiance Rugby — le rugby côté tribune", template: "%s · Ambiance Rugby" },
@@ -26,9 +32,20 @@ export const metadata: Metadata = {
   applicationName: "Ambiance Rugby",
   keywords: ["rugby", "Top 14", "Pro D2", "score rugby en direct", "classement Top 14", "résultats rugby", "pronostic rugby", "stats joueurs rugby", "Champions Cup", "Tournoi des Six Nations"],
   formatDetection: { telephone: false },
+  // app installée sur iPhone (écran d'accueil) : plein écran, barre d'état fondue dans le bordeaux, écran de démarrage
+  appleWebApp: {
+    capable: true,
+    title: "Ambiance Rugby",
+    statusBarStyle: "black-translucent",
+    startupImage: DEMARRAGE.map(([l, h, r]) => ({
+      url: `/splash/splash-${l * r}x${h * r}.png`,
+      media: `(device-width: ${l}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`,
+    })),
+  },
 };
 
 export const viewport: Viewport = {
+  viewportFit: "cover", // encoches de l'iPhone gérées en CSS (env(safe-area-inset-*))
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#3e1621" },
     { media: "(prefers-color-scheme: dark)", color: "#260d14" },

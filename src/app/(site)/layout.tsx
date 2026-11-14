@@ -2,6 +2,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Scoreboard from "@/components/Scoreboard";
 import Celebration from "@/components/deco/Celebration";
+import AppInstallable from "@/components/app/AppInstallable";
 import { getViewer } from "@/lib/supabase/server";
 import { getTickerMatches } from "@/lib/queries";
 import type { Prefs } from "@/lib/membres";
@@ -22,6 +23,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       </main>
       <Footer />
       {prefs.celebrations !== false && <Celebration />}
+      <AppInstallable />
     </>
   );
 }
