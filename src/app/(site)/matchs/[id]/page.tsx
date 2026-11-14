@@ -378,7 +378,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
 
       {live && <TribuneLive matchId={m.id} enDirect={live} home={m.home} away={m.away} totaux={totauxTribune} favori={viewer?.favorite_team_id} />}
 
-      <Comments matchId={m.id} path={`/matchs/${m.id}`} />
+      <Comments matchId={m.id} path={canonique} />
     </article>
   );
 }
