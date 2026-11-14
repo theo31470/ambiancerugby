@@ -5,7 +5,7 @@
   "description": "App iOS / Android d'Ambiance Rugby (Capacitor) — charge le site en ligne",
   "scripts": {
     "sync": "cap sync",
-    "assets": "capacitor-assets generate --iconBackgroundColor '#3e1621' --iconBackgroundColorDark '#3e1621' --splashBackgroundColor '#3e1621' --splashBackgroundColorDark '#3e1621' --ios --android",
+    "assets": "capacitor-assets generate --iconBackgroundColor '#934f5e' --iconBackgroundColorDark '#934f5e' --splashBackgroundColor '#3e1621' --splashBackgroundColorDark '#3e1621' --ios --android",
     "android": "cap open android",
     "ios": "cap open ios",
     "run:android": "cap run android",
