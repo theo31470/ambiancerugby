@@ -64,7 +64,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     if (data?.color && /^#[0-9a-f]{6}$/i.test(data.color)) club = data.color;
   }
   return (
-    <html lang="fr" data-theme={theme} data-club={club ? "" : undefined} style={club ? ({ "--club": club } as React.CSSProperties) : undefined} className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
+    <html lang="fr" suppressHydrationWarning data-theme={theme} data-club={club ? "" : undefined} style={club ? ({ "--club": club } as React.CSSProperties) : undefined} className={`${groovy.variable} ${titre.variable} ${texte.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col"><Tactile />{children}</body>
     </html>
   );

@@ -447,6 +447,15 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   header, nav, button, .bouton, .bouton-or { -webkit-user-select: none; user-select: none; }
 }
 
+/* retour au toucher, façon app : les éléments touchés s'enfoncent légèrement */
+@media (hover: none) and (pointer: coarse) {
+  a, button, [role="button"], summary { -webkit-tap-highlight-color: transparent; }
+  .bouton, .bouton-or, .bouton-discret, button:not(:disabled) { transition: transform .12s ease, filter .12s ease; }
+  .bouton:active, .bouton-or:active, .bouton-discret:active, button:not(:disabled):active { transform: scale(.96); filter: brightness(.95); }
+  main a:has(> img, > div, > span):active, .casier:active, .carte-produit:active { transform: scale(.985); transition: transform .12s ease; }
+}
+@media (prefers-reduced-motion: reduce) { .bouton:active, .bouton-or:active, button:active { transform: none; } }
+
 /* ---------------- navigation façon app (mobile) ---------------- */
 :root { --barre-onglets: 0px; }
 @media (max-width: 1023.98px) { :root { --barre-onglets: calc(4rem + env(safe-area-inset-bottom)); } }
@@ -475,4 +484,46 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .casier-numero { transition: transform .3s cubic-bezier(.3,.7,.4,1.4); }
 @media (prefers-reduced-motion: reduce) {
   .tiroir[open], .tiroir[open]::backdrop, .tiroir-ajout, .vitrine-entree > li { animation: none; }
+}
+
+/* ---------- app installée : animation de lancement ---------- */
+.lancement { display: none; }
+html[data-lancement] .lancement {
+  display: grid; place-items: center; position: fixed; inset: 0; z-index: 100; pointer-events: none;
+  background: #3e1621;
+  animation: lancement-ouvre .55s cubic-bezier(.7,0,.3,1) 1.05s both;
+}
+/* le ballon : même place et même taille que sur l'écran de démarrage de l'iPhone, puis élan et coup de pied */
+.lancement-ballon {
+  width: min(54vw, 320px); height: auto; margin-top: 8dvh; /* l'écran de démarrage de l'iPhone le place un peu sous le centre */
+  animation: lancement-elan .45s cubic-bezier(.3,.7,.4,1) .15s both, lancement-tir .6s cubic-bezier(.6,0,.4,1) .6s both;
+}
+/* les poteaux moutarde se dessinent derrière le ballon */
+.lancement-poteaux {
+  position: absolute; left: 50%; top: 50%; width: min(40vw, 230px); height: min(62vw, 360px); translate: -50% -52%;
+  border: solid #e9b949; border-width: 0 6px; opacity: 0;
+  background: linear-gradient(#e9b949, #e9b949) center 62% / 100% 6px no-repeat;
+  animation: lancement-poteaux .5s ease-out .25s both;
+}
+@keyframes lancement-elan { 0% { transform: none; } 60% { transform: rotate(-14deg) scale(.92, .86); } 100% { transform: rotate(-8deg) scale(.96); } }
+@keyframes lancement-tir { from { transform: rotate(-8deg) scale(.96); opacity: 1; } to { transform: rotate(18deg) scale(5.5) translateY(-6%); opacity: 0; } }
+@keyframes lancement-poteaux { from { opacity: 0; clip-path: inset(100% 0 0 0); } to { opacity: .9; clip-path: inset(0 0 0 0); } }
+@keyframes lancement-ouvre { from { clip-path: circle(150% at 50% 50%); } to { clip-path: circle(0% at 50% 46%); } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-lancement] .lancement { animation: voile-entree .3s ease reverse .4s both; }
+  .lancement-ballon, .lancement-poteaux { animation: none; }
+  .lancement-poteaux { display: none; }
+}
+
+/* ---------- transitions entre les pages (façon app) ---------- */
+::view-transition-old(.page-sort) { animation: 140ms ease-out both vt-sortie; }
+::view-transition-new(.page-entre) { animation: 280ms cubic-bezier(.2,.8,.2,1) 60ms both vt-entree; }
+@keyframes vt-sortie { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes vt-entree { from { opacity: 0; transform: translateY(14px); } }
+/* le reste de l'écran (bandeau des scores, menus, barre d'onglets) ne bouge pas */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+/* là où les transitions existent, l'entrée CSS ferait double emploi */
+@supports (view-transition-name: a) { .entree-page { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(.page-sort), ::view-transition-new(.page-entre) { animation: none; }
 }

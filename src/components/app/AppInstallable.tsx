@@ -15,6 +15,17 @@ type InviteInstall = Event & { prompt: () => Promise<void>; userChoice: Promise<
 const CLE_REFUS = "ar-install-refus";
 const PAUSE_JOURS = 21;
 const DELAI_MS = 15000;
+const CLE_VISITES = "ar-visites";
+const VISITES_MIN = 2; // on ne sollicite pas dès la première visite
+
+/** Compte une visite par session de navigation et renvoie le total. */
+function compterVisite() {
+  let n = Number(lire(CLE_VISITES) ?? 0);
+  try {
+    if (!sessionStorage.getItem(CLE_VISITES)) { sessionStorage.setItem(CLE_VISITES, "1"); n += 1; ecrire(CLE_VISITES, String(n)); }
+  } catch { /* navigation privée */ }
+  return n;
+}
 
 const lire = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const ecrire = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* navigation privée */ } };
@@ -61,8 +72,9 @@ export default function AppInstallable() {
       return;
     }
     let minuteur: ReturnType<typeof setTimeout> | undefined;
+    const visites = compterVisite();
     const proposer = (force = false) => {
-      if (!force && enPause()) return;
+      if (!force && (enPause() || visites < VISITES_MIN)) return;
       if (invite.current) setMode("bouton");
       else if (surIphone()) setMode("iphone");
     };

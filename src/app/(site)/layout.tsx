@@ -3,6 +3,8 @@ import Footer from "@/components/Footer";
 import Scoreboard from "@/components/Scoreboard";
 import Celebration from "@/components/deco/Celebration";
 import AppInstallable from "@/components/app/AppInstallable";
+import Lancement from "@/components/app/Lancement";
+import TirerPourRafraichir from "@/components/app/TirerPourRafraichir";
 import BarreOnglets from "@/components/nav/BarreOnglets";
 import SousOnglets from "@/components/nav/SousOnglets";
 import { createClient, getViewer, hasBadge } from "@/lib/supabase/server";
@@ -22,6 +24,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const initiale = viewer ? (viewer.display_name ?? viewer.email ?? "?").slice(0, 1).toUpperCase() : null;
   return (
     <>
+      <Lancement />
       <a href="#contenu" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:bg-surface focus:p-2">
         Aller au contenu
       </a>
@@ -37,6 +40,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <BarreOnglets initiale={initiale} supporter={hasBadge(viewer)} nonLues={nonLues} />
       {prefs.celebrations !== false && <Celebration />}
       <AppInstallable />
+      <TirerPourRafraichir />
     </>
   );
 }
