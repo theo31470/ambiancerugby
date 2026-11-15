@@ -60,7 +60,8 @@ export async function GET(req: Request) {
   // rattrapage des vieux matchs, à un rythme que l'offre gratuite Supabase supporte (budget disque limité) :
   // la nuit (0 h – 8 h) un créneau toutes les 3 minutes, le jour toutes les 4 minutes ; 1 feuille + 4 matchs World Rugby par créneau ;
   // jamais pendant un direct, et on saute le créneau si la base répond lentement
-  const heure = Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Paris" }).format(new Date()));
+  // heure de Paris (formatToParts : le format « fr-FR » renvoie « 03 h », illisible par Number)
+  const heure = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Paris" }).formatToParts(new Date()).find((x) => x.type === "hour")?.value ?? 12);
   const pas = heure < 8 ? 3 : 4;
   // le jour, le rattrapage ne tourne que si la base a récupéré (RATTRAPAGE_JOUR=1) : elle doit d'abord tenir les matchs du jour
   const jourOk = heure < 9 || process.env.RATTRAPAGE_JOUR === "1";
