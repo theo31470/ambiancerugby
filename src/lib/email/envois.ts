@@ -121,3 +121,11 @@ export async function mailCommande(template: "commande_confirmee" | "commande_ex
   }
   await sendEmail({ to: c.email, kind: "boutique", template, attachments, email: boutiqueEmail(template, { ...entree(c), factureNumero }, siteUrl()) }, { idempotencyKey: `${template}-${c.id}${template === "commande_expediee" ? `-${c.suivi_numero ?? ""}` : ""}` });
 }
+
+/** Rappel avant le renouvellement d'un abonnement annuel (article L215-1 du Code de la consommation). */
+export async function rappelRenouvellement(userId: string, finPeriode: string, montantCents: number | null) {
+  const p = await profil(userId, null);
+  if (!p?.email) return false;
+  await sendEmail({ to: p.email, kind: "supporter", template: "renouvellement", userId: p.id, email: supporterEmail("renouvellement", { name: p.nom, formule: "annuel", periodeFin: finPeriode, montantCents: montantCents ?? undefined }, siteUrl()) }, { idempotencyKey: `renouvellement-${userId}-${finPeriode.slice(0, 10)}` });
+  return true;
+}

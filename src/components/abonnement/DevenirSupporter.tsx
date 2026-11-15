@@ -228,6 +228,7 @@ function Caisse({ formule, setFormule, promo, setPromo, montant, nomDefaut, depu
           {promo && <div className="flex justify-between text-ok"><dt>Code {promo.code}</dt><dd className="tnum">{promo.libelle}</dd></div>}
           <div className="flex items-baseline justify-between border-t border-trait pt-2"><dt className="font-bold">Aujourd&apos;hui</dt><dd key={montant} className="titre tnum text-2xl font-extrabold montant-pop">{euros(montant)}</dd></div>
           <p className="text-xs text-sourdine">Puis {euros(f.cents)} {f.rythme}, renouvelé automatiquement. Résiliable à tout moment depuis votre espace.</p>
+          <p className="text-xs text-sourdine">En payant, vous acceptez les <Link href="/legal/abonnement" className="underline underline-offset-2 hover:text-vin">conditions de l&apos;abonnement</Link> et demandez l&apos;accès immédiat aux avantages Supporter. Vous gardez 14 jours pour changer d&apos;avis, remboursé au prorata.</p>
         </dl>
         {erreur && <p className="mt-4 rounded-xl bg-alerte/10 px-3 py-2 text-sm text-alerte" role="alert">{erreur}</p>}
         <button disabled={!stripe || !pret || occupe} data-fini={fini || undefined} className="bouton-or bouton-payer mt-5 w-full justify-center py-3.5 text-base disabled:cursor-not-allowed">

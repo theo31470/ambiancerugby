@@ -54,6 +54,17 @@ export default function Footer() {
             </p>
           </div>
         </div>
+        <nav aria-label="Légal" className="border-t border-white/10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-white/60">
+            <span>© Ambiance Rugby</span>
+            <Link href="/legal/mentions-legales" className="hover:text-white">Mentions légales</Link>
+            <Link href="/legal/cgu" className="hover:text-white">Conditions d&apos;utilisation</Link>
+            <Link href="/legal/confidentialite" className="hover:text-white">Confidentialité</Link>
+            <Link href="/legal/cookies" className="hover:text-white">Cookies</Link>
+            <Link href="/legal/abonnement" className="hover:text-white">Abonnement</Link>
+            <Link href="/boutique/cgv" className="hover:text-white">CGV boutique</Link>
+          </div>
+        </nav>
       </div>
     </footer>
   );

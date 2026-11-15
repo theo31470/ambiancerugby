@@ -153,7 +153,7 @@ export function authEmail(template: AuthTemplate, input: AuthEmailInput, siteUrl
 // Abonnement Supporter
 // ---------------------------------------------------------------------
 
-export type SupporterTemplate = "bienvenue" | "facture" | "paiement_refuse" | "resiliation" | "termine" | "remboursement";
+export type SupporterTemplate = "bienvenue" | "facture" | "paiement_refuse" | "resiliation" | "termine" | "remboursement" | "renouvellement";
 export type SupporterInput = {
   name?: string | null;
   formule: "mensuel" | "annuel";
@@ -222,6 +222,18 @@ export function supporterEmail(template: SupporterTemplate, i: SupporterInput, s
           { type: "button", label: "Mettre à jour ma carte", url: compte },
         ],
         reason: RAISON_ABO,
+      }, site);
+    case "renouvellement":
+      return build("Votre abonnement Supporter se renouvelle bientôt", {
+        preheader: i.periodeFin ? `Renouvellement prévu le ${dateFr(i.periodeFin)}.` : "Renouvellement de votre abonnement annuel.",
+        heading: "Renouvellement à venir",
+        blocks: [
+          { type: "p", text: bonjour(i.name) },
+          { type: "p", text: `Votre abonnement **${LIBELLE[i.formule]}** sera renouvelé automatiquement${i.periodeFin ? ` le **${dateFr(i.periodeFin)}**` : ""}, pour **${i.montantCents ? euros(i.montantCents) : PRIX[i.formule]}** et une nouvelle année.` },
+          { type: "p", text: "Rien à faire pour rester Supporter. Si vous ne souhaitez pas reconduire l'abonnement, vous pouvez le résilier en un clic depuis votre compte, à tout moment avant cette date : aucun prélèvement n'aura lieu et vous garderez vos avantages jusqu'au bout de l'année en cours." },
+          { type: "button", label: "Gérer mon abonnement", url: compte },
+        ],
+        reason: "Vous recevez cet e-mail car la loi prévoit de vous prévenir avant le renouvellement d'un abonnement annuel.",
       }, site);
     case "resiliation":
       return build("Votre résiliation est prise en compte", {
