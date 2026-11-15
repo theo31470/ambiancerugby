@@ -45,7 +45,8 @@ export async function GET(req: Request) {
   const t0 = Date.now();
   const { data: enDirect } = await db.from("matches").select("id").in("status", ["live", "halftime"]);
   // base lente (budget disque épuisé) : on saute le rattrapage pour la laisser récupérer
-  const baseLente = Date.now() - t0 > 1500;
+  // seuil large : le premier appel d'une fonction qui démarre (connexion à ouvrir) prend souvent plus d'une seconde
+  const baseLente = Date.now() - t0 > 4000;
   const { data: recents } = await db.from("matches").select("id")
     .eq("status", "finished").gt("kickoff_at", new Date(Date.now() - 3 * 86400e3).toISOString()).lt("kickoff_at", new Date(Date.now() - 100 * 60e3).toISOString())
     .or(`feuille_resultat.is.null,feuille_resultat.like.direct*,and(feuille_tentee_at.lt.${new Date(Date.now() - 3600e3).toISOString()},feuille_resultat.not.like."wr *",feuille_resultat.not.like."lnr *",feuille_resultat.not.like."espn *")`)
