@@ -995,6 +995,7 @@
 "deago-bailey": "2026-11-14",
 "declan-meredith": "2026-11-14",
 "declan-moore": "2026-11-14",
+"deian-gwynne": "2026-11-15",
 "demur-epremidze": "2026-11-14",
 "demur-tapladze": "2026-11-14",
 "denis-buckley": "2026-11-14",
@@ -1623,6 +1624,7 @@
 "harri-wilde": "2026-11-14",
 "harri-williams": "2026-11-14",
 "harrison-allan": "2026-11-14",
+"harrison-bellamy": "2026-11-15",
 "harrison-courtney": "2026-11-14",
 "harrison-goddard": "2026-11-14",
 "harrison-keddie": "2026-11-14",
@@ -8345,6 +8347,11 @@
 "t": true,
 "v": "20261114"
 },
+"kevin-noah": {
+"s": "LNR",
+"t": true,
+"v": "20261115"
+},
 "killian-geraci": {
 "s": "LNR",
 "t": true,
@@ -8840,6 +8847,11 @@
 "t": true,
 "v": "20261114"
 },
+"lucas-tabarot": {
+"s": "LNR",
+"t": true,
+"v": "20261115"
+},
 "lucas-tauzin": {
 "s": "LNR",
 "t": true,
@@ -8969,6 +8981,11 @@
 "s": "LNR",
 "t": true,
 "v": "20261114"
+},
+"ma-l-perrin": {
+"s": "LNR",
+"t": true,
+"v": "20261115"
 },
 "mackenzie-martin": {
 "s": "LNR",
@@ -11599,6 +11616,11 @@
 "s": "LNR",
 "t": true,
 "v": "20261114"
+},
+"valentin-delpy": {
+"s": "LNR",
+"t": true,
+"v": "20261115"
 },
 "valentin-gayraud": {
 "s": "LNR",
