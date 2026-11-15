@@ -126,9 +126,15 @@ export async function GET(req: Request) {
       const { data: ms } = await db.from("matches").select(`${SELECT_MATCH_WR}, competition:competitions(lnr_site)`).in("id", idsWr);
       for (const m of (ms ?? []) as unknown as (MatchWr & { competition: { lnr_site: string | null } | null })[]) {
         if (Date.now() - debut > 100_000) break;
-        // rattrapage au ralenti : la base (offre gratuite) a un budget d'écriture limité
-        await new Promise((ok) => setTimeout(ok, 2500));
-        const r = await importerFeuilleWr(db, m, { completer: !!m.competition?.lnr_site }).catch((e: Error) => ({ ok: false as const, raison: `erreur : ${e.message}`.slice(0, 200) }));
+        // petite pause entre deux matchs (ménage la base)
+        await new Promise((ok) => setTimeout(ok, 1000));
+        // marqué avant l'import : si la fonction est coupée en cours de route, le match ne bloque pas la file (nouvel essai dans 3 h)
+        await db.from("matches").update({ stats_wr_at: new Date().toISOString(), stats_wr_resultat: "import interrompu" }).eq("id", m.id);
+        const limite = new Promise<{ ok: false; raison: string }>((ok) => setTimeout(() => ok({ ok: false, raison: "délai World Rugby dépassé" }), 40_000));
+        const r = await Promise.race([
+          importerFeuilleWr(db, m, { completer: !!m.competition?.lnr_site }).catch((e: Error) => ({ ok: false as const, raison: `erreur : ${e.message}`.slice(0, 200) })),
+          limite,
+        ]);
         const res = r.ok ? `wr ${r.joueurs} joueurs${r.detail ? "" : " (sans détail)"}` : r.raison;
         // introuvable chez World Rugby : on n'y revient pas avant longtemps ; sinon nouvel essai dans 3 heures
         const vieux = Date.now() - new Date(m.kickoff_at).getTime() > 3 * 86400e3;
