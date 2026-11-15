@@ -7,7 +7,9 @@ const maj = (id: string, patch: Record<string, unknown>) => shopDb().rpc("shop_m
 /** Après un paiement confirmé : facture, puis envoi en fabrication chez Printful (brouillon en mode test). */
 export async function commandePayee(c: Commande, paymentIntent: string | null) {
   if (c.statut !== "en_attente") return; // déjà traitée (Stripe peut renvoyer l'événement)
-  await maj(c.id, { statut: "payee", stripe_payment_intent: paymentIntent, message: "Paiement reçu, facture émise." });
+  // bascule atomique : si le webhook et la page de remerciement arrivent ensemble, un seul envoie la commande à l'atelier
+  const { data: premier } = await shopDb().rpc("shop_marquer_payee", { p_id: c.id, p_pi: paymentIntent });
+  if (premier !== true) return;
   if (c.code_promo) await shopDb().rpc("shop_utiliser_code", { p_code: c.code_promo });
   await mailCommande("commande_confirmee", c);
   try {

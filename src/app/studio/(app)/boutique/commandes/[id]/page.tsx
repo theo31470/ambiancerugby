@@ -71,7 +71,7 @@ export default async function AdminCommande({ params, searchParams }: PageProps<
               <button className="bouton-discret">{c.printful_order_id ? "Relire l'état chez Printful" : "Renvoyer à Printful"}</button>
             </form>
           </div>
-          {viewer?.role === "admin" && c.stripe_session_id && !["remboursee", "en_attente"].includes(c.statut) && (
+          {viewer?.role === "admin" && (c.stripe_session_id || (c as { stripe_payment_intent?: string | null }).stripe_payment_intent) && !["remboursee", "en_attente"].includes(c.statut) && (
             <form action={rembourser} className="border-2 border-alerte/40 rounded-2xl p-5">
               <input type="hidden" name="id" value={c.id} /><input type="hidden" name="_back" value={back} />
               <h2 className="font-bold text-lg text-alerte">Rembourser</h2>

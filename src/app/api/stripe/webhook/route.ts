@@ -26,6 +26,17 @@ export async function POST(req: Request) {
       else if (c) await db.rpc("shop_maj_commande", { p_secret: null, p_id: c.id, p_patch: { statut: "probleme", message: `Montant payé (${s.amount_total}) différent de la commande (${c.total_cents}).` } });
     }
   }
+  // boutique : paiement intégré au site (Stripe Elements)
+  if (event.type === "payment_intent.succeeded") {
+    const pi = event.data.object as Stripe.PaymentIntent;
+    if (pi.metadata?.source === "boutique" && pi.metadata.order_id) {
+      const { data } = await db.rpc("shop_lire_commande", { p_secret: null, p_id: pi.metadata.order_id });
+      const c = (data as Commande[] | null)?.[0];
+      // montant contrôlé : le paiement doit correspondre exactement à la commande
+      if (c && pi.amount_received === c.total_cents) await commandePayee(c, pi.id);
+      else if (c) await db.rpc("shop_maj_commande", { p_secret: null, p_id: c.id, p_patch: { statut: "probleme", message: `Montant payé (${pi.amount_received}) différent de la commande (${c.total_cents}).` } });
+    }
+  }
   if (event.type === "charge.refunded") {
     const ch = event.data.object as Stripe.Charge;
     const orderId = ch.metadata?.order_id;

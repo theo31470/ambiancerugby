@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
-import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import type { Appearance } from "@stripe/stripe-js";
 import { usePanier } from "@/lib/shop/panier";
 import { calculerDevis, preparerPaiement, type Adresse, type Devis, type LigneDetaillee } from "@/app/(site)/boutique/actions";
 import { euros, PAYS } from "@/lib/shop/format";
@@ -31,6 +32,7 @@ export default function Paiement({ email }: { email: string | null }) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
+  const [numero, setNumero] = useState<string | null>(null);
 
   // devis recalculé à chaque changement du panier, de l'adresse (code postal, ville, pays) ou du code
   const cleDevis = `${a.pays}|${a.cp}|${a.ville}|${code}|${lignes.map((l) => l.variant_id + l.quantite).join()}`;
@@ -50,7 +52,10 @@ export default function Paiement({ email }: { email: string | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleDevis]);
 
-  const options = useMemo(() => (secret ? { clientSecret: secret } : null), [secret]);
+  const options = useMemo(() => (secret ? {
+    clientSecret: secret, locale: "fr" as const, appearance: APPARENCE,
+    fonts: typeof window === "undefined" ? [] : [{ family: "Instrument Sans", src: `url(${window.location.origin}/fonts/instrument.woff2)`, weight: "400 700" }],
+  } : null), [secret]);
   const champ = (k: keyof Adresse, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <label className="grid gap-1 text-sm font-semibold">{label}
       <input value={a[k] ?? ""} onChange={(e) => setA({ ...a, [k]: e.target.value })} className="champ font-normal" {...props} />
@@ -81,7 +86,7 @@ export default function Paiement({ email }: { email: string | null }) {
               setEnvoi(true); setErreur(null);
               const r = await preparerPaiement(lignes, a, code);
               setEnvoi(false);
-              if (r.ok) { setSecret(r.clientSecret); window.scrollTo({ top: 0, behavior: "smooth" }); } else setErreur(r.message);
+              if (r.ok) { setSecret(r.clientSecret); setNumero(r.numero); window.scrollTo({ top: 0, behavior: "smooth" }); } else setErreur(r.message);
             }}>
               <h2 className="titre font-bold text-xl">Vos coordonnées</h2>
               {champ("email", "E-mail (confirmation, facture et suivi)", { type: "email", required: true, autoComplete: "email" })}
@@ -116,10 +121,11 @@ export default function Paiement({ email }: { email: string | null }) {
           ) : (
             <div>
               <button type="button" onClick={() => setSecret(null)} className="mb-3 text-sm font-semibold text-vin underline underline-offset-4">Modifier l&apos;adresse</button>
-              <div className="bg-surface border border-trait rounded-2xl p-2 sm:p-4">
-                <EmbeddedCheckoutProvider stripe={stripePromesse} options={options!}>
-                  <EmbeddedCheckout />
-                </EmbeddedCheckoutProvider>
+              <div className="bg-surface border border-trait rounded-2xl p-5 sm:p-6">
+                <h2 className="titre font-bold text-xl mb-4">Paiement</h2>
+                <Elements stripe={stripePromesse} options={options!}>
+                  <FormulaireCarte total={devis?.total ?? 0} email={a.email} nom={a.nom} numero={numero} />
+                </Elements>
               </div>
             </div>
           )}
@@ -176,5 +182,60 @@ export default function Paiement({ email }: { email: string | null }) {
         </aside>
       </div>
     </>
+  );
+}
+
+/** Le formulaire Stripe habillé aux couleurs du site. */
+const APPARENCE: Appearance = {
+  theme: "flat",
+  variables: {
+    colorPrimary: "#934f5e", colorBackground: "#fcf7f8", colorText: "#2a1419", colorTextSecondary: "#7a6166", colorDanger: "#b3261e",
+    fontFamily: "Instrument Sans, system-ui, sans-serif", fontSizeBase: "16px", borderRadius: "12px", spacingUnit: "4px",
+  },
+  rules: {
+    ".Input": { border: "1.5px solid #ecd9dd", backgroundColor: "#ffffff", boxShadow: "none" },
+    ".Input:focus": { border: "1.5px solid #934f5e", boxShadow: "0 0 0 4px rgba(147,79,94,.16)" },
+    ".Label": { fontWeight: "600", fontSize: "14px", color: "#2a1419" },
+    ".Tab": { border: "1.5px solid #ecd9dd", backgroundColor: "#ffffff" },
+    ".Tab--selected": { borderColor: "#934f5e", boxShadow: "0 0 0 1px #934f5e" },
+  },
+};
+
+function FormulaireCarte({ total, email, nom, numero }: { total: number; email: string; nom: string; numero: string | null }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [pret, setPret] = useState(false);
+  return (
+    <form onSubmit={async (e) => {
+      e.preventDefault();
+      if (!stripe || !elements) return;
+      setEnvoi(true); setErreur(null);
+      const merci = `${window.location.origin}/boutique/merci`;
+      const r = await stripe.confirmPayment({
+        elements, redirect: "if_required",
+        confirmParams: { return_url: merci, receipt_email: email, payment_method_data: { billing_details: { email, name: nom } } },
+      });
+      if (r.error) { setErreur(r.error.message ?? "Le paiement n'a pas abouti."); setEnvoi(false); return; }
+      window.location.assign(`${merci}?payment_intent=${r.paymentIntent.id}`);
+    }}>
+      <PaymentElement onReady={() => setPret(true)} options={{
+        layout: { type: "tabs", defaultCollapsed: false },
+        wallets: { applePay: "auto", googlePay: "auto", link: "never" },
+        defaultValues: { billingDetails: { email, name: nom } },
+        fields: { billingDetails: { email: "never", name: "auto" } },
+        business: { name: "Ambiance Rugby" },
+      }} />
+      {!pret && <p className="text-sm text-sourdine py-6 text-center">Chargement du paiement sécurisé…</p>}
+      {erreur && <p role="alert" className="mt-4 rounded-lg bg-alerte/10 text-alerte px-3 py-2 text-sm">{erreur}</p>}
+      <button className="bouton-or w-full justify-center text-lg py-3.5 mt-5" disabled={!stripe || !pret || envoi}>
+        {envoi ? "Paiement en cours…" : `Payer ${euros(total)}`}
+      </button>
+      <p className="mt-3 flex items-center justify-center gap-2 text-xs text-sourdine">
+        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+        Paiement chiffré{numero ? `, commande ${numero}` : ""}. Vos coordonnées bancaires sont traitées par Stripe et ne passent jamais par Ambiance Rugby.
+      </p>
+    </form>
   );
 }

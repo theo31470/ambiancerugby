@@ -1,5 +1,4 @@
 "use server";
-import { headers } from "next/headers";
 import { getViewer } from "@/lib/supabase/server";
 import { shopDb, type ArticleCommande } from "@/lib/shop/admin";
 import { tarifsLivraison } from "@/lib/shop/printful";
@@ -121,31 +120,16 @@ export async function preparerPaiement(lignes: LignePanier[], a: Adresse, code: 
     if (error || !cree?.[0]) return { ok: false as const, message: error?.message ?? "Création de la commande impossible." };
     const { id, numero } = cree[0] as { id: string; numero: string };
 
-    // remise : un bon à usage unique, propre à cette commande
-    const coupon = d.remise > 0
-      ? await stripe().coupons.create({ amount_off: d.remise, currency: "eur", duration: "once", max_redemptions: 1, name: `Code ${d.code}`.slice(0, 40) })
-      : null;
-    const h = await headers();
-    const site = process.env.NEXT_PUBLIC_SITE_URL ?? `https://${h.get("host")}`;
-    const session = await stripe().checkout.sessions.create({
-      ui_mode: "embedded_page",
-      mode: "payment",
-      customer_email: a.email.trim(),
-      locale: "fr",
-      line_items: [
-        ...items.map((i) => ({
-          quantity: i.quantite,
-          price_data: { currency: "eur", unit_amount: i.prix_cents, product_data: { name: `${i.nom} (${i.detail})`, ...(i.image ? { images: [i.image] } : {}) } },
-        })),
-        ...(d.livraison.cents > 0 ? [{ quantity: 1, price_data: { currency: "eur", unit_amount: d.livraison.cents, product_data: { name: `Livraison : ${d.livraison.libelle}` } } }] : []),
-      ],
-      ...(coupon ? { discounts: [{ coupon: coupon.id }] } : {}),
-      metadata: { order_id: id, numero },
-      payment_intent_data: { metadata: { order_id: id, numero }, description: `Commande ${numero}` },
-      return_url: `${site}/boutique/merci?session_id={CHECKOUT_SESSION_ID}`,
-    });
-    await db.rpc("shop_maj_commande", { p_secret: null, p_id: id, p_patch: { stripe_session_id: session.id } });
-    return { ok: true as const, clientSecret: session.client_secret!, numero };
+    // paiement intégré au site : un PaymentIntent, confirmé par le formulaire Stripe Elements de la page.
+    // Carte uniquement (Apple Pay et Google Pay passent par la carte) : pas de Link ni de page Stripe.
+    const pi = await stripe().paymentIntents.create({
+      amount: d.total, currency: "eur", allowed_payment_method_types: ["card"],
+      receipt_email: a.email.trim(), description: `Commande ${numero}`,
+      metadata: { order_id: id, numero, source: "boutique" },
+      shipping: { name: a.nom.trim(), phone: a.tel?.trim() || undefined, address: { line1: a.adresse1.trim(), line2: a.adresse2?.trim() || undefined, postal_code: a.cp.trim(), city: a.ville.trim(), country: a.pays } },
+    }, { idempotencyKey: `commande-${id}` });
+    await db.rpc("shop_maj_commande", { p_secret: null, p_id: id, p_patch: { stripe_payment_intent: pi.id } });
+    return { ok: true as const, clientSecret: pi.client_secret!, numero, total: d.total };
   } catch (e) {
     return { ok: false as const, message: (e as Error).message };
   }

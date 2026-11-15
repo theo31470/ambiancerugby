@@ -7,8 +7,8 @@ export default async function CadreBoutique({ children }: { children: React.Reac
   const seuil = await seuilLivraisonOfferte().catch(() => null);
   return (
     <>
-      <NavBoutique />
       {children}
+      <NavBoutique />
       <TiroirPanier seuil={seuil} />
     </>
   );

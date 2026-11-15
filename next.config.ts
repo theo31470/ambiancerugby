@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
         ],
       },
       { source: "/hors-ligne.html", headers: [{ key: "Cache-Control", value: "no-cache" }] },
+      // police du site, chargée aussi par le formulaire de paiement Stripe (autre domaine)
+      { source: "/fonts/:fichier*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }, { key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ];
   },
   turbopack: {

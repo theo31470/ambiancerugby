@@ -41,17 +41,17 @@ export default async function Boutique({ searchParams }: PageProps<"/boutique">)
     return `/boutique${q.size ? `?${q}` : ""}#catalogue`;
   };
 
-  const garanties = [
-    ["Fabriqué pour vous", "Imprimé à la demande, sans stock ni gaspillage"],
-    ["Livraison suivie", seuil ? `Offerte dès ${euros(seuil)} d'achat` : "Numéro de suivi dès l'expédition"],
-    ["14 jours pour changer d'avis", "Retour simple depuis votre commande"],
-    ["Paiement sécurisé", "Carte, Apple Pay et Google Pay"],
+  const garanties: [string, string, string | null][] = [
+    ["Fabriqué pour vous", "Imprimé à la demande, sans stock ni gaspillage", null],
+    ["Livraison suivie", seuil ? `Offerte dès ${euros(seuil)} d'achat` : "Suivez votre colis à chaque étape", "/suivi"],
+    ["14 jours pour changer d'avis", "Retour simple depuis votre commande", "/boutique/aide#retours"],
+    ["Paiement sécurisé", "Carte, Apple Pay et Google Pay", null],
   ];
 
   return (
     <div>
       {/* l'entrée du vestiaire */}
-      <section className="pleine-largeur bg-bordeaux text-white relative overflow-hidden">
+      <section className="pleine-largeur bg-bordeaux text-white -mt-6 sm:-mt-10 relative overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 grid gap-10 lg:grid-cols-[1.1fr_1fr] items-center relative">
           <div>
             <h1 className="groovy text-6xl sm:text-8xl leading-[.9]">Le <span className="text-moutarde">vestiaire</span></h1>
@@ -78,8 +78,11 @@ export default async function Boutique({ searchParams }: PageProps<"/boutique">)
       {/* les garanties */}
       <div className="pleine-largeur border-b border-trait bg-surface">
         <ul className="max-w-6xl mx-auto px-4 sm:px-6 py-5 grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
-          {garanties.map(([t, d]) => (
-            <li key={t} className="text-sm leading-snug"><strong className="block text-base">{t}</strong><span className="text-sourdine">{d}</span></li>
+          {garanties.map(([t, d, lien]) => (
+            <li key={t} className="text-sm leading-snug">
+              {lien ? <Link href={lien} className="group"><strong className="block text-base group-hover:text-vin">{t}</strong><span className="text-sourdine underline decoration-trait underline-offset-2">{d}</span></Link>
+                : <><strong className="block text-base">{t}</strong><span className="text-sourdine">{d}</span></>}
+            </li>
           ))}
         </ul>
       </div>
