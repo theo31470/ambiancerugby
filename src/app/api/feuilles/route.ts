@@ -153,5 +153,5 @@ export async function GET(req: Request) {
     }
     if (recent) { revalidatePath("/", "layout"); revalidateTag("donnees", { expire: 0 }); }
   });
-  return Response.json({ lances: aFaire.length });
+  return Response.json({ lances: aFaire.length, rattrapage: creneau, heure, lente: baseLente });
 }
