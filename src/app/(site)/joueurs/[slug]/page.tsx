@@ -9,7 +9,7 @@ import FavoriteButton from "@/components/FavoriteButton";
 import { Ballon } from "@/components/deco/Icones";
 import { getPlayer, TEAM_LITE } from "@/lib/queries";
 import { getViewer, publicClient } from "@/lib/supabase/server";
-import { detailParSaison, clubsParSaison } from "@/lib/stats-detail";
+import { detailParSaison, clubsParSaison, saisonSportive } from "@/lib/stats-detail";
 import StatsCompletes from "@/components/joueur/StatsCompletes";
 import { POSITIONS, age, fmtDate, fmtDay } from "@/lib/format";
 import type { TeamLite } from "@/lib/types";
@@ -41,7 +41,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
   }
   const a = age(p.birth_date);
   const db = publicClient();
-  const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }, details, clubs] = await Promise.all([
+  const [{ data: seasons }, { data: perfs }, viewer, { data: parcoursData }, details, clubs, { data: dates }] = await Promise.all([
     db.from("player_season_totals").select("*").eq("player_id", p.id).order("season", { ascending: false }),
     db.from("player_match_stats")
       .select(`rating,minutes,starter,tries,points,tackles,line_breaks,turnovers_won,carries,metres,motm, match:matches!inner(id,kickoff_at,home_score,away_score, home:teams!matches_home_team_id_fkey(${TEAM_LITE}), away:teams!matches_away_team_id_fkey(${TEAM_LITE}))`)
@@ -52,10 +52,19 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
     db.from("player_career").select("kind, ordre, equipe, periode, matchs, points").eq("player_id", p.id).order("kind").order("ordre"),
     detailParSaison(p.id),
     clubsParSaison(p.id),
+    // dates des matchs : les compétitions internationales (saison « 2026 ») vont dans la saison sportive du moment
+    db.from("player_match_stats").select("match:matches!inner(competition_id,season,kickoff_at)").eq("player_id", p.id).limit(1000),
   ]);
   const parcours = (parcoursData ?? []) as { kind: "club" | "selection"; ordre: number; equipe: string; periode: string | null; matchs: number | null; points: number | null }[];
   const { data: compsData } = await db.from("competitions").select("id,name,short_name,slug");
-  const lignes = ((seasons ?? []) as Totaux[]).map((t) => ({ ...t, competition: (compsData ?? []).find((c) => c.id === t.competition_id) }));
+  const dernierMatch = new Map<string, string>();
+  for (const r of (dates ?? []) as unknown as { match: { competition_id: string; season: string; kickoff_at: string } }[]) {
+    const k = `${r.match.competition_id}|${r.match.season}`;
+    if ((dernierMatch.get(k) ?? "") < r.match.kickoff_at) dernierMatch.set(k, r.match.kickoff_at);
+  }
+  const lignes = ((seasons ?? []) as Totaux[]).map((t) => ({
+    ...t, season: saisonSportive(t.season, dernierMatch.get(`${t.competition_id}|${t.season}`)), competition: (compsData ?? []).find((c) => c.id === t.competition_id),
+  }));
   // saisons disponibles, de la plus récente à la plus ancienne, puis la carrière
   const saisons = [...new Set(lignes.map((t) => t.season))].sort((x, y) => y.localeCompare(x));
   const vue = typeof sp.stats === "string" && (sp.stats === "carriere" || saisons.includes(sp.stats)) ? sp.stats : (saisons[0] ?? "carriere");

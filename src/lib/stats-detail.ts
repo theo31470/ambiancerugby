@@ -32,16 +32,16 @@ async function matchsAvec(ids: string[], colonne: "tackles" | "carries") {
 export async function detailParSaison(playerId: string): Promise<Record<string, Detail>> {
   const db = publicClient();
   const { data: lignes } = await db.from("player_match_stats")
-    .select(`match_id,minutes,tries,tackles,line_breaks,turnovers_won,offloads,${CLES_COMPLETES.join(",")}, match:matches!inner(season)`)
+    .select(`match_id,minutes,tries,tackles,line_breaks,turnovers_won,offloads,${CLES_COMPLETES.join(",")}, match:matches!inner(season,kickoff_at)`)
     .eq("player_id", playerId).limit(3000);
-  const rows = (lignes ?? []) as unknown as (Record<string, number | null> & { match_id: string; match: { season: string } })[];
+  const rows = (lignes ?? []) as unknown as (Record<string, number | null> & { match_id: string; match: { season: string; kickoff_at: string } })[];
   const ids = [...new Set(rows.map((r) => r.match_id))];
   const [detailles, complets] = await Promise.all([matchsAvec(ids, "tackles"), matchsAvec(ids, "carries")]);
   const out: Record<string, Detail> = { carriere: detailVide() };
   const n = (v: unknown) => Number(v) || 0;
   for (const r of rows) {
     // saisons internationales « 2025 » rangées avec la saison de club « 2024-2025 »
-    for (const cle of ["carriere", r.match.season]) {
+    for (const cle of ["carriere", saisonSportive(r.match.season, r.match.kickoff_at)]) {
       const d = (out[cle] ??= detailVide());
       if (detailles.has(r.match_id)) {
         d.matchs++; d.minutes += n(r.minutes);
@@ -63,17 +63,30 @@ export type ClubSaison = { season: string; matchs: number; team: { id: string; s
 /** Où jouait le joueur, saison par saison, d'après les feuilles de match (clubs seulement, du plus récent au plus ancien). */
 export async function clubsParSaison(playerId: string): Promise<ClubSaison[]> {
   const { data } = await publicClient().from("player_match_stats")
-    .select("match:matches!inner(season), team:teams!inner(id,slug,name,short_name,logo_url,is_national)")
+    .select("match:matches!inner(season,kickoff_at), team:teams!inner(id,slug,name,short_name,logo_url,is_national)")
     .eq("player_id", playerId).limit(2000);
   const tally = new Map<string, ClubSaison>();
-  for (const r of (data ?? []) as unknown as { match: { season: string }; team: ClubSaison["team"] }[]) {
+  for (const r of (data ?? []) as unknown as { match: { season: string; kickoff_at: string }; team: ClubSaison["team"] }[]) {
     if (r.team.is_national) continue;
     // saisons internationales « 2025 » rangées avec la saison de club « 2024-2025 »
-    const s = /^\d{4}$/.test(r.match.season) ? `${Number(r.match.season) - 1}-${r.match.season}` : r.match.season;
+    const s = saisonSportive(r.match.season, r.match.kickoff_at);
     const k = `${s}|${r.team.id}`;
     const x = tally.get(k) ?? { season: s, matchs: 0, team: r.team };
     x.matchs++;
     tally.set(k, x);
   }
   return [...tally.values()].sort((a, b) => b.season.localeCompare(a.season) || b.matchs - a.matchs);
+}
+
+/**
+ * Saison sportive (« 2026-2027 ») d'un match : les compétitions internationales comptent en années civiles (« 2026 »),
+ * on les range dans la saison en cours à la date du match (bascule au 1er août), avec les matchs de club.
+ */
+export function saisonSportive(season: string, kickoff?: string | null) {
+  const annee = season.match(/^(\d{4})$/)?.[1];
+  if (!annee) return season;
+  if (!kickoff) return `${Number(annee) - 1}-${annee}`;
+  const d = new Date(kickoff);
+  const y = d.getUTCFullYear();
+  return d.getUTCMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
 }
