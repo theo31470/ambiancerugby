@@ -6,6 +6,7 @@ import AppInstallable from "@/components/app/AppInstallable";
 import Lancement from "@/components/app/Lancement";
 import TirerPourRafraichir from "@/components/app/TirerPourRafraichir";
 import MesureAudience from "@/components/app/MesureAudience";
+import GestesApp from "@/components/app/GestesApp";
 import BarreOnglets from "@/components/nav/BarreOnglets";
 import SousOnglets from "@/components/nav/SousOnglets";
 import { createClient, getViewer, hasBadge } from "@/lib/supabase/server";
@@ -42,6 +43,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       {prefs.celebrations !== false && <Celebration />}
       <AppInstallable />
       <TirerPourRafraichir />
+      <GestesApp />
       {/* la rédaction ne compte pas dans l'audience */}
       <MesureAudience connecte={!!viewer} ignorer={!!viewer && viewer.role !== "user"} />
     </>

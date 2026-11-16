@@ -102,7 +102,7 @@ export default function BarreOnglets({ initiale, supporter, nonLues }: { initial
   };
 
   return (
-    <nav aria-label="Navigation principale" className="barre-onglets lg:hidden fixed inset-x-0 bottom-0 z-40 bg-bordeaux/95 backdrop-blur-md text-white border-t border-white/10"
+    <nav aria-label="Navigation principale" className="barre-onglets lg:hidden fixed inset-x-0 bottom-0 z-40 bg-bordeaux text-white border-t border-white/10"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       {/* repère doré qui glisse sous l'onglet actif */}
       {actif >= 0 && (

@@ -77,6 +77,12 @@
 
 html { background: var(--fond); color: var(--encre); -webkit-text-size-adjust: 100%; }
 body { background: var(--fond); color: var(--encre); font-family: var(--font-texte), system-ui, sans-serif; overflow-x: clip; }
+/* la page ne glisse jamais sur le côté : seul le défilement vertical (et le zoom) est permis sur l'écran,
+   les bandeaux qui défilent horizontalement gardent leur propre geste */
+html, body { overflow-x: hidden; overscroll-behavior-x: none; }
+@supports (overflow: clip) { html, body { overflow-x: clip; } }
+@media (pointer: coarse) { body { touch-action: pan-y pinch-zoom; } }
+.defile-scroll, [class*="overflow-x-auto"], [class*="overflow-x-scroll"] { touch-action: pan-x pan-y pinch-zoom; overscroll-behavior-x: contain; }
 
 .tnum { font-variant-numeric: tabular-nums; }
 
@@ -436,12 +442,10 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 /* dans l'app installée : la barre d'état est peinte en bordeaux, le contenu passe dessous */
 @media (display-mode: standalone) {
   html { overscroll-behavior-y: none; }
-  body { padding-top: env(safe-area-inset-top); -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
-  body::before {
-    content: ""; position: fixed; z-index: 90; inset: 0 0 auto 0; height: env(safe-area-inset-top);
-    background: var(--bordeaux); pointer-events: none;
-  }
-  .entete { top: env(safe-area-inset-top); }
+  body { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  /* l'en-tête monte sous la barre d'état et la remplit d'une couleur pleine (pas de flou de l'iPhone sur le contenu) */
+  body:has(.entete) .entete { order: -1; top: 0; padding-top: env(safe-area-inset-top); }
+  body:not(:has(.entete)) { padding-top: env(safe-area-inset-top); }
   .vestiaire { padding-top: env(safe-area-inset-top); }
   /* pas de sélection de texte accidentelle sur les éléments d'interface */
   header, nav, button, .bouton, .bouton-or { -webkit-user-select: none; user-select: none; }
@@ -526,4 +530,39 @@ html[data-lancement] .lancement {
 @supports (view-transition-name: a) { .entree-page { animation: none; } }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(.page-sort), ::view-transition-new(.page-entre) { animation: none; }
+}
+
+/* ---------- en-tête qui s'efface quand on descend, revient quand on remonte (mobile) ---------- */
+@media (max-width: 1023px) {
+  .entete { transition: transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .2s; will-change: transform; }
+  .entete[data-cache] { transform: translateY(-100%); }
+}
+@media (max-width: 1023px) and (display-mode: standalone) {
+  /* dans l'app, la bande de la barre d'état reste en place */
+  .entete[data-cache] { transform: translateY(calc(-100% + env(safe-area-inset-top))); }
+}
+
+/* ---------- sens de la navigation : on avance (glisse depuis la droite), on revient (depuis la gauche), on change d'onglet (fondu) ---------- */
+html[data-sens="avant"]::view-transition-old(.page-sort) { animation: 160ms ease-in both vt-fondu-sortie, 320ms cubic-bezier(.4,0,.2,1) both vt-vers-gauche; }
+html[data-sens="avant"]::view-transition-new(.page-entre) { animation: 220ms ease-out 60ms both vt-fondu-entree, 340ms cubic-bezier(.2,.8,.2,1) both vt-depuis-droite; }
+html[data-sens="retour"]::view-transition-old(.page-sort) { animation: 160ms ease-in both vt-fondu-sortie, 320ms cubic-bezier(.4,0,.2,1) both vt-vers-droite; }
+html[data-sens="retour"]::view-transition-new(.page-entre) { animation: 220ms ease-out 60ms both vt-fondu-entree, 340ms cubic-bezier(.2,.8,.2,1) both vt-depuis-gauche; }
+html[data-sens="onglet"]::view-transition-old(.page-sort) { animation: 120ms ease-out both vt-fondu-sortie; }
+html[data-sens="onglet"]::view-transition-new(.page-entre) { animation: 200ms ease-out 40ms both vt-fondu-entree; }
+html[data-sens="glisse"]::view-transition-old(.page-sort), html[data-sens="glisse"]::view-transition-new(.page-entre) { animation: none; }
+@keyframes vt-fondu-sortie { to { opacity: 0; } }
+@keyframes vt-fondu-entree { from { opacity: 0; } }
+@keyframes vt-vers-gauche { to { translate: -48px 0; } }
+@keyframes vt-vers-droite { to { translate: 48px 0; } }
+@keyframes vt-depuis-droite { from { translate: 64px 0; } }
+@keyframes vt-depuis-gauche { from { translate: -64px 0; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-sens]::view-transition-old(.page-sort), html[data-sens]::view-transition-new(.page-entre) { animation: none; }
+}
+
+/* ---------- retour par glissement depuis le bord gauche (app iPhone) ---------- */
+.retour-glisse-ombre { position: fixed; inset: 0; z-index: 35; pointer-events: none; background: #000; opacity: 0; }
+.retour-glisse-fleche {
+  position: fixed; left: 10px; top: 50%; z-index: 70; width: 40px; height: 40px; margin-top: -20px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--bordeaux); color: #fff; pointer-events: none; opacity: 0; box-shadow: 0 6px 20px -6px rgba(0,0,0,.5);
 }

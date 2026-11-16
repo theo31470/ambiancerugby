@@ -19,7 +19,7 @@ export default function SousOnglets() {
   if (!groupe) return null;
   const actif = groupe.findIndex((o) => o.href === path);
   return (
-    <nav aria-label="Dans cette rubrique" className="lg:hidden -mt-2 mb-5">
+    <nav aria-label="Dans cette rubrique" className="sous-onglets lg:hidden -mt-2 mb-5">
       <ul className="relative grid rounded-full bg-teinte p-1" style={{ gridTemplateColumns: `repeat(${groupe.length}, minmax(0, 1fr))` }}>
         {/* pastille qui glisse */}
         <span aria-hidden className="absolute inset-y-1 left-1 rounded-full bg-vin shadow-sm transition-transform duration-300 ease-[cubic-bezier(.3,1.3,.5,1)]"

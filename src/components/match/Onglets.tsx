@@ -37,7 +37,7 @@ export default function Onglets({ onglets, initial }: { onglets: Onglet[]; initi
 
   return (
     <div className="mt-8">
-      <div className="sticky top-0 z-20 -mx-4 px-4 sm:mx-0 sm:px-0 bg-fond/95 backdrop-blur border-b border-trait">
+      <div className="sticky top-[env(safe-area-inset-top)] z-20 -mx-4 px-4 sm:mx-0 sm:px-0 bg-fond border-b border-trait">
         <div role="tablist" aria-label="Sections du match" className="flex gap-1 overflow-x-auto py-2 [scrollbar-width:none]">
           {visibles.map((o, i) => (
             <button key={o.id} ref={(el) => { refs.current[o.id] = el; }} role="tab" type="button" id={`${base}-t-${o.id}`}
