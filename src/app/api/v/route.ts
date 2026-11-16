@@ -31,6 +31,9 @@ export async function POST(req: Request) {
     pays: req.headers.get("x-vercel-ip-country"), ville: ville ? decodeURIComponent(ville).slice(0, 80) : null,
     app: !!b?.a, connecte: !!b?.l,
   };
-  after(async () => { await shopDb().from("visites").insert(ligne); });
+  after(async () => {
+    const { error } = await shopDb().from("visites").insert(ligne);
+    if (error) console.error("[audience]", error.message);
+  });
   return new Response(null, { status: 204 });
 }
