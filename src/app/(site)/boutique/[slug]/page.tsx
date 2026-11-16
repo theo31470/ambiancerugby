@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps<"/boutique/[slug]">): Promise<Metadata> {
   const p = await getProduit((await params).slug);
-  return p ? { title: `${p.name} : boutique`, description: p.description ?? undefined, openGraph: { images: p.images.slice(0, 1) } } : {};
+  return p ? { title: `${p.name} : boutique`, description: p.description ?? undefined, alternates: { canonical: `/boutique/${p.slug}` }, openGraph: { images: p.images.slice(0, 1) } } : {};
 }
 
 export default async function ProduitPage({ params }: PageProps<"/boutique/[slug]">) {

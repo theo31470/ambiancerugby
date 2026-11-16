@@ -7,6 +7,7 @@ import CarteProduit from "@/components/shop/CarteProduit";
 import { Maillot } from "@/components/deco/Icones";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/boutique" },
   title: "Boutique",
   description: "Le vestiaire Ambiance Rugby : t-shirts, sweats, casquettes, posters des villes de rugby et goodies, fabriqués à la demande.",
 };

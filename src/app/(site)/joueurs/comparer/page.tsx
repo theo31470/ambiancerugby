@@ -5,7 +5,7 @@ import ChoixJoueur from "@/components/comparer/ChoixJoueur";
 import { getViewer, publicClient } from "@/lib/supabase/server";
 import { detailParSaison, detailVide, type Detail } from "@/lib/stats-detail";
 
-export const metadata: Metadata = { title: "Comparateur de joueurs" };
+export const metadata: Metadata = { title: "Comparateur de joueurs", robots: { index: false, follow: true } };
 export const dynamic = "force-dynamic";
 
 type Saison = { season: string; games: number; minutes: number; tries: number; points: number; tackles: number; carries: number; metres: number; line_breaks: number; turnovers_won: number; motm: number; rating: number | null };

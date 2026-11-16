@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Suivre ma commande" };
+export const metadata: Metadata = { title: "Suivre ma commande", robots: { index: false, follow: true } };
 
 async function chercher(form: FormData) {
   "use server";

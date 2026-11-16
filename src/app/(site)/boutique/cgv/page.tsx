@@ -4,7 +4,7 @@ import { infosVendeur } from "@/lib/shop/vendeur";
 import { seuilLivraisonOfferte } from "@/lib/shop/catalogue";
 import { euros } from "@/lib/shop/format";
 
-export const metadata: Metadata = { title: "Conditions générales de vente", description: "Conditions générales de vente de la boutique Ambiance Rugby." };
+export const metadata: Metadata = { title: "Conditions générales de vente", alternates: { canonical: "/boutique/cgv" }, description: "Conditions générales de vente de la boutique Ambiance Rugby." };
 export const dynamic = "force-dynamic";
 
 /** Conditions générales de vente : vente à distance à des consommateurs, articles fabriqués à la demande. */

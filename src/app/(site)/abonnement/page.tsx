@@ -5,7 +5,7 @@ import { getViewer, hasBadge } from "@/lib/supabase/server";
 import { fmtDate } from "@/lib/format";
 import DevenirSupporter from "@/components/abonnement/DevenirSupporter";
 
-export const metadata: Metadata = { title: "Devenir Supporter", description: "L'abonnement Ambiance Rugby : stats et algorithme complets, alertes de match, contenus exclusifs et badge Supporter, pour 5,99 € par mois ou 59 € par an." };
+export const metadata: Metadata = { title: "Devenir Supporter", alternates: { canonical: "/abonnement" }, description: "L'abonnement Ambiance Rugby : stats et algorithme complets, alertes de match, contenus exclusifs et badge Supporter, pour 5,99 € par mois ou 59 € par an." };
 export const dynamic = "force-dynamic";
 
 const AVANTAGES = [

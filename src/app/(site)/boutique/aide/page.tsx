@@ -4,7 +4,7 @@ import { seuilLivraisonOfferte } from "@/lib/shop/catalogue";
 import { infosVendeur } from "@/lib/shop/vendeur";
 import { euros } from "@/lib/shop/format";
 
-export const metadata: Metadata = { title: "Aide, livraison et retours", description: "Délais de fabrication et de livraison, suivi de colis, retours sous 14 jours, échanges et paiement sur la boutique Ambiance Rugby." };
+export const metadata: Metadata = { title: "Aide, livraison et retours", alternates: { canonical: "/boutique/aide" }, description: "Délais de fabrication et de livraison, suivi de colis, retours sous 14 jours, échanges et paiement sur la boutique Ambiance Rugby." };
 export const dynamic = "force-dynamic";
 
 export default async function Aide() {

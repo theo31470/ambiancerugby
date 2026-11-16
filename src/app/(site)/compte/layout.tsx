@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { getViewer, hasBadge } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions";
 import CompteNav from "./CompteNav";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export const dynamic = "force-dynamic";
 

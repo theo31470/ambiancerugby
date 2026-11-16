@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { publicClient } from "@/lib/supabase/server";
 import { SITE, urlMatch } from "@/lib/seo";
 
+// tous les matchs (y compris les archives : chaque feuille de match est une page utile), jusqu'à 45 jours à l'avance
 // généré à la demande (pas au build : un build ne doit jamais dépendre de la base)
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,6 @@ async function tout<T>(requete: (de: number, a: number) => PromiseLike<{ data: T
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const db = publicClient();
   const maintenant = new Date();
-  const depuis = new Date(Date.now() - 400 * 86400e3).toISOString();
   const jusqua = new Date(Date.now() + 45 * 86400e3).toISOString();
   const [comps, clubs, joueurs, matchs, articles] = await Promise.all([
     tout<{ slug: string; last_synced_at: string | null }>((de, a) => db.from("competitions").select("slug,last_synced_at").eq("active", true).range(de, a)),
@@ -29,7 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     tout<{ slug: string; updated_at: string | null }>((de, a) => db.from("players").select("slug,updated_at").not("team_id", "is", null).range(de, a)),
     tout<{ id: string; kickoff_at: string; updated_at: string | null; status: string; home: { name: string; slug: string } | null; away: { name: string; slug: string } | null }>((de, a) =>
       db.from("matches").select("id,kickoff_at,updated_at,status, home:teams!matches_home_team_id_fkey(name,slug), away:teams!matches_away_team_id_fkey(name,slug)")
-        .gte("kickoff_at", depuis).lte("kickoff_at", jusqua).neq("status", "cancelled").order("kickoff_at", { ascending: false }).range(de, a) as never),
+        .lte("kickoff_at", jusqua).neq("status", "cancelled").order("kickoff_at", { ascending: false }).range(de, a) as never),
     tout<{ slug: string; updated_at: string | null; published_at: string | null }>((de, a) => db.from("articles").select("slug,updated_at,published_at").eq("status", "published").range(de, a)),
   ]);
   const d = (x: string | null | undefined) => (x ? new Date(x) : maintenant);

@@ -6,7 +6,7 @@ import ClassementTribunes from "@/components/ClassementTribunes";
 import { getCompetitions, getMatchesOfDay } from "@/lib/queries";
 import { fmtDay, parisToday, shiftDay } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Matchs et scores en direct" };
+export const metadata: Metadata = { title: "Matchs et scores rugby en direct", description: "Tous les matchs de rugby du jour, résultats et calendrier : Top 14, Pro D2, Champions Cup, Challenge Cup, Six Nations, tests internationaux. Scores en direct et feuilles de match.", alternates: { canonical: "/matchs" } };
 export const dynamic = "force-dynamic";
 
 export default async function MatchsPage({ searchParams }: PageProps<"/matchs">) {

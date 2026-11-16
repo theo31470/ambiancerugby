@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
 
-export const metadata: Metadata = { title: "Créer un compte" };
+export const metadata: Metadata = { title: "Créer un compte", description: "Créez votre compte Ambiance Rugby gratuit : clubs et joueurs favoris, notes des joueurs, pronostics et commentaires.", alternates: { canonical: "/inscription" } };
 
 export default function InscriptionPage() {
   return (

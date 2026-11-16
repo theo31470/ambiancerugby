@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { DemandeReinitialisation } from "@/components/MotDePasseForms";
 
-export const metadata: Metadata = { title: "Mot de passe oublié" };
+export const metadata: Metadata = { title: "Mot de passe oublié", robots: { index: false, follow: true } };
 
 export default async function MotDePasseOublie({ searchParams }: PageProps<"/mot-de-passe-oublie">) {
   const sp = await searchParams;

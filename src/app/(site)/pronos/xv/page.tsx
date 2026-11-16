@@ -5,7 +5,7 @@ import TerrainXV from "@/components/xv/TerrainXV";
 import { getViewer, publicClient } from "@/lib/supabase/server";
 import { candidats, semaineActive, type Candidat } from "@/lib/xv";
 
-export const metadata: Metadata = { title: "XV de la semaine" };
+export const metadata: Metadata = { title: "XV de la semaine", description: "Composez votre XV de la semaine parmi les joueurs du Top 14 et de la Pro D2, et comparez-le à celui des autres supporters.", alternates: { canonical: "/pronos/xv" } };
 export const dynamic = "force-dynamic";
 
 export default async function XVPage() {

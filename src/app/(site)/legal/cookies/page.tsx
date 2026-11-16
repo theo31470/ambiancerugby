@@ -16,7 +16,9 @@ const TRACEURS: [string, string, string][] = [
 export default function Cookies() {
   return (
     <TexteLegal titre="Cookies et traceurs">
-      <p>Ambiance Rugby n&apos;utilise <strong>aucun cookie publicitaire, aucun outil de mesure d&apos;audience et aucun bouton de partage qui piste</strong>. Les seuls éléments enregistrés sur votre appareil servent au fonctionnement du site ou à retenir vos propres choix. C&apos;est pourquoi aucune bannière ne vous demande votre accord : la loi en dispense ces traceurs indispensables.</p>
+      <p>Ambiance Rugby n&apos;utilise <strong>aucun cookie publicitaire, aucun outil de mesure d&apos;audience tiers et aucun bouton de partage qui piste</strong>. Les seuls éléments enregistrés sur votre appareil servent au fonctionnement du site ou à retenir vos propres choix. C&apos;est pourquoi aucune bannière ne vous demande votre accord : la loi en dispense ces traceurs indispensables.</p>
+
+      <p>Pour savoir combien de personnes viennent et par quel canal, nous comptons les pages vues avec un outil maison qui <strong>n&apos;enregistre rien sur votre appareil</strong> : chaque visite est reconnue par une empreinte calculée pour la journée (adresse IP et navigateur, mélangés avec une clé secrète), qui ne permet pas de vous identifier et change chaque jour. Les résultats ne servent qu&apos;à des statistiques globales et sont effacés au bout de 13 mois.</p>
 
       <Titre id="liste">La liste complète</Titre>
       <div className="mt-4 overflow-x-auto rounded-2xl border border-trait">

@@ -8,6 +8,7 @@ import { Coupe } from "@/components/deco/Icones";
 import type { Competition } from "@/lib/types";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/competitions" },
   title: "Compétitions",
   description: "Top 14, Pro D2, Champions Cup, URC, Premiership, Super Rugby, Six Nations, Coupe du monde : classements, calendriers et résultats.",
 };

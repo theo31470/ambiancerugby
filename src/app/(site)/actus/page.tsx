@@ -4,7 +4,7 @@ import ArticleCard, { ArticleHero } from "@/components/ArticleCard";
 import { getArticles } from "@/lib/queries";
 import { CATEGORIES } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Actus" };
+export const metadata: Metadata = { title: "Actus rugby", description: "L'actualité du rugby vue des tribunes : Top 14, Pro D2, coupes d'Europe et XV de France, par la rédaction d'Ambiance Rugby.", alternates: { canonical: "/actus" } };
 export const dynamic = "force-dynamic";
 
 export default async function ActusPage({ searchParams }: PageProps<"/actus">) {

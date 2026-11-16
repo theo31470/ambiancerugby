@@ -9,6 +9,7 @@ import { getPowerRanking } from "@/lib/algo";
 import { getViewer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/indice" },
   title: "Indice Ambiance : le classement de puissance des clubs",
   description: "Notre algorithme classe les clubs et sélections de rugby selon leur vraie force du moment, au-delà du simple classement.",
 };

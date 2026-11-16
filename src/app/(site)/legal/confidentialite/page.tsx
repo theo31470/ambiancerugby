@@ -12,6 +12,7 @@ const DONNEES: [string, string, string, string][] = [
   ["Notifications push", "Adresse technique d'abonnement de l'appareil, type d'appareil", "Votre consentement, retirable à tout moment", "Jusqu'à la désactivation ou la désinstallation"],
   ["Abonnement Supporter", "Formule, dates, factures, identifiant client chez Stripe. Nous ne voyons jamais votre numéro de carte complet", "Exécution du contrat ; obligations comptables", "Durée de l'abonnement, puis factures 10 ans"],
   ["Commandes de la boutique", "Nom, adresse de livraison, e-mail, téléphone, articles, échanges et photos envoyés au service client", "Exécution du contrat ; obligations comptables", "5 ans après la commande (garanties et litiges), factures 10 ans"],
+  ["Mesure d'audience", "Pages vues, site ou réseau d'origine, type d'appareil, pays et ville approximative, avec une empreinte du jour qui ne permet pas de vous identifier. Rien n'est enregistré sur votre appareil", "Intérêt légitime : connaître la fréquentation du site", "13 mois"],
   ["Journaux techniques", "Adresse IP, navigateur, pages demandées, erreurs", "Intérêt légitime : sécurité et bon fonctionnement", "Quelques jours à 1 an selon l'hébergeur"],
 ];
 

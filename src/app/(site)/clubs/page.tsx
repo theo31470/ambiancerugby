@@ -5,7 +5,7 @@ import { getCompetitions, getCompetitionTeams } from "@/lib/queries";
 import { publicClient } from "@/lib/supabase/server";
 import type { Team } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Clubs et sélections", description: "Tous les clubs du Top 14, de la Pro D2, de la Nationale, de Premiership, d'URC, du Super Rugby et les sélections nationales." };
+export const metadata: Metadata = { title: "Clubs et sélections", alternates: { canonical: "/clubs" }, description: "Tous les clubs du Top 14, de la Pro D2, de la Nationale, de Premiership, d'URC, du Super Rugby et les sélections nationales." };
 export const dynamic = "force-dynamic";
 
 export default async function ClubsPage() {

@@ -11,7 +11,7 @@ type Groupe = { titre: string; liens: Lien[] };
 export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0, aTraiter = 0 }: { brouillons: number; aSaisir: number; admin: boolean; commentaires?: number; aTraiter?: number }) {
   const path = usePathname();
   const groupes: Groupe[] = [
-    { titre: "", liens: [{ href: "/studio", label: "Aujourd'hui", Icone: Ballon, exact: true }] },
+    { titre: "", liens: [{ href: "/studio", label: "Aujourd'hui", Icone: Ballon, exact: true }, { href: "/studio/audience", label: "Audience", Icone: Podium }] },
     {
       titre: "Rédaction",
       liens: [

@@ -5,7 +5,7 @@ import TeamBadge from "@/components/TeamBadge";
 import { searchPlayers } from "@/lib/queries";
 import { POSITIONS } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Joueurs" };
+export const metadata: Metadata = { title: "Joueurs de rugby : stats, notes et fiches", description: "Les fiches de plus de 6 000 joueurs de rugby : statistiques par saison, essais, sélections internationales, notes des supporters et parcours en club.", alternates: { canonical: "/joueurs" } };
 export const dynamic = "force-dynamic";
 
 export default async function JoueursPage({ searchParams }: PageProps<"/joueurs">) {

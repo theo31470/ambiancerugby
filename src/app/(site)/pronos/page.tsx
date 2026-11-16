@@ -10,7 +10,7 @@ import { MATCH_SELECT } from "@/lib/queries";
 import { fmtDay, fmtTime } from "@/lib/format";
 import type { MatchFull } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Pronos : pronostics et ligues entre potes" };
+export const metadata: Metadata = { title: "Pronostics rugby : ligues entre potes", description: "Pronostiquez les matchs du Top 14, de la Pro D2 et des coupes d'Europe, gratuitement, et affrontez vos amis dans des ligues privées.", alternates: { canonical: "/pronos" } };
 export const dynamic = "force-dynamic";
 
 const VUES = [
