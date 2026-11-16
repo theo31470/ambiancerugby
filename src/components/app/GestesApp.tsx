@@ -30,9 +30,15 @@ export default function GestesApp() {
       else sens("avant");
     };
     const retour = () => { if (html.dataset.sens !== "glisse") sens("retour"); };
+    // les images qui arrivent après l'affichage de la page apparaissent en fondu au lieu de surgir
+    const image = (e: Event) => {
+      const img = e.target as HTMLImageElement;
+      if (img.tagName === "IMG" && !img.closest("[data-sans-fondu]")) img.classList.add("img-arrivee");
+    };
     document.addEventListener("click", clic, true);
+    document.addEventListener("load", image, true);
     window.addEventListener("popstate", retour);
-    return () => { document.removeEventListener("click", clic, true); window.removeEventListener("popstate", retour); clearTimeout(minuteur); };
+    return () => { document.removeEventListener("click", clic, true); document.removeEventListener("load", image, true); window.removeEventListener("popstate", retour); clearTimeout(minuteur); };
   }, []);
 
   // retour par glissement depuis le bord gauche (iPhone, app installée)

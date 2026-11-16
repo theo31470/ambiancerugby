@@ -43,6 +43,7 @@ export default function Celebration() {
   useEffect(() => {
     if (!fete) return;
     window.dispatchEvent(new Event("ar:essai")); // la tribune se lève (si le son est activé)
+    try { navigator.vibrate?.([40, 70, 40, 70, 140]); } catch { /* téléphone sans vibreur */ }
     const t = setTimeout(() => setFete(null), 2900);
     return () => clearTimeout(t);
   }, [fete]);

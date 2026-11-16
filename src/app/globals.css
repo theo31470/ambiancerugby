@@ -245,7 +245,8 @@ h1, h2, h3, .titre {
 /* fiche match : changement d'onglet, chiffre du score qui change, homme du match */
 .onglet-entree { animation: onglet-entree .28s ease-out; }
 @keyframes onglet-entree { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.score-saut { animation: score-saut 1.4s cubic-bezier(.2,.9,.2,1.2); }
+.score-saut { animation: score-bascule .5s cubic-bezier(.2,.9,.3,1.3), score-saut 1.4s .1s cubic-bezier(.2,.9,.2,1.2); transform-origin: 50% 0; }
+@keyframes score-bascule { from { transform: perspective(300px) rotateX(-90deg) translateY(-20%); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes score-saut { 0% { transform: scale(1); } 12% { transform: scale(1.35); background: var(--moutarde); color: var(--bordeaux); } 40% { transform: scale(1); } 100% { background: transparent; } }
 .apparition-hdm { animation: apparition-hdm .6s cubic-bezier(.2,.8,.2,1.1) both; }
 @keyframes apparition-hdm { from { opacity: 0; transform: translateY(16px) rotate(-.6deg); } to { opacity: 1; transform: none; } }
@@ -566,3 +567,34 @@ html[data-sens="glisse"]::view-transition-old(.page-sort), html[data-sens="gliss
   position: fixed; left: 10px; top: 50%; z-index: 70; width: 40px; height: 40px; margin-top: -20px; border-radius: 999px;
   display: grid; place-items: center; background: var(--bordeaux); color: #fff; pointer-events: none; opacity: 0; box-shadow: 0 6px 20px -6px rgba(0,0,0,.5);
 }
+
+/* ---------- onglets de la fiche match : le contenu arrive du côté où l'on va ---------- */
+.onglet-depuis-droite { animation: onglet-depuis-droite .32s cubic-bezier(.2,.8,.2,1); }
+.onglet-depuis-gauche { animation: onglet-depuis-gauche .32s cubic-bezier(.2,.8,.2,1); }
+@keyframes onglet-depuis-droite { from { opacity: 0; transform: translateX(48px); } }
+@keyframes onglet-depuis-gauche { from { opacity: 0; transform: translateX(-48px); } }
+@media (prefers-reduced-motion: reduce) { .onglet-depuis-droite, .onglet-depuis-gauche { animation: none; } }
+
+/* ---------- le point rouge « en direct » qui pulse ---------- */
+.point-direct { position: relative; width: .5rem; height: .5rem; border-radius: 999px; background: #ff4d4d; }
+.point-direct::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #ff4d4d; animation: point-direct 1.6s ease-out infinite; }
+@keyframes point-direct { from { transform: scale(1); opacity: .7; } to { transform: scale(3); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .point-direct::after { animation: none; } }
+
+/* ---------- volet qui monte du bas ---------- */
+.volet[open] .volet-panneau { animation: volet-monte .32s cubic-bezier(.2,.9,.25,1); }
+.volet[open]::backdrop { animation: volet-fond .25s ease-out; }
+.volet[data-sortie] .volet-panneau { animation: volet-descend .2s ease-in forwards; }
+.volet[data-sortie]::backdrop { animation: volet-fond .2s ease-in reverse forwards; }
+@keyframes volet-monte { from { transform: translateY(100%); } }
+@keyframes volet-descend { to { transform: translateY(100%); } }
+@keyframes volet-fond { from { opacity: 0; } }
+@media (min-width: 640px) { @keyframes volet-monte { from { transform: translateY(24px) scale(.97); opacity: 0; } } }
+@media (prefers-reduced-motion: reduce) { .volet .volet-panneau, .volet::backdrop { animation: none !important; } }
+
+/* images arrivées après l'affichage : fondu doux */
+.img-arrivee { animation: img-arrivee .45s ease-out; }
+@keyframes img-arrivee { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .img-arrivee { animation: none; } }
+.hors-ligne { animation: invite-entree .35s cubic-bezier(.2,.9,.25,1) both; }
+@media (min-width: 1024px) { .hors-ligne { bottom: 1.5rem !important; } }

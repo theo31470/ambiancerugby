@@ -12,6 +12,7 @@ import Pronostic from "@/components/pronos/Pronostic";
 import AvantMatch from "@/components/AvantMatch";
 import Compositions from "@/components/Compositions";
 import Onglets from "@/components/match/Onglets";
+import ActionsMatch from "@/components/match/ActionsMatch";
 import ScoreAnime from "@/components/match/ScoreAnime";
 import CompteARebours from "@/components/match/CompteARebours";
 import ChiffresEquipes, { type LigneChiffre } from "@/components/match/ChiffresEquipes";
@@ -155,6 +156,16 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     ["📺", "Diffusion", m.tv ?? <span key="t" className="text-sourdine font-normal">Non communiquée</span>],
   ];
   const minute = m.status === "finished" ? 80 : m.status === "halftime" ? 40 : Math.min(80, Math.max(0, ...(events ?? []).map((e) => e.minute ?? 0), m.clock && /^\d+/.test(m.clock) ? parseInt(m.clock, 10) : 0));
+  // score compact, affiché dans la barre d'onglets quand le grand tableau sort de l'écran
+  const scoreCompact = (
+    <div className="flex items-center justify-center gap-3 pt-2 pb-1 text-sm font-semibold">
+      <span className="flex items-center gap-2 min-w-0 justify-end flex-1"><span className="truncate">{m.home.short_name ?? m.home.name}</span><TeamBadge team={m.home} /></span>
+      <span className={`titre font-extrabold text-lg tnum rounded-lg px-2.5 py-0.5 ${live ? "bg-bordeaux text-moutarde" : "bg-teinte"}`}>{m.home_score ?? 0}–{m.away_score ?? 0}</span>
+      <span className="flex items-center gap-2 min-w-0 flex-1"><TeamBadge team={m.away} /><span className="truncate">{m.away.short_name ?? m.away.name}</span></span>
+      {live && <span className="inline-flex items-center gap-1.5 text-xs text-vin shrink-0"><span className="pastille" aria-hidden />{m.clock ?? "Live"}</span>}
+    </div>
+  );
+
   return (
     <article>
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd([
@@ -176,12 +187,16 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
         filAriane([["Accueil", "/"], ["Matchs", "/matchs"], [m.competition.name, `/competitions/${m.competition.slug}`], [`${m.home.short_name ?? m.home.name} – ${m.away.short_name ?? m.away.name}`, canonique]]),
       ])} />
       <LiveRefresh matchId={m.id} />
-      <p className="text-sm text-sourdine">
-        <Link href={`/competitions/${m.competition.slug}`} className="font-semibold text-vin underline underline-offset-4">{m.competition.name}</Link>
-        {m.round && <span>, journée {m.round}</span>}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-sourdine">
+          <Link href={`/competitions/${m.competition.slug}`} className="font-semibold text-vin underline underline-offset-4">{m.competition.name}</Link>
+          {m.round && <span>, journée {m.round}</span>}
+        </p>
+        <ActionsMatch titre={`${m.home.short_name ?? m.home.name} – ${m.away.short_name ?? m.away.name}`} coupEnvoi={m.kickoff_at} lieu={m.venue}
+          aVenir={new Date(m.kickoff_at) > new Date()} competition={{ nom: m.competition.name, href: `/competitions/${m.competition.slug}` }} />
+      </div>
 
-      <section aria-label="Score" className="mt-4 bg-bordeaux text-white rounded-2xl px-4 pt-8 pb-5 sm:px-10 overflow-hidden">
+      <section aria-label="Score" data-score-hero className="mt-4 bg-bordeaux text-white rounded-2xl px-4 pt-8 pb-5 sm:px-10 overflow-hidden">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8 entree-score">
           <div style={{ ["--i" as string]: 0 }}><TeamSide team={m.home} align="end" /></div>
           <div className="text-center" style={{ ["--i" as string]: 1 }}>
@@ -285,7 +300,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
 
       {/* ---------- 2. en direct ---------- */}
       {live && (
-        <Onglets initial="direct" onglets={[
+        <Onglets initial="direct" score={scoreCompact} onglets={[
           { id: "direct", label: "Direct", contenu: (
             <div className="grid gap-8">
               {events && events.length > 0
@@ -305,7 +320,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
       {fini && (
         <>
           {hdm && <HommeDuMatch h={hdm} sup={supHdm} />}
-          <Onglets initial="resume" onglets={[
+          <Onglets initial="resume" score={scoreCompact} onglets={[
             { id: "resume", label: "Le match en chiffres", contenu: (
               <div className="grid gap-8">
                 {joueurs.length > 0 && <ChiffresEquipes lignes={chiffres} dom={hn} ext={an} couleurs={["var(--vin)", "var(--or)"]} />}

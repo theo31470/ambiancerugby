@@ -1,12 +1,17 @@
 /* Service worker d'Ambiance Rugby (app installable / PWA)
  * - garde en réserve la page hors ligne, le logo et les fichiers statiques du site ;
- * - pages : toujours le réseau d'abord (scores frais), la page hors ligne si pas de connexion ;
+ * - pages : toujours le réseau d'abord (scores frais) ; chaque page publique visitée est gardée en réserve
+ *   pour rester consultable sans réseau (derniers scores, classements, fiches) ; sinon la page hors ligne ;
  * - prêt pour les notifications push (matchs en direct, alertes).
  * Changer VERSION à chaque modification de ce fichier.
  */
-const VERSION = "ar-v1";
+const VERSION = "ar-v2";
 const RESERVE = `reserve-${VERSION}`;
 const STATIQUES = `statiques-${VERSION}`;
+const PAGES = `pages-${VERSION}`;
+const PAGES_MAX = 80;
+// pages personnelles ou de paiement : jamais gardées
+const PRIVEES = /^\/(compte|moi|connexion|inscription|mot-de-passe-oublie|suivi|boutique\/(panier|paiement|merci|facture))(\/|$)/;
 const HORS_LIGNE = "/hors-ligne.html";
 const A_GARDER = [HORS_LIGNE, "/icons/icon-192.png", "/icons/icon-512.png", "/logo-blanc.png"];
 
@@ -44,11 +49,16 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       (async () => {
         try {
-          const pre = await event.preloadResponse;
-          if (pre) return pre;
-          return await fetch(req);
+          const rep = (await event.preloadResponse) || (await fetch(req));
+          if (rep.ok && rep.type === "basic" && !PRIVEES.test(url.pathname)) {
+            const copie = rep.clone();
+            event.waitUntil(garderPage(url, copie));
+          }
+          return rep;
         } catch {
-          return (await caches.match(HORS_LIGNE)) || Response.error();
+          // sans réseau : la dernière version vue de cette page, sinon la page hors ligne
+          const gardee = await caches.match(sansSuivi(url), { cacheName: PAGES });
+          return gardee || (await caches.match(HORS_LIGNE)) || Response.error();
         }
       })(),
     );
@@ -71,6 +81,21 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+/* ---------- pages gardées pour le hors-ligne ---------- */
+function sansSuivi(url) {
+  const u = new URL(url.href);
+  [...u.searchParams.keys()].filter((k) => k.startsWith("utm_") || k === "fbclid" || k === "gclid").forEach((k) => u.searchParams.delete(k));
+  u.hash = "";
+  return u.href;
+}
+async function garderPage(url, rep) {
+  const c = await caches.open(PAGES);
+  await c.put(sansSuivi(url), rep);
+  // on ne garde que les dernières pages visitées
+  const cles = await c.keys();
+  if (cles.length > PAGES_MAX) await Promise.all(cles.slice(0, cles.length - PAGES_MAX).map((k) => c.delete(k)));
+}
 
 /* ---------- notifications push ---------- */
 self.addEventListener("push", (event) => {

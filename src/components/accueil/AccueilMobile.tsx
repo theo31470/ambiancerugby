@@ -7,6 +7,7 @@ import { Ballon, Coupe, Echarpe, Podium, Trompette } from "@/components/deco/Ico
 import { CATEGORIES, fmtDay, fmtRelative, fmtTime, isLive } from "@/lib/format";
 import { urlMatch } from "@/lib/seo";
 import type { Article, MatchFull, StandingRow, TeamLite } from "@/lib/types";
+import CarrouselPoints from "@/components/app/CarrouselPoints";
 
 /**
  * Accueil des téléphones, façon app : l'essentiel d'abord, en cartes qu'on fait défiler au pouce.
@@ -60,7 +61,18 @@ export default function AccueilMobile(props: {
         {/* 1. le direct / les prochains matchs */}
         <Bloc titre={direct.length ? "En direct" : jour ? (aujourdhui ? "Matchs du jour" : "Prochains matchs") : "Matchs"} pastille={direct.length > 0}
           sousTitre={!direct.length && jour && !aujourdhui ? fmtDay(`${jour}T12:00:00Z`) : undefined} lien="/matchs">
-          {fil.length ? (
+          {direct.length ? (
+            <div className="grid gap-4">
+              <CarrouselPoints etiquette="Matchs en direct">
+                {direct.map((m) => <CarteDirect key={m.id} m={m} />)}
+              </CarrouselPoints>
+              {fil.length > direct.length && (
+                <Carrousel>
+                  {fil.filter((m) => !isLive(m.status)).map((m) => <CarteMatch key={m.id} m={m} />)}
+                </Carrousel>
+              )}
+            </div>
+          ) : fil.length ? (
             <Carrousel>
               {fil.map((m) => <CarteMatch key={m.id} m={m} />)}
             </Carrousel>
@@ -207,6 +219,38 @@ function Carrousel({ children }: { children: ReactNode }) {
     <div className="defile-scroll overflow-x-auto snap-x snap-mandatory scroll-px-4 overscroll-x-contain">
       <div className="flex gap-3 px-4 w-max">{children}</div>
     </div>
+  );
+}
+
+/** Grande carte d'un match en direct, une par écran. */
+function CarteDirect({ m }: { m: MatchFull }) {
+  return (
+    <Link href={urlMatch(m)} className="carte-direct relative block w-[calc(100vw-2rem)] max-w-md shrink-0 snap-start overflow-hidden rounded-3xl bg-bordeaux text-white p-5 active:scale-[.985] transition-transform">
+      <img src="/logo-blanc.png" alt="" aria-hidden className="absolute -right-8 -bottom-10 w-40 opacity-[0.06] -rotate-12" />
+      <p className="relative flex items-center justify-between text-xs font-semibold text-white/70">
+        <span className="truncate">{m.competition.short_name ?? m.competition.name}</span>
+        <span className="flex items-center gap-2 rounded-full bg-white/10 px-2.5 py-1 text-moutarde">
+          <span className="point-direct" aria-hidden />
+          {m.status === "halftime" ? "Mi-temps" : m.clock ? `${m.clock}` : "Direct"}
+        </span>
+      </p>
+      <div className="relative mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
+        {(["home", "away"] as const).map((c, k) => {
+          const t = m[c];
+          const equipe = (
+            <span key={c} className="grid justify-items-center gap-2 min-w-0">
+              <span className="w-14 h-14 rounded-2xl bg-white grid place-items-center"><TeamBadge team={t} size="md" /></span>
+              <span className="titre font-bold text-sm leading-tight line-clamp-2">{t.short_name ?? t.name}</span>
+            </span>
+          );
+          return k === 0 ? equipe : [
+            <span key="score" className="titre font-extrabold text-5xl tnum text-moutarde leading-none">{m.home_score ?? 0}<span className="text-white/30 mx-1.5">–</span>{m.away_score ?? 0}</span>,
+            equipe,
+          ];
+        })}
+      </div>
+      <p className="relative mt-4 text-center text-xs font-semibold text-white/70">Suivre le match en direct</p>
+    </Link>
   );
 }
 

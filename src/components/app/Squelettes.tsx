@@ -98,3 +98,74 @@ export function SqueletteArticle() {
     </Cadre>
   );
 }
+
+/** Accueil des téléphones : bandeau, raccourcis, carrousel de matchs, une. */
+export function SqueletteAccueil() {
+  return (
+    <Cadre label="Chargement de l'accueil">
+      <div className="pleine-largeur -mt-6 bg-bordeaux px-4 pt-5 pb-5">
+        <div className="h-3 w-32 rounded-full bg-white/15" />
+        <div className="mt-2 h-8 w-56 rounded-xl bg-white/15" />
+        <div className="mt-4 flex gap-2 overflow-hidden">{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-9 w-32 shrink-0 rounded-full bg-white/10" />)}</div>
+      </div>
+      <B className="mt-6 h-6 w-40" />
+      <div className="mt-3 flex gap-3 overflow-hidden">{Array.from({ length: 2 }, (_, i) => <B key={i} className="h-28 w-60 shrink-0 rounded-2xl" />)}</div>
+      <B className="mt-8 h-24 rounded-3xl" />
+      <B className="mt-8 h-6 w-32" />
+      <B className="mt-3 aspect-[16/10] rounded-2xl" />
+    </Cadre>
+  );
+}
+
+/** Grille de cartes (clubs, joueurs, compétitions, boutique). */
+export function SqueletteGrille({ label = "Chargement", carre = false }: { label?: string; carre?: boolean }) {
+  return (
+    <Cadre label={label}>
+      <B className="h-10 w-56 mb-3" />
+      <B className="h-4 w-72 max-w-full mb-6" />
+      <div className="flex gap-2 mb-6 overflow-hidden">{Array.from({ length: 5 }, (_, i) => <B key={i} className="h-9 w-24 shrink-0 rounded-full" />)}</div>
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i}>
+            <B className={carre ? "aspect-[4/5] rounded-2xl" : "h-24 rounded-2xl"} />
+            {carre && <><B className="mt-3 h-4 w-3/4" /><B className="mt-2 h-4 w-1/3" /></>}
+          </div>
+        ))}
+      </div>
+    </Cadre>
+  );
+}
+
+/** Liste en lignes (Indice, pronos, membres). */
+export function SqueletteListe({ label = "Chargement" }: { label?: string }) {
+  return (
+    <Cadre label={label}>
+      <B className="h-10 w-64 mb-3" />
+      <B className="h-4 w-80 max-w-full mb-6" />
+      <div className="bg-surface border border-trait rounded-2xl divide-y divide-trait overflow-hidden">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+            <B className="w-6 h-5" /><B className="w-8 h-8 rounded-full" /><B className="h-4 flex-1 max-w-48" /><B className="h-5 w-12 ml-auto" />
+          </div>
+        ))}
+      </div>
+    </Cadre>
+  );
+}
+
+/** Fiche produit de la boutique. */
+export function SqueletteProduit() {
+  return (
+    <Cadre label="Chargement de l'article">
+      <div className="grid gap-8 lg:grid-cols-2">
+        <B className="aspect-square rounded-3xl" />
+        <div>
+          <B className="h-4 w-32" /><B className="mt-3 h-10 w-3/4" /><B className="mt-3 h-7 w-24" />
+          <div className="mt-6 flex gap-2">{Array.from({ length: 5 }, (_, i) => <B key={i} className="h-11 w-14 rounded-xl" />)}</div>
+          <B className="mt-6 h-14 rounded-full" />
+          <B className="mt-6 h-20" />
+        </div>
+      </div>
+    </Cadre>
+  );
+}
