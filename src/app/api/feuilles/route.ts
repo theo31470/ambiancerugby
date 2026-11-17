@@ -62,9 +62,9 @@ export async function GET(req: Request) {
   // jamais pendant un direct, et on saute le créneau si la base répond lentement
   // heure de Paris (formatToParts : le format « fr-FR » renvoie « 03 h », illisible par Number)
   const heure = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Paris" }).formatToParts(new Date()).find((x) => x.type === "hour")?.value ?? 12);
-  const pas = heure < 8 ? 3 : 4;
-  // le jour, le rattrapage ne tourne que si la base a récupéré (RATTRAPAGE_JOUR=1) : elle doit d'abord tenir les matchs du jour
-  const jourOk = heure < 9 || process.env.RATTRAPAGE_JOUR === "1";
+  // base Pro (Micro) : le rattrapage tourne aussi le jour, plus doucement, et jamais pendant un direct (voir plus bas)
+  const pas = heure < 8 ? 3 : 6;
+  const jourOk = heure < 9 || process.env.RATTRAPAGE_JOUR !== "0";
   const creneau = process.env.RATTRAPAGE_WR !== "0" && jourOk && Math.floor(Date.now() / 60e3) % pas < 2 && !(enDirect ?? []).length && !baseLente;
   const { data: ids } = creneau ? await db.rpc("feuilles_a_traiter", { p_limite: 6 }) : { data: [] };
   const file = ((ids ?? []) as unknown[]).map((x) => (typeof x === "string" ? x : (x as { feuilles_a_traiter: string }).feuilles_a_traiter));
