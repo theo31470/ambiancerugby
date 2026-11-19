@@ -1,10 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import AuthForm from "@/components/AuthForm";
+import { getViewer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Créer un compte", description: "Créez votre compte Ambiance Rugby gratuit : clubs et joueurs favoris, notes des joueurs, pronostics et commentaires.", alternates: { canonical: "/inscription" } };
 
-export default function InscriptionPage() {
+export default async function InscriptionPage() {
+  // déjà membre et connecté : direction son espace
+  if (await getViewer()) redirect("/moi");
   return (
     <div className="max-w-sm mx-auto">
       <h1 className="groovy text-5xl text-vin">Créer un compte</h1>
