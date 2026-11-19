@@ -483,7 +483,6 @@
 "bodene-davis": "2026-11-14",
 "boeta-chamberlain": "2026-11-14",
 "bongi-mbonambi": "2026-11-14",
-"boris-wenger": "2026-11-14",
 "boston-fakafanua": "2026-11-14",
 "braam-reyneke": "2026-11-14",
 "braam-steyn": "2026-11-14",
@@ -1353,7 +1352,6 @@
 "francisco-gomez-kodela": "2026-11-14",
 "francisco-gonzalez-capdevila": "2026-11-14",
 "francisco-minervino": "2026-11-14",
-"francisco-moreno": "2026-11-14",
 "francisco-suarez-folch": "2026-11-14",
 "francisco-urroz": "2026-11-14",
 "franck-giraudeau": "2026-11-14",
@@ -1560,7 +1558,6 @@
 "gregory-fichten": "2026-11-14",
 "griffin-culver": "2026-11-14",
 "guglielmo-palazzani": "2026-11-14",
-"guido-petti": "2026-11-14",
 "guido-petti-pagadizabal": "2026-11-14",
 "guido-volpi": "2026-11-14",
 "guilhem-guirado": "2026-11-14",
@@ -1761,7 +1758,6 @@
 "ignacio-alvarez": "2026-11-14",
 "ignacio-dotti": "2026-11-14",
 "ignacio-facciolo": "2026-11-14",
-"ignacio-mendy": "2026-11-14",
 "ignacio-peculo": "2026-11-14",
 "ignacio-pineiro": "2026-11-14",
 "ignacio-silva": "2026-11-14",
@@ -2470,7 +2466,6 @@
 "juan-manuel-alonso": "2026-11-14",
 "juan-manuel-rodriguez": "2026-11-14",
 "juan-manuel-tafernaberry": "2026-11-14",
-"juan-martin-gonzalez": "2026-11-14",
 "juan-mostert": "2026-11-14",
 "juan-pablo-socino": "2026-11-14",
 "juan-penoucos": "2026-11-14",
@@ -2915,7 +2910,6 @@
 "lucas-vaccaro": "2026-11-14",
 "lucas-vigneres": "2026-11-14",
 "lucien-richardis": "2026-11-14",
-"lucio-cinti": "2026-11-14",
 "ludo-kolade": "2026-11-14",
 "lui-naeata": "2026-11-14",
 "luis-lopes": "2026-11-14",
@@ -4361,7 +4355,6 @@
 "sila-puafisi": "2026-11-14",
 "simao-bento": "2026-11-14",
 "simeon-soenen": "2026-11-14",
-"simon-benitez-cruz": "2026-11-14",
 "simon-berghan": "2026-11-14",
 "simon-christian-njewel": "2026-11-14",
 "simon-delas": "2026-11-14",
@@ -4824,7 +4817,6 @@
 "tomas-francis": "2026-11-14",
 "tomas-gwilliam": "2026-11-14",
 "tomas-inciarte": "2026-11-14",
-"tomas-lavanini": "2026-11-14",
 "tomas-lezana": "2026-11-14",
 "tomas-medina": "2026-11-14",
 "tomas-montilla": "2026-11-14",
@@ -12011,5 +12003,45 @@
 "s": "LNR",
 "t": true,
 "v": "20261114"
+},
+"boris-wenger": {
+"s": "Harlequins",
+"t": true,
+"v": "20261120"
+},
+"francisco-moreno": {
+"s": "Newcastle Red Bulls",
+"t": true,
+"v": "20261120"
+},
+"guido-petti": {
+"s": "UBB",
+"t": true,
+"v": "20261120"
+},
+"tomas-lavanini": {
+"s": "UAR",
+"t": true,
+"v": "20261120"
+},
+"juan-martin-gonzalez": {
+"s": "UAR",
+"t": true,
+"v": "20261120"
+},
+"simon-benitez-cruz": {
+"s": "UAR",
+"t": true,
+"v": "20261120"
+},
+"ignacio-mendy": {
+"s": "UAR",
+"t": true,
+"v": "20261120"
+},
+"lucio-cinti": {
+"s": "UAR",
+"t": true,
+"v": "20261120"
 }
 }
