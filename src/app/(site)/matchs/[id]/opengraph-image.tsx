@@ -17,9 +17,21 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const fini = m?.status === "finished" && m.home_score != null;
   const live = m && ["live", "halftime"].includes(m.status);
   const quand = m ? new Date(m.kickoff_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "";
-  const blason = (t?: { logo_url: string | null; color: string | null; short_name: string | null; name: string }) => t?.logo_url
+  // le logo est vérifié avant d'être dessiné : un logo illisible (format inconnu, lien mort) ferait échouer toute l'image
+  const lisible = async (url: string | null | undefined) => {
+    if (!url) return null;
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      const type = r.headers.get("content-type") ?? "";
+      if (!r.ok || !/^image\/(png|jpe?g|gif|webp|svg\+xml)/.test(type)) return null;
+      return `data:${type.split(";")[0]};base64,${Buffer.from(await r.arrayBuffer()).toString("base64")}`;
+    } catch { return null; }
+  };
+  const [logoDom, logoExt] = await Promise.all([lisible(m?.home.logo_url), lisible(m?.away.logo_url)]);
+  const logos = new Map([[m?.home, logoDom], [m?.away, logoExt]]);
+  const blason = (t?: { logo_url: string | null; color: string | null; short_name: string | null; name: string }) => t && logos.get(t as never)
     // eslint-disable-next-line @next/next/no-img-element
-    ? <div style={{ width: 170, height: 170, borderRadius: 32, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}><img src={t.logo_url} width={140} height={140} style={{ objectFit: "contain" }} alt="" /></div>
+    ? <div style={{ width: 170, height: 170, borderRadius: 32, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}><img src={logos.get(t as never)!} width={140} height={140} style={{ objectFit: "contain" }} alt="" /></div>
     : <div style={{ width: 170, height: 170, borderRadius: 999, background: t?.color ?? "#934f5e", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "Bricolage", fontSize: 64 }}>{nom(t).slice(0, 3).toUpperCase()}</div>;
 
   return new ImageResponse(
