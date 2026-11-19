@@ -142,6 +142,11 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
       ? { ...base, firstName: prenom } : base;
   };
 
+  // les 23 de chaque équipe d'après la composition officielle
+  const compo = analyserCompos(compos);
+  const coteCompo = new Map<string, "home" | "away">();
+  if (compo) for (const [liste, side] of [[compo.dom, "home"], [compo.ext, "away"]] as const) for (const c of liste) { coteCompo.set(c.lnrId, side); if (!numeros.has(c.lnrId)) numeros.set(c.lnrId, c.numero); }
+
   // tous les joueurs cités, avec leur côté
   const joueurs = new Map<string, { j: JoueurLnr; side: "home" | "away" }>();
   // noms complets du fil (remplacements, buteurs) en priorité sur le classement abrégé
@@ -149,6 +154,13 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   for (const j of [...rempl.flatMap((r) => [r.in, r.out]), ...faits.flatMap((f) => [f.player, f.conversionPlayer])]) { const id = idLnr(j); if (id && j?.firstName) duFil.set(id, j); }
   for (const e of equipes) for (const l of e.lignes) { const id = idLnr(l.player); if (id) joueurs.set(id, { j: complet(id, { ...l.player, ...(duFil.get(id) ?? {}) }), side: e.side }); }
   for (const [id, side] of cote) if (!joueurs.has(id) && duFil.has(id)) joueurs.set(id, { j: complet(id, duFil.get(id)!), side });
+  // tant que la LNR n'a pas publié le classement des stats (ou pour les vieux matchs qui n'en ont pas), la composition
+  // donne quand même tous les joueurs du match : titulaires et remplaçants entrés en jeu
+  if (compo) for (const liste of [compo.dom, compo.ext]) for (const c of liste) {
+    if (joueurs.has(c.lnrId)) continue;
+    const j: JoueurLnr = { ...(duFil.get(c.lnrId) ?? {}), firstName: duFil.get(c.lnrId)?.firstName ?? c.prenom, lastName: duFil.get(c.lnrId)?.lastName ?? c.nom } as JoueurLnr;
+    joueurs.set(c.lnrId, { j: complet(c.lnrId, j), side: coteCompo.get(c.lnrId)! });
+  }
 
   // correspondance avec nos joueurs : identifiant LNR, puis nom dans le club, puis nom n'importe où ; sinon création
   const ids = [...joueurs.keys()];
@@ -215,6 +227,27 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
       minutes: Math.min(100, min), tries: n(l.nbEssais), tackles: n(l.totalSuccessfulTackles), line_breaks: n(l.lineBreak), offloads: n(l.offload),
       turnovers_won: n(l.breakdownSteals), yellow: n(l.nbCartonsJaunes), red: n(l.nbCartonsRouges) + n(l.nbCartonsOranges), starter: !entrants.has(id) && min > 0,
     });
+  }
+
+  // sans classement des stats : temps de jeu déduit de la composition et des remplacements
+  if (compo && (fini || !recent)) {
+    const fin = 80;
+    const sortie = new Map<string, number>(), entree = new Map<string, number>();
+    for (const r of rempl) {
+      const o = idLnr(r.out), i = idLnr(r.in);
+      if (o && !sortie.has(o)) sortie.set(o, Math.min(fin, r.minute ?? fin));
+      if (i && !entree.has(i)) entree.set(i, Math.min(fin, r.minute ?? fin));
+    }
+    for (const liste of [compo.dom, compo.ext]) for (const c of liste) {
+      const side = coteCompo.get(c.lnrId)!;
+      const r = ligne(c.lnrId, side);
+      if (!r || Number(r.minutes) > 0) continue;
+      const titulaire = c.numero <= 15;
+      const debut = titulaire ? 0 : entree.get(c.lnrId);
+      if (debut == null) continue; // remplaçant resté sur le banc
+      const finJ = sortie.get(c.lnrId) ?? fin;
+      Object.assign(r, { minutes: Math.max(1, finJ - debut), starter: titulaire });
+    }
   }
 
   // fil du match (et buteurs, absents du classement)
@@ -303,7 +336,11 @@ export type JoueurCompo = { lnrId: string; numero: number; prenom: string; nom: 
 export async function lireCompositionLnr(url: string): Promise<{ dom: JoueurCompo[]; ext: JoueurCompo[] } | null> {
   const r = await fetch(`${url}/compositions`, { next: { revalidate: 1800 }, signal: AbortSignal.timeout(15_000), headers: { "user-agent": UA, accept: "text/html" } }).catch(() => null);
   if (!r?.ok) return null;
-  const html = await r.text();
+  return analyserCompos(await r.text());
+}
+
+/** Lit la page « compositions » de la LNR : les joueurs de chaque équipe, l'équipe qui reçoit d'abord. */
+function analyserCompos(html: string): { dom: JoueurCompo[]; ext: JoueurCompo[] } | null {
   const liste: JoueurCompo[] = [];
   for (const x of html.matchAll(/<a\s+class="player-pitch[^"]*"\s+href="[^"]*\/joueur\/([^"/]+)"\s*>([\s\S]*?)<\/a>/g)) {
     const id = x[1], bloc = x[2];
