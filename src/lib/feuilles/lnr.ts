@@ -252,7 +252,14 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
 
   // fil du match (et buteurs, absents du classement)
   const fil: EvtPropose[] = [];
-  const minute = (f: { minute?: number; additionalMinute?: number }) => Math.min(130, (f.minute ?? 0) + (f.additionalMinute ?? 0));
+  // en direct, la LNR publie parfois un fait sans minute : on prend celle du fait voisin (la transformation qui suit, sinon le fait précédent)
+  const minuteVoisine = (f: Fait): number => {
+    const i = faits.indexOf(f);
+    for (let k = i + 1; k < faits.length; k++) if (faits[k].minute != null) return faits[k].minute! + (faits[k].additionalMinute ?? 0);
+    for (let k = i - 1; k >= 0; k--) if (faits[k].minute != null) return faits[k].minute! + (faits[k].additionalMinute ?? 0);
+    return 0;
+  };
+  const minute = (f: Fait) => Math.min(130, f.minute == null ? minuteVoisine(f) : f.minute + (f.additionalMinute ?? 0));
   const triesFil = new Map<string, number>();
   for (const f of faits) {
     const sst = norm(f.slugSubType ?? f.subtype);
