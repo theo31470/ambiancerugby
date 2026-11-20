@@ -257,7 +257,8 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   for (const f of faits) {
     const sst = norm(f.slugSubType ?? f.subtype);
     const st = norm(f.slugType ?? f.type);
-    const side = f.club === "away" ? "away" : "home";
+    // la composition fait foi sur le camp d'un joueur : le côté d'un fait en direct peut être faux (transformation rangée chez l'adversaire)
+    const side: "home" | "away" = coteCompo.get(idLnr(f.player) ?? "") ?? (f.club === "away" ? "away" : "home");
     const pid = notreId.get(idLnr(f.player) ?? "") ?? null;
     const nom = nomComplet(f.player);
     let type: string | null = null;
@@ -282,7 +283,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     if (f.conversionPlayer) {
       const cid = idLnr(f.conversionPlayer);
       const cpid = notreId.get(cid ?? "") ?? null;
-      fil.push({ minute: minute(f), cote: side, player_id: cpid, nom: cpid ? "" : joli(nomComplet(f.conversionPlayer)), type: "conversion" });
+      fil.push({ minute: minute(f), cote: coteCompo.get(cid ?? "") ?? side, player_id: cpid, nom: cpid ? "" : joli(nomComplet(f.conversionPlayer)), type: "conversion" });
       const r = cid ? ligne(cid, side) : null;
       if (r) r.conversions = Number(r.conversions) + 1;
     }
