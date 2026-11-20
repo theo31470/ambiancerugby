@@ -306,6 +306,9 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   if (rows.length) {
     const { count: manuels } = await db.from("player_match_stats").select("player_id", { count: "exact", head: true }).eq("match_id", m.id).is("source", null);
     if (manuels && !opts.remplacer) return { ok: false, raison: "déjà saisi à la main" };
+    // une relecture ne doit jamais appauvrir une feuille : si on a déjà plus de joueurs, on garde l'existant
+    const { count: existants } = await db.from("player_match_stats").select("player_id", { count: "exact", head: true }).eq("match_id", m.id).in("source", ["espn", "claude", "lnr"]);
+    if (!opts.remplacer && !enCours && (existants ?? 0) > rows.length) return { ok: false, raison: `feuille LNR incomplète (${rows.length} joueurs, ${existants} déjà enregistrés)` };
     // la feuille officielle remplace les lectures automatiques précédentes (ESPN, Claude)
     await db.from("player_match_stats").delete().eq("match_id", m.id).in("source", ["espn", "claude", "lnr"]);
     for (let i = 0; i < rows.length; i += 100) {
