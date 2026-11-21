@@ -474,6 +474,13 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
     const iso = new Date(maintenant).toISOString();
     await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: iso, ...(m.status === "scheduled" && live ? { status: "live" } : {}), ...chrono, ...(horloge ? { clock: horloge, clock_at: iso } : {}) }).eq("id", m.id);
   }
+  // matchs internationaux : World Rugby fait foi pour le statut (mi-temps, reprise, fin) comme pour le score
+  if (m.home?.is_national && m.away?.is_national && (live || fini)) {
+    const etat = fini ? "finished" : statut.includes("HT") ? "halftime" : "live";
+    if (m.status && m.status !== etat && !(m.status === "finished" && etat !== "finished")) {
+      await db.from("matches").update({ status: etat, ...(fini ? { home_score: dom, away_score: ext, feuille_tentee_at: new Date().toISOString() } : {}) }).eq("id", m.id);
+    }
+  }
   const detailOk = rows.some((r) => (r.tackles ?? 0) > 0);
   return { ok: true, joueurs: rows.length, crees, fil: nFil, dom, ext, conforme: dom === m.home_score && ext === m.away_score, detail: detailOk, live };
 }
