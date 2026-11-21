@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   await Promise.all((abos ?? []).map(async (a) => {
     try {
       await webpush.sendNotification({ endpoint: a.endpoint, keys: { p256dh: a.p256dh, auth: a.auth } }, charge, {
-        TTL: ["try", "joueur", "retournement", "penalite"].includes(n.kind) ? 600 : 3600, urgency: ["try", "joueur", "retournement", "penalite"].includes(n.kind) ? "high" : "normal",
+        TTL: ["try", "joueur", "retournement", "penalite", "transformation"].includes(n.kind) ? 600 : 3600, urgency: ["try", "joueur", "retournement", "penalite", "transformation"].includes(n.kind) ? "high" : "normal",
       });
       envoyees++;
       await db.from("push_abonnements").update({ dernier_envoi: new Date().toISOString() }).eq("id", a.id);
