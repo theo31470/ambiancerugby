@@ -56,7 +56,10 @@ export async function GET(req: Request) {
     .eq("status", "finished").not("wr_id", "is", null).is("homme_du_match", null)
     .gt("kickoff_at", new Date(Date.now() - 12 * 3600e3).toISOString()).lt("feuille_tentee_at", new Date(Date.now() - 20 * 60e3).toISOString())
     .limit(2);
-  const prioritaires = [...new Set([...(enDirect ?? []), ...(recents ?? []), ...(sansHdm ?? [])].map((x) => x.id as string))];
+  // matchs qui viennent de commencer (ou vont commencer) : on guette le coup d'envoi sur la feuille, plus vite qu'API-Sports
+  const { data: departs } = await db.from("matches").select("id").eq("status", "scheduled")
+    .gt("kickoff_at", new Date(Date.now() - 20 * 60e3).toISOString()).lt("kickoff_at", new Date(Date.now() + 2 * 60e3).toISOString()).limit(4);
+  const prioritaires = [...new Set([...(enDirect ?? []), ...(departs ?? []), ...(recents ?? []), ...(sansHdm ?? [])].map((x) => x.id as string))];
   // rattrapage des vieux matchs, à un rythme que l'offre gratuite Supabase supporte (budget disque limité) :
   // la nuit (0 h – 8 h) un créneau toutes les 3 minutes, le jour toutes les 4 minutes ; 1 feuille + 4 matchs World Rugby par créneau ;
   // jamais pendant un direct, et on saute le créneau si la base répond lentement

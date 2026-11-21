@@ -472,7 +472,7 @@ export async function importerFeuilleWr(db: SupabaseClient, m: MatchWr, opts: { 
     const secs = Math.max(...evts.map((e) => e.time?.secs ?? 0), 0);
     const horloge = secs > 0 ? `${Math.floor(secs / 60)}'` : null;
     const iso = new Date(maintenant).toISOString();
-    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: iso, ...chrono, ...(horloge ? { clock: horloge, clock_at: iso } : {}) }).eq("id", m.id);
+    await db.from("matches").update({ home_score: dom, away_score: ext, feuille_tentee_at: iso, ...(m.status === "scheduled" && live ? { status: "live" } : {}), ...chrono, ...(horloge ? { clock: horloge, clock_at: iso } : {}) }).eq("id", m.id);
   }
   const detailOk = rows.some((r) => (r.tackles ?? 0) > 0);
   return { ok: true, joueurs: rows.length, crees, fil: nFil, dom, ext, conforme: dom === m.home_score && ext === m.away_score, detail: detailOk, live };

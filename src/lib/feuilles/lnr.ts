@@ -330,6 +330,8 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     ...chrono, lnr_url: url, home_tries: essais("home"), away_tries: essais("away"),
     // en direct (ou à la fin d'un direct) : score de la feuille ; feuille_tentee_at signe l'écriture pour la base
     ...(enCours || fini ? { home_score: dom, away_score: ext, feuille_tentee_at: new Date().toISOString() } : {}),
+    // coup d'envoi vu sur la feuille avant API-Sports : le match passe en direct (et la notification part)
+    ...(enCours && m.status === "scheduled" ? { status: "live" } : {}),
   }).eq("id", m.id);
   if (m.competition_id && fini) await db.rpc("appliquer_bonus_offensif", { p_comp: m.competition_id });
   return { ok: true, joueurs: rows.length, crees, fil: nFil, dom, ext, conforme: m.home_score === dom && m.away_score === ext, enCours, fini };

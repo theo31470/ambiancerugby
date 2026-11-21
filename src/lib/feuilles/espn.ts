@@ -47,7 +47,7 @@ function ressemblance(t: EquipeLocale, e: EquipeEspn) {
 }
 
 export type MatchLocal = {
-  id: string; live?: boolean; competition_id?: string; kickoff_at: string; home_score: number | null; away_score: number | null; home_team_id: string; away_team_id: string; espn_event_id?: string | null;
+  id: string; live?: boolean; status?: string; competition_id?: string; kickoff_at: string; home_score: number | null; away_score: number | null; home_team_id: string; away_team_id: string; espn_event_id?: string | null;
   home: EquipeLocale; away: EquipeLocale; competition: { espn_league: string | null };
 };
 
