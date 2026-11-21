@@ -117,7 +117,7 @@ async function Classement({ compId, season, slug, calcule }: { compId: string; s
       <StandingsPools rows={rows} zones={zonesFor(slug)} />
       {calcule && (
         <p className="mt-3 text-xs text-sourdine max-w-prose">
-          Classement calculé par Ambiance Rugby à partir des résultats : 4 points la victoire, 2 le nul, 1 point de bonus défensif. Les bonus offensifs (nombre d&apos;essais) ne sont pas encore comptés.
+          Classement calculé par Ambiance Rugby à partir des résultats : 4 points la victoire, 2 le nul, plus les bonus offensif et défensif. Il se met à jour dès la fin de chaque match.
         </p>
       )}
     </div>
