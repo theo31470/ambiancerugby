@@ -144,7 +144,7 @@ async function trouverPage(team: { name: string; short_name: string | null; alia
 // ---------- squads ----------
 async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?: boolean }, t0: number) {
   // clubs des compétitions actives (saison en cours), les plus relevées d'abord
-  const { data: comps, error: e1 } = await db.from("competitions").select("id, current_season, niveau").eq("active", true).neq("kind", "international");
+  const { data: comps, error: e1 } = await db.from("competitions").select("id, current_season, niveau, lnr_site").eq("active", true).neq("kind", "international");
   if (e1) throw new Error(e1.message);
   const { data: liens, error: e2 } = await db.from("team_competitions").select("team_id, competition_id, season").in("competition_id", (comps ?? []).map((c) => c.id));
   if (e2) throw new Error(e2.message);
@@ -152,6 +152,11 @@ async function jobSquads(db: SupabaseClient, params: { slugs?: string[]; force?:
   for (const l of liens ?? []) {
     const c = (comps ?? []).find((x) => x.id === l.competition_id);
     if (c && l.season === c.current_season) prio.set(l.team_id, Math.max(prio.get(l.team_id) ?? 0, c.niveau));
+  }
+  // Top 14 et Pro D2 : l'effectif officiel LNR fait foi (route /api/effectifs du site), Wikipédia n'y touche plus
+  for (const l of liens ?? []) {
+    const c = (comps ?? []).find((x) => x.id === l.competition_id);
+    if (c?.lnr_site && l.season === c.current_season) prio.delete(l.team_id);
   }
   let q = db.from("teams").select("id, slug, name, short_name, aliases, wiki_title, squad_synced_at, is_national").eq("is_national", false);
   if (params.slugs?.length) q = q.in("slug", params.slugs);

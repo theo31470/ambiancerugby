@@ -191,7 +191,9 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
         const slug = norm(nom).replace(/ /g, "-") + (n > 1 ? `-${n}` : "");
         const { data, error } = await db.from("players").insert({
           slug, first_name: joli(j.firstName ?? nom.split(" ")[0] ?? ""), last_name: joli(j.lastName ?? nom.split(" ").slice(1).join(" ")),
-          team_id: team, name_key: cle || null, source: "lnr", in_squad: true, lnr_id: id,
+          team_id: team, name_key: cle || null, source: "lnr", lnr_id: id,
+          // joueur découvert sur une vieille feuille : il a pu quitter le club depuis, l'effectif officiel LNR tranchera
+          in_squad: Date.now() - new Date(m.kickoff_at).getTime() < 45 * 86400e3,
         }).select("id").single();
         if (data) { p = { id: data.id, photo_source: null, verrou: false }; crees++; }
         else if (error?.code !== "23505" || error.message.includes("name_key")) break;
