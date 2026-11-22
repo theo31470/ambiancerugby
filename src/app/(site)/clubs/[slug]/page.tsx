@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: PageProps<"/clubs/[slug]">): 
   const t = await getTeam((await params).slug);
   if (!t) return {};
   const description = (t.description ?? `${t.name}${t.city ? ` (${t.city})` : ""} : effectif et stats des joueurs, calendrier, résultats, classement, forme et Indice Ambiance du club.`).slice(0, 300);
-  return { title: `${t.name} : effectif, calendrier, résultats et stats`, description, alternates: { canonical: `/clubs/${t.slug}` }, openGraph: { title: `${t.name} sur Ambiance Rugby`, description, url: `/clubs/${t.slug}`, images: t.logo_url ? [t.logo_url] : ["/og.jpg"] } };
+  return { title: `${t.name} : effectif, calendrier, résultats et stats`, description, alternates: { canonical: `/clubs/${t.slug}` }, openGraph: { title: `${t.name} sur Ambiance Rugby`, description, url: `/clubs/${t.slug}`, images: t.logo_url ? [t.logo_url] : ["/og.jpg?v=2"] } };
 }
 
 export default async function ClubPage({ params }: PageProps<"/clubs/[slug]">) {

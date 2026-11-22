@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/joueurs/[slug]">)
   if (!p) return {};
   const nom = `${p.first_name} ${p.last_name}`;
   const description = `${nom}${p.position ? `, ${p.position.toLowerCase()}` : ""} : stats saison par saison, essais, points, plaquages, notes sur 10 et derniers matchs.`;
-  return { title: `${nom} : stats, notes et fiche joueur`, description, alternates: { canonical: `/joueurs/${p.slug}` }, openGraph: { type: "profile", title: nom, description, url: `/joueurs/${p.slug}`, images: p.photo_url ? [p.photo_url] : ["/og.jpg"] } };
+  return { title: `${nom} : stats, notes et fiche joueur`, description, alternates: { canonical: `/joueurs/${p.slug}` }, openGraph: { type: "profile", title: nom, description, url: `/joueurs/${p.slug}`, images: p.photo_url ? [p.photo_url] : ["/og.jpg?v=2"] } };
 }
 
 type Totaux = { season: string; competition_id: string; games: number; starts: number; minutes: number; tries: number; conversions: number; penalty_goals: number; drop_goals: number; points: number; yellow: number; red: number; tackles: number; carries: number; metres: number; line_breaks: number; offloads: number; turnovers_won: number; motm: number; rating: number | null; games_saisis: number; competition?: { name: string; short_name: string | null; slug: string } };
