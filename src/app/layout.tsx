@@ -32,6 +32,8 @@ export const metadata: Metadata = {
   applicationName: "Ambiance Rugby",
   keywords: ["rugby", "Top 14", "Pro D2", "score rugby en direct", "classement Top 14", "résultats rugby", "pronostic rugby", "stats joueurs rugby", "Champions Cup", "Tournoi des Six Nations"],
   formatDetection: { telephone: false },
+  // vérification du domaine pour Meta Business Suite
+  other: { "facebook-domain-verification": "7ld7gqpmkwomqrfapw7vxd3rnz8u7a" },
   // app installée sur iPhone (écran d'accueil) : plein écran, barre d'état fondue dans le bordeaux, écran de démarrage
   appleWebApp: {
     capable: true,
