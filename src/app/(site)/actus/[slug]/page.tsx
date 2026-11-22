@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/actus/[slug]">): 
     title: a.title,
     description: a.excerpt ?? undefined,
     alternates: { canonical: `/actus/${a.slug}` },
-    openGraph: { type: "article", title: a.title, description: a.excerpt ?? undefined, url: `/actus/${a.slug}`, publishedTime: a.published_at ?? undefined, modifiedTime: a.updated_at, images: a.cover_url ? [a.cover_url] : ["/og.jpg?v=2"] },
+    openGraph: { type: "article", title: a.title, description: a.excerpt ?? undefined, url: `/actus/${a.slug}`, publishedTime: a.published_at ?? undefined, modifiedTime: a.updated_at, images: a.cover_url ? [a.cover_url] : ["/og.jpg?v=3"] },
   };
 }
 
@@ -33,7 +33,7 @@ export default async function ArticlePage({ params }: PageProps<"/actus/[slug]">
     <article className="max-w-3xl" id="lecture-article">
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd([{
         "@context": "https://schema.org", "@type": "NewsArticle", headline: a.title, description: a.excerpt ?? undefined, url: absolue(`/actus/${a.slug}`),
-        image: a.cover_url ? [a.cover_url] : [absolue("/og.jpg?v=2")], datePublished: a.published_at ?? a.created_at, dateModified: a.updated_at,
+        image: a.cover_url ? [a.cover_url] : [absolue("/og.jpg?v=3")], datePublished: a.published_at ?? a.created_at, dateModified: a.updated_at,
         author: { "@type": "Person", name: a.author?.display_name ?? "La rédaction Ambiance Rugby" }, publisher: ORGANISATION,
         isAccessibleForFree: !a.premium, mainEntityOfPage: absolue(`/actus/${a.slug}`),
       }, filAriane([["Accueil", "/"], ["Actus", "/actus"], [a.title, `/actus/${a.slug}`]])])} />
