@@ -120,9 +120,10 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
           <h1 className="groovy text-5xl sm:text-7xl text-vin leading-none">{p.last_name}</h1>
           {p.team && (
             <Link href={`/clubs/${p.team.slug}`} className="mt-4 inline-flex items-center gap-2 font-semibold hover:underline underline-offset-4">
+              {(p as { in_squad?: boolean }).in_squad === false && <span className="text-sourdine font-normal">Ancien joueur de</span>}
               <TeamBadge team={p.team} size="sm" />
               {p.team.name}
-              {p.number != null && <span className="text-sourdine font-normal">, n° {p.number}</span>}
+              {p.number != null && (p as { in_squad?: boolean }).in_squad !== false && <span className="text-sourdine font-normal">, n° {p.number}</span>}
             </Link>
           )}
           <div className="mt-4"><FavoriteButton kind="player" id={p.id} path={`/joueurs/${p.slug}`} /></div>
