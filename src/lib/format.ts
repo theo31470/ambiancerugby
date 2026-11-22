@@ -141,3 +141,15 @@ export function teamLabel(t: { short_name: string | null; name: string }) {
 export function isoFromNow(ms: number) {
   return new Date(Date.now() + ms).toISOString();
 }
+
+/** « 6 » → « Journée 6 », « Final » → « Finale », « 3rd place » → « Match pour la 3e place »… (tours en anglais d'API-Sports). */
+export function libelleTour(round: string): string {
+  const r = round.trim();
+  if (/^\d+$/.test(r)) return `Journée ${r}`;
+  const pref = r.match(/^(.*?)\s+-\s+(.*)$/);
+  if (pref) return `${pref[1]}, ${libelleTour(pref[2]).replace(/^./, (c) => c.toLowerCase())}`;
+  const place = r.match(/^(\d+)(?:st|nd|rd|th) place$/i);
+  if (place) return `Match pour la ${place[1]}e place`;
+  const fr: Record<string, string> = { final: "Finale", "semi-finals": "Demi-finales", "quarter-finals": "Quarts de finale", "round of 16": "Huitièmes de finale" };
+  return fr[r.toLowerCase()] ?? r;
+}

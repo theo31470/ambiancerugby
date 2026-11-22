@@ -31,7 +31,7 @@ import Forme from "@/components/algo/Forme";
 import { getMatch } from "@/lib/queries";
 import { getForms, getRatings, pronostic } from "@/lib/algo";
 import { getViewer, publicClient } from "@/lib/supabase/server";
-import { STATUS_LABEL, fmtDay, fmtTime, isLive } from "@/lib/format";
+import { STATUS_LABEL, fmtDay, fmtTime, isLive, libelleTour } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -190,7 +190,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-sourdine">
           <Link href={`/competitions/${m.competition.slug}`} className="font-semibold text-vin underline underline-offset-4">{m.competition.name}</Link>
-          {m.round && <span>, journée {m.round}</span>}
+          {m.round && <span>, {libelleTour(m.round).replace(/^./, (c) => c.toLowerCase())}</span>}
         </p>
         <ActionsMatch titre={`${m.home.short_name ?? m.home.name} – ${m.away.short_name ?? m.away.name}`} coupEnvoi={m.kickoff_at} lieu={m.venue}
           aVenir={new Date(m.kickoff_at) > new Date()} competition={{ nom: m.competition.name, href: `/competitions/${m.competition.slug}` }} />

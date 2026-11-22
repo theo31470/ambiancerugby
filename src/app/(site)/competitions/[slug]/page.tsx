@@ -7,7 +7,7 @@ import TeamBadge from "@/components/TeamBadge";
 import ArticleCard from "@/components/ArticleCard";
 import LiveRefresh from "@/components/LiveRefresh";
 import { getArticles, getCompetition, getCompetitionMatches, getCompetitionTeams, getSeasons, getStandings } from "@/lib/queries";
-import { fmtDay, isoFromNow } from "@/lib/format";
+import { fmtDay, isoFromNow, libelleTour } from "@/lib/format";
 import type { MatchFull } from "@/lib/types";
 import Simulateur from "@/components/simulateur/Simulateur";
 import { getRatings } from "@/lib/algo";
@@ -148,7 +148,7 @@ async function Calendrier({ compId, season, upcoming }: { compId: string; season
   // regroupement par journée (champ round) ou par date
   const groups = new Map<string, MatchFull[]>();
   for (const m of matches) {
-    const key = m.round ? `Journée ${m.round}` : fmtDay(m.kickoff_at);
+    const key = m.round ? libelleTour(m.round) : fmtDay(m.kickoff_at);
     groups.set(key, [...(groups.get(key) ?? []), m]);
   }
   return (
