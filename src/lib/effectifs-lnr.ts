@@ -133,6 +133,12 @@ async function appliquer(db: SupabaseClient, equipe: Equipe, joueurs: JoueurEffe
       if (memes.length === 1) p = memes[0];
     }
     if (!p) {
+      // ailleurs dans la base (joueur arrivé d'un autre club), seulement si un seul joueur colle
+      const { data: ailleurs } = await db.from("players").select(CHAMPS).ilike("last_name", j.nom).is("lnr_id", null).limit(5);
+      const memes = ((ailleurs ?? []) as Fiche[]).filter((x) => norm(x.first_name).slice(0, 1) === norm(j.prenom).slice(0, 1));
+      if (memes.length === 1) p = memes[0];
+    }
+    if (!p) {
       crees++;
       if (essai) continue;
       for (let n = 1; n < 6; n++) {
