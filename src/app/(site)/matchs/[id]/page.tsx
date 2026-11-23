@@ -68,6 +68,15 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     .order("created_at");
 
   const live = isLive(m.status);
+  // lieu du match pour Google (champ obligatoire) : stade connu, sinon stade ou ville du club qui reçoit
+  const { data: recevant } = await publicClient().from("teams").select("stadium,city,country").eq("id", m.home_team_id).maybeSingle();
+  const stadeVille = (m as { stade_ville?: string | null }).stade_ville ?? null;
+  const ville = stadeVille ?? recevant?.city ?? null;
+  const lieu = {
+    "@type": "Place",
+    name: m.venue ?? recevant?.stadium ?? (ville ? `Stade de ${ville}` : `Stade de ${m.home.name}`),
+    address: { "@type": "PostalAddress", ...(ville ? { addressLocality: ville } : {}), ...(recevant?.country ? { addressCountry: recevant.country } : {}), ...(!ville && !recevant?.country ? { name: m.home.name } : {}) },
+  };
   const { data: amb } = await publicClient().from("match_ambiance").select("team_id,cris").eq("match_id", m.id);
   const totauxTribune = { h: amb?.find((a) => a.team_id === m.home_team_id)?.cris ?? 0, a: amb?.find((a) => a.team_id === m.away_team_id)?.cris ?? 0 };
   const showScore = live || m.status === "finished";
@@ -175,11 +184,12 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           startDate: m.kickoff_at,
           eventStatus: m.status === "postponed" ? "https://schema.org/EventPostponed" : m.status === "cancelled" ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
           eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-          ...(m.venue ? { location: { "@type": "Place", name: m.venue } } : {}),
+          endDate: new Date(new Date(m.kickoff_at).getTime() + 2 * 3600e3).toISOString(),
+          location: lieu,
+          performer: [{ "@type": "SportsTeam", name: m.home.name }, { "@type": "SportsTeam", name: m.away.name }],
           homeTeam: { "@type": "SportsTeam", name: m.home.name, url: absolue(`/clubs/${m.home.slug}`) },
           awayTeam: { "@type": "SportsTeam", name: m.away.name, url: absolue(`/clubs/${m.away.slug}`) },
           competitor: [{ "@type": "SportsTeam", name: m.home.name }, { "@type": "SportsTeam", name: m.away.name }],
-          superEvent: { "@type": "SportsEvent", name: m.competition.name, url: absolue(`/competitions/${m.competition.slug}`) },
           organizer: ORGANISATION,
           image: absolue(`${canonique}/opengraph-image`),
           description: `${m.competition.name} : ${m.home.name} – ${m.away.name}${m.status === "finished" && m.home_score != null ? `, score final ${m.home_score}-${m.away_score}` : ""}.`,
