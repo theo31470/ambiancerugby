@@ -15,7 +15,8 @@ def grade(img,mix=.62):
 def head(slug):
     out=f'{G}/xv-{slug}.png'
     if not os.path.exists(out):
-        im=Image.open(f'{PORT}/{slug}.webp').convert('RGBA').crop((90,0,510,430)); im.save(out)
+        src=f'{G}/fr/{slug}.png' if os.path.exists(f'{G}/fr/{slug}.png') else f'{PORT}/{slug}.webp'
+        im=Image.open(src).convert('RGBA').crop((90,0,510,430)); im.save(out)
     return out
 def bigface(name):
     out=f'{G}/xv-big-{name}.png'; grade(Image.open(f'{L}/{name}.png'),.7).save(out); return out
