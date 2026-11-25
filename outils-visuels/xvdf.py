@@ -80,10 +80,15 @@ def compo(D,OUT):
       f'<div class="a" style="left:46px;top:74px"><span style="position:absolute;left:6px;top:-4px;font-family:Shrik;font-size:58px;color:{RED};transform:rotate(-7deg);text-shadow:0 0 18px rgba(0,0,0,.4),0 6px 14px rgba(0,0,0,.5);white-space:nowrap;z-index:2">La compo</span>'
       f'<div class="d" style="font-size:150px;padding-top:50px;color:#fff;text-shadow:3px 3px 0 #e9ecf5,6px 6px 0 {RED},9px 9px 0 #8e1530,12px 14px 18px rgba(0,0,0,.55),0 0 50px rgba(120,160,255,.35)">XV de France</div></div>'
       )
-    XV=''.join(player(int(n),s,nm,*POS[int(n)],cap=int(n)==cap) for n,(s,nm) in D['xv'].items())
+    nob=not D.get('banc')
+    def pos(n):
+        x,y=POS[n]
+        return (x,340+(y-338)*1.17+20) if nob else (x,y)
+    XV=''.join(player(int(n),s,nm,*pos(int(n)),size=(108 if nob else 100),cap=int(n)==cap) for n,(s,nm) in D['xv'].items())
     BENCH=(f'<div class="a" style="left:36px;right:36px;top:1104px;height:166px;background:linear-gradient(180deg,rgba(20,40,120,.75),rgba(6,14,50,.85));border-top:3px solid #fff;box-shadow:0 -6px 0 rgba(226,48,62,.9),0 24px 40px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.2)"></div>'
       f'<div class="a d" style="left:36px;top:1084px;font-size:24px;background:{RED};padding:6px 12px 3px">Sur le banc</div>'
       + ''.join(player(int(n),s,nm,100+i*126,1168,size=72,small=True) for i,(n,(s,nm)) in enumerate(D['banc'].items())))
+    if nob: BENCH=''
     FOOT=(f'<div class="a" style="left:52px;right:52px;top:1282px;height:46px;display:grid;grid-template-columns:1fr 70px 1fr;align-items:center">'
       f'<span class="d" style="font-size:28px">Dim. 29 nov.</span><img src="file://{R}/public/logo-blanc.png" style="height:44px;width:70px;object-fit:contain">'
       f'<span class="d" style="font-size:28px;text-align:right"><span style="color:{RED}">17h40</span> · Twickenham</span></div>')
