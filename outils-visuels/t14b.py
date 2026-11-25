@@ -83,13 +83,27 @@ BG=(f'<div class="a" style="inset:0;background:radial-gradient(70% 40% at 50% 0%
  + ''.join(f'<div class="a" style="left:0;right:0;top:{i}px;height:1px;background:rgba(255,255,255,.018)"></div>' for i in range(0,1350,4))
  + f'<div class="a d" style="right:-60px;top:150px;font-size:980px;color:transparent;-webkit-text-stroke:3px rgba(209,174,102,.16);letter-spacing:-.04em">{DATA["num"]}</div>'
  + DUST)
-title='Le programme' if MODE=='prog' else 'Les résultats'
+title={'prog':'Le programme','result':'Les résultats','ff':'Face-à-face','duel':''}[MODE]
 HDR=(f'<div class="a" style="left:0;right:0;top:46px;display:flex;justify-content:center;align-items:center;gap:18px">'
  f'<span style="height:1.5px;width:120px;background:linear-gradient(90deg,transparent,{GO})"></span><span class="d g" style="font-size:44px;letter-spacing:.08em">Top 14</span>'
  f'<span class="l" style="font-size:13px;color:{CRE}">{DATA["titre"]}</span><span style="height:1.5px;width:120px;background:linear-gradient(270deg,transparent,{GO})"></span></div>'
  f'<div class="a d g" style="left:0;right:0;top:84px;padding-top:28px;text-align:center;font-size:150px;letter-spacing:.005em">{title}</div>'
 )
 body=''
+CB={'lou':dict(a='#e0102f',b='#14080b',pat="repeating-linear-gradient(135deg,rgba(0,0,0,.55) 0 34px,transparent 34px 68px)"),
+    'st':dict(a='#b80d28',b='#0c0b0d',pat="repeating-linear-gradient(180deg,rgba(220,20,50,.55) 0 10px,transparent 10px 36px)",base='#141216'),
+    'asm':dict(a='#f7c600',b='#1d3a8f',pat="repeating-linear-gradient(180deg,rgba(18,40,120,.75) 0 26px,transparent 26px 92px)"),
+    'rct':dict(a='#d50c2f',b='#0b0b0b',pat="repeating-conic-gradient(from 0deg at 50% -10%,rgba(0,0,0,.45) 0 4deg,transparent 4deg 9deg)")}
+def clubbg(k,w,side):
+    d=CB[k]; a,b=d['a'],d['b']; base=d.get('base',a)
+    return (f'<div class="a" style="inset:0;background:linear-gradient(180deg,{base} 0%,{base} 30%,{b} 95%)"></div>'
+            f'<div class="a" style="inset:0;background:{d["pat"]};opacity:.9"></div>'
+            f'<div class="a" style="inset:0;background:radial-gradient(70% 45% at 50% 30%,transparent 30%,rgba(0,0,0,.55) 100%)"></div>'
+            # logo géant en relief (embossé)
+            f'<img class="a" src="file://{SP}/clubs/{k}.png" style="left:{w/2-400}px;top:90px;width:800px;height:800px;object-fit:contain;opacity:.28;mix-blend-mode:luminosity;'
+            f'filter:grayscale(.3) contrast(1.2) drop-shadow(-4px -4px 0 rgba(255,255,255,.35)) drop-shadow(8px 10px 0 rgba(0,0,0,.6)) drop-shadow(0 0 40px rgba(0,0,0,.5));transform:rotate({-6 if side=="l" else 6}deg)">'
+            f'<div class="a" style="left:{w/2-360}px;top:-260px;width:720px;height:900px;background:radial-gradient(closest-side,rgba(255,245,225,.42),rgba(255,245,225,.10) 50%,transparent);mix-blend-mode:screen"></div>'
+            f'<div class="a" style="left:{w/2-30}px;top:-40px;width:60px;height:760px;background:linear-gradient(rgba(255,250,235,.25),transparent);filter:blur(18px);transform:rotate({8 if side=="l" else -8}deg);mix-blend-mode:screen"></div>')
 if MODE=='prog':
     J=DATA['jours']; sat,sun=J[0]['matchs'],J[1]['matchs']
     body+=label(304,'En ouverture','Samedi 28 novembre')+row(354,104,sat[0],'14h30')
@@ -98,6 +112,78 @@ if MODE=='prog':
     body+=label(842,'Les affiches','Prime time')
     body+=affiche(56,892,474,330,sat[5],'Samedi soir','21h00')+affiche(550,892,474,330,sun[0],'Dimanche soir','21h05')
     end=1222
+elif MODE=='duel':
+    A,B=DATA['a'],DATA['b']
+    def half(T,side):
+        k=T['k']; c1,c2=C[k][2],C[k][3]; x0=0 if side=='l' else 545; w=535
+        rk=T['rang']; num=rk.rstrip('erE'); suf=rk[len(num):]
+        dots=''.join(f'<span style="display:inline-block;width:40px;height:40px;border-radius:50%;margin:0 6px;background:radial-gradient(circle at 35% 30%,{"#7dffa8,#1fbf5a" if r=="V" else "#ff8a94,#d9253a"});box-shadow:0 0 14px {"rgba(40,220,110,.6)" if r=="V" else "rgba(240,50,70,.6)"},0 4px 8px rgba(0,0,0,.6)"></span>' for r in T['forme'])
+        return (f'<div class="a" style="left:{x0}px;top:0;width:{w}px;height:1350px;overflow:hidden">'
+                + f'<img class="a" src="file:///home/claude/gfx/decor-{k}.png" style="left:0;top:0;width:{w}px;height:1350px">' +
+                f'<img class="a" src="file:///home/claude/gfx/up-{T["joueur"]}-cr.png" style="left:{w/2-400}px;top:150px;width:800px;height:1000px;object-fit:contain;object-position:50% 0;image-rendering:auto;filter:drop-shadow(0 0 3px rgba(0,0,0,.7)) drop-shadow(0 0 28px rgba(0,0,0,.85)) drop-shadow(0 0 60px rgba(0,0,0,.6)) drop-shadow(0 0 2px rgba(255,240,200,.35))">'
+                f'<div class="a" style="left:0;right:0;bottom:0;height:640px;background:linear-gradient(transparent,rgba(10,9,7,.55) 30%,rgba(10,9,7,.94) 70%,#0a0907)"></div>'
+                f'<div class="a" style="left:0;right:0;top:770px;display:flex;justify-content:center">{badge(k,150)}</div>'
+                f'<div class="a l" style="left:0;right:0;top:944px;text-align:center;font-size:13px;color:{CRE}">{T["nom"]}</div>'
+                f'<div class="a" style="left:0;right:0;top:978px;display:flex;justify-content:center;align-items:flex-end;gap:26px">'
+                f'<div style="display:flex;align-items:flex-start"><span class="d g" style="font-size:190px">{num}</span><span class="d g" style="font-size:78px;margin-top:8px">{suf}</span></div>'
+                f'<div style="display:flex;flex-direction:column;align-items:flex-start;padding-bottom:14px"><span class="d g" style="font-size:84px">{T["pts"]}</span><span class="l" style="font-size:13px;color:{CRE};margin-top:6px">points</span></div></div>'
+                f'<div class="a" style="left:0;right:0;top:1210px;text-align:center">{dots}</div></div>')
+    body+=half(A,'l')+half(B,'r')
+    body+=(f'<div class="a" style="left:535px;top:0;width:10px;height:1350px;background:linear-gradient({GOL},{GO} 40%,{GOD});box-shadow:0 0 24px rgba(209,174,102,.6)"></div>'
+           f'<div class="a" style="left:0;right:0;top:34px;display:flex;justify-content:center"><div style="display:flex;align-items:center;gap:14px;background:rgba(10,9,7,.82);border:1.5px solid {GO};padding:10px 22px 8px;box-shadow:0 10px 24px rgba(0,0,0,.6)">'
+           f'<span class="d g" style="font-size:34px;letter-spacing:.06em">Top 14</span><span class="l" style="font-size:12px;color:{CRE}">{DATA["quand"]}</span></div></div>'
+           f'<div class="a" style="left:490px;top:560px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2a2418,#0a0907);box-shadow:0 0 0 3px {GO},0 0 34px rgba(209,174,102,.6),0 12px 22px rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center"><span class="d g" style="font-size:50px;padding-top:4px">vs</span></div>'
+           )
+    end=1262
+elif MODE=='ff':
+    A,B=DATA['a'],DATA['b']; ka,kb=A['k'],B['k']
+    body+=f'<div class="a l" style="left:0;right:0;top:262px;text-align:center;font-size:14px;color:{CRE}">{DATA["quand"]}</div>'
+    # héros
+    x,y,w,h=56,304,968,330; ca,cb=C[ka][2],C[kb][2]
+    def side(k,al,T):
+        n=C[k][0]
+        return (f'<div class="a" style="{al}:0;top:0;width:50%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">'
+                f'{badge(k,170)}<span class="d" style="font-size:50px;color:#fff;text-shadow:0 4px 14px rgba(0,0,0,.7)">{n}</span>'
+                f'<span class="l" style="font-size:13px;color:{CRE};background:rgba(0,0,0,.45);border:1px solid {GO};padding:6px 12px">{T["rang"]} · {T["pts"]} pts</span></div>')
+    body+=(f'<div class="card" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px;box-shadow:0 30px 50px -12px rgba(0,0,0,.95),0 0 40px rgba(209,174,102,.25),inset 0 0 0 2.5px {GO}">'
+           f'<div class="a" style="left:0;top:0;width:{w}px;height:{h}px;clip-path:polygon(0 0,54% 0,46% 100%,0 100%);background:linear-gradient(160deg,{ca},#0a0907 80%);opacity:.6"></div>'
+           f'<div class="a" style="left:0;top:0;width:{w}px;height:{h}px;clip-path:polygon(54% 0,100% 0,100% 100%,46% 100%);background:linear-gradient(200deg,{cb},#0a0907 80%);opacity:.6"></div>'
+           f'{fx(ka,"l",w*.25,h*.4,w,h,1.3)}{fx(kb,"r",w*.75,h*.4,w,h,1.3)}'
+           f'<div class="a" style="left:0;top:0;width:{w}px;height:{h}px;clip-path:polygon(53.6% 0,54.4% 0,46.4% 100%,45.6% 100%);background:linear-gradient({GOL},{GO},{GOD})"></div>'
+           f'{side(ka,"left",A)}{side(kb,"right",B)}'
+           f'<div class="a" style="left:50%;top:50%;transform:translate(-50%,-50%);width:96px;height:96px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2a2418,#0a0907);box-shadow:0 0 0 2.5px {GO},0 0 30px rgba(209,174,102,.5),0 10px 20px rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center"><span class="d g" style="font-size:48px;padding-top:4px">vs</span></div></div>')
+    # stats
+    body+=label(662,'Les chiffres','Top 14 · saison 2026-2027')
+    rows=[('Classement',A['rang_n'],B['rang_n'],False,lambda v:f"{v}e" if v>1 else "1er"),('Points',A['pts'],B['pts'],True,str),('Victoires',A['v'],B['v'],True,str),
+          ('Points marqués',A['pm'],B['pm'],True,str),('Points encaissés',A['pe'],B['pe'],False,str),('Bonus',A['bonus'],B['bonus'],True,str)]
+    yy=712
+    for lab,va,vb,hi,fmt in rows:
+        mx=max(va,vb) or 1; best_a=(va>vb) if hi else (va<vb); best_b=(vb>va) if hi else (vb<va)
+        ra=(va/mx) if hi else (min(va,vb)/va if va else 1); rb=(vb/mx) if hi else (min(va,vb)/vb if vb else 1)
+        if lab=='Classement': ra,rb=(14-va+1)/14,(14-vb+1)/14
+        W2=250
+        def bar(r,best,side):
+            c=f'linear-gradient({"90deg" if side=="r" else "270deg"},{GOD},{GO},{GOL})' if best else 'linear-gradient(90deg,#3a352c,#55503f)'
+            pos=f'left:{540+100}px' if side=='r' else f'right:{540+100}px'
+            return f'<div class="a" style="{pos};top:{yy+14}px;width:{max(10,W2*r):.0f}px;height:18px;background:{c};border-radius:2px;box-shadow:{"0 0 14px rgba(209,174,102,.45)" if best else "none"}"></div>'
+        body+=(bar(ra,best_a,'l')+bar(rb,best_b,'r')
+               +f'<div class="a l" style="left:0;right:0;top:{yy+16}px;text-align:center;font-size:10px;letter-spacing:.2em;color:{CRE};opacity:.85">{lab}</div>'
+               +f'<div class="a d{" g" if best_a else ""}" style="left:56px;top:{yy+4}px;font-size:40px;{"" if best_a else "color:"+("#fff" if va==vb else "rgba(244,233,220,.55)")}">{fmt(va)}</div>'
+               +f'<div class="a d{" g" if best_b else ""}" style="right:56px;top:{yy+4}px;font-size:40px;text-align:right;{"" if best_b else "color:"+("#fff" if va==vb else "rgba(244,233,220,.55)")}">{fmt(vb)}</div>')
+        yy+=52
+    # forme + confrontations
+    body+=label(1030,'La forme','5 derniers matchs')
+    def pills(f,x0,y0):
+        return ''.join(f'<div class="a d" style="left:{x0+i*46}px;top:{y0}px;width:38px;height:38px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:22px;padding-top:3px;{"background:linear-gradient("+GOL+","+GO+","+GOD+");color:#14100a" if c=="V" else "background:#2a2620;color:rgba(244,233,220,.6);box-shadow:inset 0 0 0 1px rgba(244,233,220,.2)"}">{c}</div>' for i,c in enumerate(f))
+    body+=(f'<div class="a" style="left:56px;top:1080px;display:flex;align-items:center;gap:10px">{badge(ka,40)}</div>'+pills(A['forme'],110,1081)
+           +f'<div class="a" style="left:56px;top:1130px;display:flex;align-items:center;gap:10px">{badge(kb,40)}</div>'+pills(B['forme'],110,1131))
+    H=DATA['h2h']
+    body+=(f'<div class="card" style="left:376px;top:1074px;width:648px;height:106px;padding:14px 22px">'
+           f'<div class="l" style="font-size:12px;color:{GO}">{H["titre"]}</div>'
+           f'<div style="display:flex;align-items:baseline;gap:18px;margin-top:10px"><span class="d g" style="font-size:52px">{H["a"]}</span><span class="d" style="font-size:22px;color:{CRE}">{C[ka][0]}</span>'
+           f'<span class="d" style="font-size:22px;color:rgba(244,233,220,.6)">{"· "+str(H["n"])+" nul ·" if H["n"] else "–"}</span><span class="d" style="font-size:22px;color:{CRE}">{C[kb][0]}</span><span class="d g" style="font-size:52px">{H["b"]}</span></div></div>'
+           f'<div class="a l" style="left:376px;right:56px;top:1196px;font-size:12px;color:{CRE};opacity:.9;line-height:1.6;letter-spacing:.12em;text-transform:none;font-weight:600">{H["note"]}</div>')
+    end=1240
 else:
     y=304
     for j in DATA['jours']:
@@ -105,9 +191,9 @@ else:
         for m in j['matchs']: body+=row(y,108,m,score=True); y+=120
         y+=8
     end=y
-FOOT=f'<img class="a" src="file://{R}/public/logo-blanc.png" style="left:50%;top:{max(end+18,1262)}px;height:52px;transform:translateX(-50%);opacity:.95">'
+FOOT=(f'<img class="a" src="file://{R}/public/logo-blanc.png" style="left:50%;top:{max(end+18,1262)}px;height:52px;transform:translateX(-50%);opacity:.95">' if MODE!='duel' else f'<img class="a" src="file://{R}/public/logo-blanc.png" style="left:50%;top:1262px;height:58px;transform:translateX(-50%);filter:drop-shadow(0 0 10px rgba(0,0,0,.9)) drop-shadow(0 0 22px rgba(0,0,0,.8))">')
 VIG='<div class="a" style="inset:0;background:radial-gradient(130% 100% at 50% 40%,transparent 60%,rgba(0,0,0,.6));pointer-events:none"></div>'
-PAGE=f'<div class="p">{BG}{VIG}{HDR}{body}{FOOT}</div>'
+PAGE=f'<div class="p">{BG}{VIG}{"" if MODE=="duel" else HDR}{body}{FOOT}</div>'
 from PIL import ImageFilter
 RAMP=np.array([(24,14,4),(92,60,20),(168,126,58),(209,174,102),(240,214,150),(255,246,214)],np.float32)
 def ramp(t):
@@ -160,7 +246,6 @@ def gold(base,mask):
                         +.8*np.exp(-(dx**2+dy**2)/(2*(9*sz)**2))+.25*np.exp(-(dx**2+dy**2)/(2*(28*sz)**2)))
             # traînée anamorphique sur le titre
             ty=int(np.median(cand[:,0]))+60
-            fl+=.30*np.exp(-((yy-ty)/3.0)**2)*np.exp(-((xx-W_*.62)/(W_*.33))**2)
             out=255-(255-out)*(1-np.clip(fl,0,1)[...,None]*np.array([1,.96,.84],np.float32))
     out+=rng.normal(0,4.5,out.shape[:2])[...,None]
     return Image.fromarray(out.clip(0,255).astype(np.uint8))
