@@ -90,6 +90,7 @@ HDR=(f'<div class="a" style="left:0;right:0;top:46px;display:flex;justify-conten
  f'<div class="a d g" style="left:0;right:0;top:84px;padding-top:28px;text-align:center;font-size:150px;letter-spacing:.005em">{title}</div>'
 )
 body=''
+DEEP={'lou':'112,12,40','st':'92,10,30','asm':'22,50,140','rct':'118,10,36'}
 CB={'lou':dict(a='#e0102f',b='#14080b',pat="repeating-linear-gradient(135deg,rgba(0,0,0,.55) 0 34px,transparent 34px 68px)"),
     'st':dict(a='#b80d28',b='#0c0b0d',pat="repeating-linear-gradient(180deg,rgba(220,20,50,.55) 0 10px,transparent 10px 36px)",base='#141216'),
     'asm':dict(a='#f7c600',b='#1d3a8f',pat="repeating-linear-gradient(180deg,rgba(18,40,120,.75) 0 26px,transparent 26px 92px)"),
@@ -120,22 +121,22 @@ elif MODE=='forces':
         for j,(val,lab,rk) in enumerate(T['forces']):
             y=470+j*262
             top1=rk.lower().startswith('1')
-            cards+=(f'<div class="a" style="left:40px;width:{w-80}px;top:{y}px;height:230px;border-radius:8px;background:linear-gradient(180deg,rgba(20,17,12,.78),rgba(8,7,5,.9));'
+            cards+=(f'<div class="a" style="left:40px;width:{w-80}px;top:{y}px;height:230px;border-radius:8px;background:linear-gradient(180deg,rgba({DEEP[k]},.72),rgba({DEEP[k]},.9));backdrop-filter:blur(6px);'
                     f'box-shadow:0 26px 40px -12px rgba(0,0,0,.9),inset 0 0 0 1.5px rgba(209,174,102,{.9 if top1 else .45}),inset 0 1px 0 rgba(255,240,200,.3){",0 0 34px rgba(209,174,102,.35)" if top1 else ""}">'
                     f'<div class="a" style="left:0;right:0;top:26px;text-align:center"><span class="d g" style="font-size:{118 if len(val)<5 else 100}px">{val}</span></div>'
                     f'<div class="a l" style="left:16px;right:16px;top:152px;text-align:center;font-size:12px;letter-spacing:.18em;color:{CRE}">{lab}</div>'
-                    f'<div class="a" style="left:50%;top:184px;transform:translateX(-50%);white-space:nowrap;padding:6px 14px 4px;{"background:linear-gradient(90deg,"+GOD+","+GOL+" 50%,"+GOD+");color:#14100a" if top1 else "background:rgba(0,0,0,.5);color:"+GOL+";box-shadow:inset 0 0 0 1px "+GO}">'
+                    f'<div class="a" style="left:50%;top:184px;transform:translateX(-50%);white-space:nowrap;padding:6px 14px 4px;{"background:linear-gradient(90deg,"+GOD+","+GOL+" 50%,"+GOD+");color:#14100a" if top1 else "background:rgba("+DEEP[k]+",.85);color:"+GOL+";box-shadow:inset 0 0 0 1px "+GO}">'
                     f'<span class="d" style="font-size:22px;letter-spacing:.06em">{rk}</span></div></div>')
         return (f'<div class="a" style="left:{x0}px;top:0;width:{w}px;height:1350px;overflow:hidden">'
                 f'<img class="a" src="file:///home/claude/gfx/decor-{k}.png" style="left:0;top:0;width:{w}px;height:1350px">'
-                f'<div class="a" style="inset:0;background:linear-gradient(rgba(0,0,0,.15),rgba(0,0,0,.55) 40%,rgba(0,0,0,.8))"></div>'
-                f'<div class="a" style="left:0;right:0;top:190px;display:flex;flex-direction:column;align-items:center;gap:12px">{badge(k,150)}'
+                f'<div class="a" style="inset:0;background:linear-gradient(rgba({DEEP[k]},0),rgba({DEEP[k]},.35) 40%,rgba({DEEP[k]},.6))"></div>'
+                f'<div class="a" style="left:0;right:0;top:210px;display:flex;flex-direction:column;align-items:center;gap:10px">{badge(k,140)}'
                 f'<span class="d" style="font-size:46px;color:#fff;text-shadow:0 4px 14px rgba(0,0,0,.8)">{C[k][0]}</span></div>{cards}</div>')
     body+=col(A,'l')+col(B,'r')
     body+=(f'<div class="a" style="left:535px;top:0;width:10px;height:1350px;background:linear-gradient({GOL},{GO} 40%,{GOD});box-shadow:0 0 24px rgba(209,174,102,.6)"></div>'
-           f'<div class="a" style="left:0;right:0;top:34px;display:flex;justify-content:center"><div style="display:flex;align-items:center;gap:14px;background:rgba(10,9,7,.88);border:1.5px solid {GO};padding:10px 22px 8px;box-shadow:0 10px 24px rgba(0,0,0,.6)">'
+           f'<div class="a" style="left:0;right:0;top:34px;display:flex;justify-content:center"><div style="display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,rgba(120,10,30,.75),rgba(40,30,15,.75));backdrop-filter:blur(8px);border:1.5px solid {GO};padding:10px 22px 8px;box-shadow:0 10px 24px rgba(0,0,0,.6)">'
            f'<span class="d g" style="font-size:34px;letter-spacing:.06em">Top 14</span><span class="l" style="font-size:12px;color:{CRE}">{DATA["quand"]}</span></div></div>'
-           f'<div class="a" style="left:0;right:0;top:98px;text-align:center"><span class="d g" style="font-size:78px;padding:0 30px;background:radial-gradient(closest-side,rgba(10,9,7,.85),transparent)">Les points forts</span></div>'
+           f'<div class="a" style="left:0;right:0;top:96px;display:flex;justify-content:center"><div style="padding:12px 34px 4px;background:linear-gradient(90deg,rgba(110,10,30,.85),rgba(60,12,20,.85));backdrop-filter:blur(8px);border:2px solid {GO};box-shadow:0 14px 30px rgba(40,0,10,.5),0 0 30px rgba(209,174,102,.35)"><span class="d g" style="font-size:72px">Les points forts</span></div></div>'
            f'<div class="a l" style="left:0;right:0;top:1300px;text-align:center;font-size:11px;color:{CRE};opacity:.75">Moyenne par match · classement parmi les 14 clubs · saison 2026-2027</div>')
     end=1262
 elif MODE=='duel':
@@ -147,7 +148,7 @@ elif MODE=='duel':
         return (f'<div class="a" style="left:{x0}px;top:0;width:{w}px;height:1350px;overflow:hidden">'
                 + f'<img class="a" src="file:///home/claude/gfx/decor-{k}.png" style="left:0;top:0;width:{w}px;height:1350px">' +
                 f'<img class="a" src="file:///home/claude/gfx/up-{T["joueur"]}-cr.png" style="left:{w/2-400}px;top:150px;width:800px;height:1000px;object-fit:contain;object-position:50% 0;image-rendering:auto;filter:drop-shadow(0 0 3px rgba(0,0,0,.7)) drop-shadow(0 0 28px rgba(0,0,0,.85)) drop-shadow(0 0 60px rgba(0,0,0,.6)) drop-shadow(0 0 2px rgba(255,240,200,.35))">'
-                f'<div class="a" style="left:0;right:0;bottom:0;height:640px;background:linear-gradient(transparent,rgba(10,9,7,.55) 30%,rgba(10,9,7,.94) 70%,#0a0907)"></div>'
+                f'<div class="a" style="left:0;right:0;bottom:0;height:640px;background:linear-gradient(transparent,rgba({DEEP[k]},.55) 30%,rgba({DEEP[k]},.92) 70%,rgb({DEEP[k]}))"></div>'
                 f'<div class="a" style="left:0;right:0;top:770px;display:flex;justify-content:center">{badge(k,150)}</div>'
                 f'<div class="a l" style="left:0;right:0;top:944px;text-align:center;font-size:13px;color:{CRE}">{T["nom"]}</div>'
                 f'<div class="a" style="left:0;right:0;top:978px;display:flex;justify-content:center;align-items:flex-end;gap:26px">'
@@ -156,9 +157,9 @@ elif MODE=='duel':
                 f'<div class="a" style="left:0;right:0;top:1210px;text-align:center">{dots}</div></div>')
     body+=half(A,'l')+half(B,'r')
     body+=(f'<div class="a" style="left:535px;top:0;width:10px;height:1350px;background:linear-gradient({GOL},{GO} 40%,{GOD});box-shadow:0 0 24px rgba(209,174,102,.6)"></div>'
-           f'<div class="a" style="left:0;right:0;top:34px;display:flex;justify-content:center"><div style="display:flex;align-items:center;gap:14px;background:rgba(10,9,7,.82);border:1.5px solid {GO};padding:10px 22px 8px;box-shadow:0 10px 24px rgba(0,0,0,.6)">'
+           f'<div class="a" style="left:0;right:0;top:34px;display:flex;justify-content:center"><div style="display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,rgba(120,10,30,.75),rgba(40,30,15,.75));backdrop-filter:blur(8px);border:1.5px solid {GO};padding:10px 22px 8px;box-shadow:0 10px 24px rgba(0,0,0,.6)">'
            f'<span class="d g" style="font-size:34px;letter-spacing:.06em">Top 14</span><span class="l" style="font-size:12px;color:{CRE}">{DATA["quand"]}</span></div></div>'
-           f'<div class="a" style="left:490px;top:560px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2a2418,#0a0907);box-shadow:0 0 0 3px {GO},0 0 34px rgba(209,174,102,.6),0 12px 22px rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center"><span class="d g" style="font-size:50px;padding-top:4px">vs</span></div>'
+           f'<div class="a" style="left:490px;top:560px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#7a1a2a,#3e0f19);box-shadow:0 0 0 3px {GO},0 0 34px rgba(209,174,102,.6),0 12px 22px rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center"><span class="d g" style="font-size:50px;padding-top:4px">vs</span></div>'
            )
     end=1262
 elif MODE=='ff':
