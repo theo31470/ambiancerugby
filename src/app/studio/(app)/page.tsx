@@ -6,6 +6,9 @@ import { MATCH_SELECT } from "@/lib/queries";
 import { fmtRelative, isoFromNow } from "@/lib/format";
 import { deleteComment } from "@/app/actions";
 import { shopDb } from "@/lib/shop/admin";
+import Notice from "@/components/admin/Notice";
+import { modeNoel, noelActif, MODES_NOEL, type ModeNoel } from "@/lib/noel";
+import { setModeNoel } from "./actions";
 import MatchRow from "@/components/MatchRow";
 import type { MatchFull } from "@/lib/types";
 
@@ -13,7 +16,8 @@ const QUOTA_JOUR = 7500; // API-Sports PRO
 /** Synchro de plus de 36 h : compétition en retard. */
 const vieux = (iso: string | null) => !iso || Date.now() - new Date(iso).getTime() > 36 * 3600e3;
 
-export default async function AdminHome() {
+export default async function AdminHome({ searchParams }: PageProps<"/studio">) {
+  const sp = await searchParams;
   const db = await createClient();
   const count = async (t: string, f?: (q: any) => any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     let q = db.from(t).select("*", { count: "exact", head: true });
@@ -58,6 +62,7 @@ export default async function AdminHome() {
     sdb.from("email_log").select("id", { count: "exact", head: true }).not("error", "is", null).gte("created_at", isoFromNow(-7 * 86400e3)),
     viewer?.role === "admin" ? sdb.rpc("studio_taches") : Promise.resolve({ data: [] }),
   ]);
+  const [mode, noel] = await Promise.all([modeNoel(), noelActif()]);
   const tachesEnEchec = ((taches ?? []) as { actif: boolean; statut: string | null }[]).filter((x) => x.actif && x.statut === "failed").length;
   const alertes = [
     { n: commandesATraiter ?? 0, titre: "commande{s} à traiter", detail: "Payées ou en problème", href: "/studio/boutique?statut=a-traiter" },
@@ -103,6 +108,7 @@ export default async function AdminHome() {
           <Link href="/studio/articles/nouveau" className="bouton-discret">Écrire un article</Link>
         </>} />
 
+      <Notice sp={sp} />
       <section aria-labelledby="h-afaire">
         <h2 id="h-afaire" className="text-xl font-bold mb-3">À faire</h2>
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -147,7 +153,7 @@ export default async function AdminHome() {
 
       <dl className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {kpis.map((k) => (
-          <Link key={k.label} href={k.href} className="bg-surface border border-trait rounded-2xl p-4 hover:border-vin carte-vie">
+          <Link key={k.label} href={k.href} data-neige={noel ? "" : undefined} className="bg-surface border border-trait rounded-2xl p-4 hover:border-vin carte-vie">
             <dt className="text-sm text-sourdine">{k.label}</dt>
             <dd className="titre text-3xl font-extrabold tnum">{k.value}</dd>
             <dd className="text-xs text-sourdine">{k.sub}</dd>
@@ -176,6 +182,28 @@ export default async function AdminHome() {
           <Link href="/studio/donnees" className="mt-4 inline-block text-sm underline underline-offset-4 text-white/80">Synchronisations et effectifs</Link>
         </section>
       </div>
+
+      <section id="noel" aria-labelledby="h-noel" data-neige={noel ? "" : undefined} className={`scroll-mt-24 rounded-2xl p-5 flex flex-wrap items-center gap-x-6 gap-y-4 ${noel ? "bg-[#2f6b45] text-white" : "bg-surface border border-trait"}`}>
+        <svg width="34" height="52" viewBox="-2 -4 44 76" aria-hidden className="shrink-0">
+          <path d="M20 2 L34 22 H26 L38 40 H28 L42 62 H-2 L12 40 H2 L14 22 H6Z" fill={noel ? "#fff" : "#2f6b45"} /><rect x="17" y="62" width="6" height="8" fill="#f2b53a" /><circle cx="20" cy="2" r="3.2" fill="#f2b53a" /><circle cx="14" cy="30" r="2.4" fill="#c0392b" /><circle cx="26" cy="46" r="2.4" fill="#f2b53a" />
+        </svg>
+        <div className="min-w-0 flex-1">
+          <h2 id="h-noel" className="groovy text-2xl">Mode Noël</h2>
+          <p className={`text-sm mt-0.5 ${noel ? "text-white/85" : "text-sourdine"}`}>
+            {noel ? "Le décor est visible sur le site : neige, bonshommes de neige, traîneau et clins d'œil." : "Le décor est éteint."}
+            {mode === "auto" && " En automatique, il s'allume du 1er décembre au 6 janvier."}
+          </p>
+        </div>
+        <form action={setModeNoel} className="flex flex-wrap gap-1.5" aria-label="Réglage du mode Noël">
+          <input type="hidden" name="_back" value="/studio" />
+          {(Object.keys(MODES_NOEL) as ModeNoel[]).map((m) => (
+            <button key={m} name="mode" value={m} aria-pressed={mode === m}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-semibold border transition-colors ${mode === m ? (noel ? "bg-white text-[#2f6b45] border-white" : "bg-vin text-white border-vin") : (noel ? "border-white/40 hover:bg-white/10" : "border-trait hover:border-vin")}`}>
+              {MODES_NOEL[m]}
+            </button>
+          ))}
+        </form>
+      </section>
 
       <section aria-labelledby="h-live">
         <h2 id="h-live" className="text-xl font-bold mb-3">En direct maintenant</h2>

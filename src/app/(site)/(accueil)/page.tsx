@@ -3,6 +3,8 @@ import { jsonLd, ORGANISATION, SITE } from "@/lib/seo";
 import Link from "next/link";
 import { urlMatch } from "@/lib/seo";
 import ArticleCard, { ArticleHero } from "@/components/ArticleCard";
+import { noelActif } from "@/lib/noel";
+import { BonhommeAssis, BonhommeCoucou } from "@/components/noel/Bonshommes";
 import MatchGroups from "@/components/MatchGroups";
 import StandingsTable from "@/components/StandingsTable";
 import LiveRefresh from "@/components/LiveRefresh";
@@ -123,6 +125,7 @@ export default async function Home() {
   const ratings = affiche ? await getRatings([affiche.home_team_id, affiche.away_team_id]) : new Map();
   const prono = affiche ? pronostic(ratings.get(affiche.home_team_id)?.rating, ratings.get(affiche.away_team_id)?.rating) : null;
   const [hero, ...others] = articles;
+  const noel = await noelActif();
   const isToday = upcoming.day === parisToday();
 
   return (
@@ -184,8 +187,10 @@ export default async function Home() {
 
           {/* le match à suivre */}
           <div className="relative z-10">
+            {/* Noël : un bonhomme de neige passe la tête derrière la carte et fait coucou */}
+            {noel && <div className="absolute right-10 -top-[58px] w-[70px] h-[58px] overflow-hidden" aria-hidden><BonhommeCoucou className="absolute left-0 top-0" /></div>}
             <div className="absolute -inset-3 rounded-[2rem] bg-vin rotate-2" aria-hidden />
-            <div className="relative rounded-[1.75rem] bg-surface text-encre p-6 sm:p-7 shadow-[0_14px_0_-6px_rgba(0,0,0,.25)]">
+            <div data-neige className="relative rounded-[1.75rem] bg-surface text-encre p-6 sm:p-7 shadow-[0_14px_0_-6px_rgba(0,0,0,.25)]">
               {affiche ? (
                 <Link href={urlMatch(affiche)} className="block group">
                   <p className="flex items-center justify-between text-sm">
@@ -235,7 +240,7 @@ export default async function Home() {
           <section aria-labelledby="h-alaune">
             <TitreSection id="h-alaune" lien="/actus" lienTexte="Toutes les actus">À la une</TitreSection>
             <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
-              <Reveal className="apparait"><ArticleHero a={hero} /></Reveal>
+              <Reveal className="apparait relative">{noel && <BonhommeAssis className="absolute right-6 -top-[58px] z-10" />}<ArticleHero a={hero} /></Reveal>
               <div className="grid gap-5 content-start">
                 {others.slice(0, 4).map((a) => <Reveal key={a.id} className="apparait"><ArticleCard a={a} /></Reveal>)}
               </div>

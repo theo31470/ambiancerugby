@@ -598,3 +598,46 @@ html[data-sens="glisse"]::view-transition-old(.page-sort), html[data-sens="gliss
 @media (prefers-reduced-motion: reduce) { .img-arrivee { animation: none; } }
 .hors-ligne { animation: invite-entree .35s cubic-bezier(.2,.9,.25,1) both; }
 @media (min-width: 1024px) { .hors-ligne { bottom: 1.5rem !important; } }
+
+/* ================= Mode Noël (décor saisonnier, piloté depuis le studio) ================= */
+.noel-neige i { position: absolute; top: -10px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 .5px rgba(147,79,94,.15), 0 1px 2px rgba(62,22,33,.13); animation: noel-tombe linear infinite; }
+@keyframes noel-tombe { to { transform: translate(var(--derive), calc(100vh + 20px)); } }
+.noel-neige-bloc i { animation-name: noel-tombe-bloc; }
+@keyframes noel-tombe-bloc { to { transform: translate(var(--derive), 110vh); } }
+.noel-couche { position: absolute; left: -3px; right: -3px; top: -11px; height: 24px; pointer-events: none; z-index: 3; filter: drop-shadow(0 1.5px 1.2px rgba(62,22,33,.12)); }
+.noel-couche svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.noel-traineau { transform: translateX(-320px); animation: noel-vol 46s linear infinite 6s; }
+@keyframes noel-vol { 0% { transform: translate(-320px, 24px) rotate(-3deg); } 16% { transform: translate(calc(100vw + 40px), -16px) rotate(-3deg); } 100% { transform: translate(calc(100vw + 40px), -16px); } }
+.noel-rebond { animation: noel-rebond .45s ease-in-out infinite alternate; }
+@keyframes noel-rebond { to { transform: translateY(-3px); } }
+.noel-coucou { animation: noel-coucou 9s ease-in-out infinite; }
+@keyframes noel-coucou { 0%, 68%, 100% { transform: translateY(72px); } 76%, 92% { transform: translateY(0); } }
+.noel-coucou .noel-bras { transform-box: view-box; transform-origin: 0 0; animation: noel-salut 9s ease-in-out infinite; }
+@keyframes noel-salut { 0%, 79%, 100% { transform: translate(16px, 18px) rotate(0); } 82%, 88% { transform: translate(16px, 18px) rotate(-38deg); } 85% { transform: translate(16px, 18px) rotate(-8deg); } }
+.noel-hoche { transform-box: fill-box; transform-origin: 50% 100%; animation: noel-hoche 4s ease-in-out infinite; }
+@keyframes noel-hoche { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-6deg); } }
+.noel-passe { offset-path: path('M58 52 Q150 -20 242 52'); animation: noel-passe 3.2s ease-in-out infinite alternate; }
+@keyframes noel-passe { 0%, 15% { offset-distance: 0%; } 85%, 100% { offset-distance: 100%; } }
+.noel-sapin .noel-etoile { transform-box: fill-box; transform-origin: center; animation: noel-scintille 2.6s ease-in-out infinite; }
+@keyframes noel-scintille { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.25) rotate(20deg); } }
+.noel-b1 { animation: noel-clignote 1.8s infinite; } .noel-b2 { animation: noel-clignote 1.8s .6s infinite; } .noel-b3 { animation: noel-clignote 1.8s 1.2s infinite; }
+@keyframes noel-clignote { 50% { opacity: .25; } }
+.noel-gigote { animation: noel-secoue 1.2s ease-in-out infinite 2s; }
+@keyframes noel-secoue { 20% { transform: rotate(-12deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-6deg); } 80% { transform: rotate(4deg); } }
+.noel-grelot { transform-origin: 50% 10%; }
+a:hover .noel-grelot, button:hover .noel-grelot { animation: noel-grelot .5s ease-in-out 2; }
+@keyframes noel-grelot { 25% { transform: rotate(18deg); } 75% { transform: rotate(-18deg); } }
+.noel-scene { background: var(--fond); }
+.noel-buteur .noel-jambe { transform-box: view-box; transform-origin: 12px 52px; }
+.noel-tir .noel-jambe { animation: noel-frappe .35s ease-out; }
+@keyframes noel-frappe { 40% { transform: rotate(-40deg); } }
+.noel-bulle { animation: noel-bulle .35s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes noel-bulle { from { opacity: 0; transform: translate(-100%, 6px) scale(.5); } }
+.noel-plouf { animation: noel-plouf .7s ease-out forwards; }
+@keyframes noel-plouf { 0% { transform: scale(.2); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+.ola-bonnet > * { animation: ola 2.8s ease-in-out infinite; animation-delay: calc(var(--i) * 0.09s); }
+@media (prefers-reduced-motion: reduce) {
+  .noel-neige, .noel-traineau { display: none; }
+  .noel-rebond, .noel-coucou, .noel-coucou .noel-bras, .noel-hoche, .noel-passe, .noel-sapin .noel-etoile, .noel-b1, .noel-b2, .noel-b3, .noel-gigote, .noel-grelot, .noel-tir .noel-jambe, .noel-bulle, .noel-plouf { animation: none !important; }
+  .noel-coucou { transform: translateY(20px); }
+}

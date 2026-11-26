@@ -13,10 +13,15 @@ import SousOnglets from "@/components/nav/SousOnglets";
 import { createClient, getViewer, hasBadge } from "@/lib/supabase/server";
 import { getTickerMatches } from "@/lib/queries";
 import type { Prefs } from "@/lib/membres";
+import { noelActif } from "@/lib/noel";
+import DefsNoel from "@/components/noel/DefsNoel";
+import NeigeTombe from "@/components/noel/NeigeTombe";
+import TracesNeige from "@/components/noel/TracesNeige";
+import Traineau from "@/components/noel/Traineau";
 
 /** Habillage du site public : bandeau des scores, menu, pied de page, célébrations en direct. */
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const [ticker, viewer] = await Promise.all([getTickerMatches(), getViewer()]);
+  const [ticker, viewer, noel] = await Promise.all([getTickerMatches(), getViewer(), noelActif()]);
   const prefs = (viewer?.prefs ?? {}) as Prefs;
   let nonLues = 0;
   if (viewer) {
@@ -27,6 +32,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const initiale = viewer ? (viewer.display_name ?? viewer.email ?? "?").slice(0, 1).toUpperCase() : null;
   return (
     <>
+      {noel && <><DefsNoel /><NeigeTombe /><Traineau /><TracesNeige /></>}
       <Lancement />
       <a href="#contenu" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:bg-surface focus:p-2">
         Aller au contenu

@@ -796,3 +796,18 @@ export async function saveParcours(form: FormData) {
     redirect(`/studio/joueurs/${playerId}?ok=enregistre#parcours`);
   });
 }
+
+/** Mode Noël : automatique (1er décembre → 6 janvier), forcé allumé ou éteint. Effet immédiat sur tout le site. */
+export async function setModeNoel(form: FormData) {
+  await run(form, async () => {
+    await staff();
+    const mode = String(form.get("mode"));
+    if (!["auto", "on", "off"].includes(mode)) throw new Error("Mode inconnu.");
+    const { shopDb } = await import("@/lib/shop/admin");
+    const { error } = await shopDb().from("app_state").upsert({ key: "mode_noel", value: mode });
+    fail(error, "le mode Noël");
+    revalidateTag("mode-noel", { expire: 0 });
+    revalidatePath("/", "layout");
+  });
+  redirect("/studio?ok=enregistre#noel");
+}

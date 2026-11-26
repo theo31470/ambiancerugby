@@ -6,6 +6,11 @@ import { isoFromNow } from "@/lib/format";
 import AdminNav from "@/components/admin/AdminNav";
 import RechercheRapide from "@/components/admin/RechercheRapide";
 import { quitterStudio } from "../(acces)/actions";
+import { noelActif } from "@/lib/noel";
+import DefsNoel from "@/components/noel/DefsNoel";
+import NeigeTombe from "@/components/noel/NeigeTombe";
+import TracesNeige from "@/components/noel/TracesNeige";
+import { BonhommeMenu } from "@/components/noel/Bonshommes";
 
 export const metadata: Metadata = { title: { default: "Studio", template: "%s · Studio Ambiance Rugby" }, robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -14,7 +19,7 @@ export const dynamic = "force-dynamic";
 const COMPS_SAISIE = ["top-14", "pro-d2"];
 
 export default async function AdminLayout({ children }: LayoutProps<"/studio">) {
-  const viewer = await getViewer();
+  const [viewer, noel] = await Promise.all([getViewer(), noelActif()]);
   if (!viewer) redirect("/studio/connexion");
   // seuls rédacteurs et administrateurs entrent (le code à 6 chiffres est vérifié avant, à chaque requête)
   if (viewer.role === "user") redirect("/studio/securite");
@@ -38,9 +43,11 @@ export default async function AdminLayout({ children }: LayoutProps<"/studio">) 
   const nav = <AdminNav brouillons={brouillons ?? 0} aSaisir={aSaisir} commentaires={commentaires ?? 0} aTraiter={aTraiter ?? 0} sav={sav ?? 0} emailsErreur={emailsErreur ?? 0} admin={viewer.role === "admin"} />;
   return (
     <div className="min-h-screen bg-teinte/40 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <aside className="bg-bordeaux text-white lg:h-screen lg:sticky lg:top-0 flex flex-col">
+      {noel && <><DefsNoel /><TracesNeige cibles="[data-neige]" /></>}
+      <aside className="bg-bordeaux text-white lg:h-screen lg:sticky lg:top-0 flex flex-col relative overflow-hidden">
+        {noel && <NeigeTombe nombre={16} className="absolute inset-0 z-0 noel-neige-bloc" />}
         <div className="flex items-center justify-between gap-3 px-4 lg:px-5 pt-4 lg:pt-6 pb-3">
-          <Link href="/studio" className="groovy text-3xl text-moutarde">Studio</Link>
+          <Link href="/studio" data-neige={noel ? "" : undefined} className="groovy text-3xl text-moutarde relative">Studio</Link>
           <a href="/" target="_blank" rel="noopener" className="text-xs font-semibold text-white/70 underline underline-offset-2">Voir le site ↗</a>
         </div>
         {/* sur mobile, la navigation se replie */}
@@ -48,7 +55,13 @@ export default async function AdminLayout({ children }: LayoutProps<"/studio">) 
           <summary className="cursor-pointer rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold">Menu du studio</summary>
           <div className="mt-3">{nav}</div>
         </details>
-        <div className="hidden lg:block flex-1 overflow-y-auto px-5 pb-6">{nav}</div>
+        <div className="hidden lg:block flex-1 overflow-y-auto px-5 pb-6 relative">{nav}</div>
+        {noel && (
+          <div className="hidden lg:block relative h-16 shrink-0" aria-hidden>
+            <svg className="absolute inset-x-0 bottom-0 w-full h-10" viewBox="0 0 240 40" preserveAspectRatio="none"><path d="M0 40V22 Q30 8 60 20 T120 18 T180 22 T240 16V40Z" fill="url(#noel-couche)" opacity=".95" /></svg>
+            <BonhommeMenu className="absolute right-5 bottom-1" />
+          </div>
+        )}
         <div className="hidden lg:flex items-center gap-3 border-t border-white/10 px-5 py-4">
           <span className="w-9 h-9 shrink-0 rounded-full bg-white/15 grid place-items-center font-bold">{(viewer.display_name ?? viewer.email ?? "?").slice(0, 1).toUpperCase()}</span>
           <div className="min-w-0 flex-1">

@@ -8,9 +8,12 @@ import MenuVestiaire from "./nav/MenuVestiaire";
 import SonStade from "./deco/SonStade";
 import BoutonPanier from "./shop/BoutonPanier";
 import { Ballon } from "./deco/Icones";
+import { noelActif } from "@/lib/noel";
+import LogoNeige from "./noel/LogoNeige";
+import Glacons from "./noel/Glacons";
 
 export default async function Header() {
-  const viewer = await getViewer();
+  const [viewer, noel] = await Promise.all([getViewer(), noelActif()]);
   const badge = hasBadge(viewer);
   let unread = 0;
   if (viewer) {
@@ -22,7 +25,10 @@ export default async function Header() {
     <EnteteCollant>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-3 xl:gap-5 h-14 lg:h-20 group-data-[reduit]:h-12 lg:group-data-[reduit]:h-14 transition-[height] duration-300">
         <Link href="/" className="shrink-0 logo-roulis relative z-[70]" aria-label="Ambiance Rugby, accueil">
-          <img src="/logo-blanc.png" alt="Ambiance Rugby" width={340} height={256} className="h-10 lg:h-16 group-data-[reduit]:h-9 lg:group-data-[reduit]:h-10 w-auto transition-[height] duration-300" />
+          <span className="relative block">
+            <img src="/logo-blanc.png" alt="Ambiance Rugby" width={340} height={256} className="h-10 lg:h-16 group-data-[reduit]:h-9 lg:group-data-[reduit]:h-10 w-auto transition-[height] duration-300" />
+            {noel && <LogoNeige />}
+          </span>
         </Link>
         <div className="hidden xl:block flex-1 min-w-0">
           <NavBureau />
@@ -31,7 +37,7 @@ export default async function Header() {
           <span className="hidden lg:block"><SonStade /></span>
           {viewer && !badge && (
             <Link href="/abonnement" className="hidden xl:inline-flex items-center gap-1.5 whitespace-nowrap pl-2 pr-3.5 py-1.5 rounded-full bg-moutarde text-bordeaux hover:brightness-105">
-              <Ballon className="w-6 text-bordeaux" />
+              {noel ? <svg className="noel-grelot w-5 h-5 text-bordeaux" viewBox="0 0 18 20" aria-hidden><use href="#noel-grelot" /></svg> : <Ballon className="w-6 text-bordeaux" />}
               <span className="2xl:hidden">Supporter</span>
               <span className="hidden 2xl:inline">Devenir Supporter</span>
             </Link>
@@ -54,6 +60,7 @@ export default async function Header() {
           <span className="hidden lg:block xl:hidden"><MenuVestiaire connecte={!!viewer} supporter={!!viewer?.supporter} /></span>
         </div>
       </div>
+      {noel && <Glacons className="absolute left-0 right-0 top-full w-full h-[22px]" />}
     </EnteteCollant>
   );
 }

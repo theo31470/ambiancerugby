@@ -5,12 +5,18 @@ import { Supporter } from "./deco/Icones";
 import TenteLeDrop from "./deco/TenteLeDrop";
 import BoutonInstaller from "./app/BoutonInstaller";
 import Reseaux from "./Reseaux";
+import { noelActif } from "@/lib/noel";
+import SceneNoel from "./noel/SceneNoel";
+import LogoNeige from "./noel/LogoNeige";
+import { Passeurs } from "./noel/Bonshommes";
 
 const TRIBUNE = ["#f2b53a", "#ffffff", "#c98595", "#f2b53a", "#f6e4e8", "#934f5e"];
 
-export default function Footer() {
+export default async function Footer() {
+  const noel = await noelActif();
   return (
     <footer className="mt-14 lg:mt-20">
+      {noel && <SceneNoel />}
       <Defile ton="or" incline={1.5} />
       <div className="bg-bordeaux text-white/80 -mt-3 pt-14 relative overflow-hidden">
         <div className="hidden lg:block"><TenteLeDrop /></div>
@@ -18,14 +24,22 @@ export default function Footer() {
         <div className="ola flex items-end justify-center gap-1 sm:gap-1.5 h-14 opacity-90 mt-6" aria-hidden>
           {Array.from({ length: 34 }, (_, i) => (
             <span key={i} style={{ ["--i" as string]: i }} className="block">
-              <Supporter className="w-4 sm:w-5 h-auto" couleur={TRIBUNE[(i * 7) % TRIBUNE.length]} />
+              {noel ? (
+                <span className="relative block">
+                  <svg className="absolute -top-[7px] left-[1px] w-[85%] h-auto" viewBox="0 -2 22 14" aria-hidden><path d="M2 11 Q6 -2 18 1 L20 11Z" fill="#c0392b" /><rect x="1" y="9" width="20" height="4" rx="2" fill="#fff" /><circle cx="19" cy="1" r="2.4" fill="#fff" /></svg>
+                  <Supporter className="w-4 sm:w-5 h-auto" couleur={TRIBUNE[(i * 7) % TRIBUNE.length]} />
+                </span>
+              ) : <Supporter className="w-4 sm:w-5 h-auto" couleur={TRIBUNE[(i * 7) % TRIBUNE.length]} />}
             </span>
           ))}
         </div>
         <div className="border-t border-white/10" />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 lg:py-12 grid gap-6 lg:gap-10 sm:grid-cols-2 lg:grid-cols-4 text-sm">
           <div>
-            <img src="/logo-blanc.png" alt="Ambiance Rugby" className="h-14 lg:h-20 w-auto" />
+            <span className="relative inline-block">
+              <img src="/logo-blanc.png" alt="Ambiance Rugby" className="h-14 lg:h-20 w-auto" />
+              {noel && <LogoNeige />}
+            </span>
             <p className="mt-3 max-w-xs">Le rugby côté tribune : scores en direct, Indice Ambiance, stats et actus.</p>
             <p className="text-white font-semibold mt-5 mb-2">Suis-nous</p>
             <Reseaux clair />
@@ -57,6 +71,12 @@ export default function Footer() {
             </p>
           </div>
         </div>
+        {noel && (
+          <div className="relative h-24 sm:h-28 -mt-6" aria-hidden>
+            <svg className="absolute inset-x-0 bottom-0 w-full h-12" viewBox="0 0 1280 48" preserveAspectRatio="none"><path d="M0 48V22 Q70 4 150 18 T300 14 T450 20 T600 10 T750 18 T900 12 T1050 20 T1280 14V48Z" fill="url(#noel-couche)" /></svg>
+            <Passeurs className="absolute left-1/2 -translate-x-1/2 bottom-3 w-[240px] sm:w-[300px] h-auto" />
+          </div>
+        )}
         <nav aria-label="Légal" className="border-t border-white/10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-white/60">
             <span>© Ambiance Rugby</span>
