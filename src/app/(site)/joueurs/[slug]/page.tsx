@@ -148,7 +148,7 @@ export default async function JoueurPage({ params, searchParams }: PageProps<"/j
           <h2 id="h-saison" className="groovy text-3xl text-vin">{vue === "carriere" ? "Carrière" : `Saison ${vue}`}</h2>
           <nav aria-label="Période" className="flex flex-wrap gap-1">
             {[...saisons.slice(0, 4), "carriere"].map((v) => (
-              <Link key={v} href={`/joueurs/${p.slug}?stats=${encodeURIComponent(v)}#h-saison`} scroll={false} aria-current={v === vue ? "page" : undefined}
+              <Link key={v} href={`/joueurs/${p.slug}?stats=${encodeURIComponent(v)}#h-saison`} scroll={false} rel="nofollow" aria-current={v === vue ? "page" : undefined}
                 className={`rounded-full px-3 py-1 text-sm font-semibold ${v === vue ? "bg-vin text-white" : "bg-teinte hover:bg-trait"}`}>
                 {v === "carriere" ? "Carrière" : v === saisons[0] ? `Cette saison (${v})` : v}
               </Link>
