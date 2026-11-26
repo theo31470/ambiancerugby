@@ -83,7 +83,7 @@ BG=(f'<div class="a" style="inset:0;background:radial-gradient(70% 40% at 50% 0%
  + ''.join(f'<div class="a" style="left:0;right:0;top:{i}px;height:1px;background:rgba(255,255,255,.018)"></div>' for i in range(0,1350,4))
  + f'<div class="a d" style="right:-60px;top:150px;font-size:980px;color:transparent;-webkit-text-stroke:3px rgba(209,174,102,.16);letter-spacing:-.04em">{DATA["num"]}</div>'
  + DUST)
-title={'prog':'Le programme','result':'Les résultats','ff':'Face-à-face','duel':''}[MODE]
+title={'prog':'Le programme','result':'Les résultats','ff':'Face-à-face','duel':'','forces':''}[MODE]
 HDR=(f'<div class="a" style="left:0;right:0;top:46px;display:flex;justify-content:center;align-items:center;gap:18px">'
  f'<span style="height:1.5px;width:120px;background:linear-gradient(90deg,transparent,{GO})"></span><span class="d g" style="font-size:44px;letter-spacing:.08em">Top 14</span>'
  f'<span class="l" style="font-size:13px;color:{CRE}">{DATA["titre"]}</span><span style="height:1.5px;width:120px;background:linear-gradient(270deg,transparent,{GO})"></span></div>'
@@ -112,6 +112,32 @@ if MODE=='prog':
     body+=label(842,'Les affiches','Prime time')
     body+=affiche(56,892,474,330,sat[5],'Samedi soir','21h00')+affiche(550,892,474,330,sun[0],'Dimanche soir','21h05')
     end=1222
+elif MODE=='forces':
+    A,B=DATA['a'],DATA['b']
+    def col(T,side):
+        k=T['k']; x0=0 if side=='l' else 545; w=535
+        cards=''
+        for j,(val,lab,rk) in enumerate(T['forces']):
+            y=470+j*262
+            top1=rk.lower().startswith('1')
+            cards+=(f'<div class="a" style="left:40px;width:{w-80}px;top:{y}px;height:230px;border-radius:8px;background:linear-gradient(180deg,rgba(20,17,12,.78),rgba(8,7,5,.9));'
+                    f'box-shadow:0 26px 40px -12px rgba(0,0,0,.9),inset 0 0 0 1.5px rgba(209,174,102,{.9 if top1 else .45}),inset 0 1px 0 rgba(255,240,200,.3){",0 0 34px rgba(209,174,102,.35)" if top1 else ""}">'
+                    f'<div class="a" style="left:0;right:0;top:26px;text-align:center"><span class="d g" style="font-size:{118 if len(val)<5 else 100}px">{val}</span></div>'
+                    f'<div class="a l" style="left:16px;right:16px;top:152px;text-align:center;font-size:12px;letter-spacing:.18em;color:{CRE}">{lab}</div>'
+                    f'<div class="a" style="left:50%;top:184px;transform:translateX(-50%);white-space:nowrap;padding:6px 14px 4px;{"background:linear-gradient(90deg,"+GOD+","+GOL+" 50%,"+GOD+");color:#14100a" if top1 else "background:rgba(0,0,0,.5);color:"+GOL+";box-shadow:inset 0 0 0 1px "+GO}">'
+                    f'<span class="d" style="font-size:22px;letter-spacing:.06em">{rk}</span></div></div>')
+        return (f'<div class="a" style="left:{x0}px;top:0;width:{w}px;height:1350px;overflow:hidden">'
+                f'<img class="a" src="file:///home/claude/gfx/decor-{k}.png" style="left:0;top:0;width:{w}px;height:1350px">'
+                f'<div class="a" style="inset:0;background:linear-gradient(rgba(0,0,0,.15),rgba(0,0,0,.55) 40%,rgba(0,0,0,.8))"></div>'
+                f'<div class="a" style="left:0;right:0;top:190px;display:flex;flex-direction:column;align-items:center;gap:12px">{badge(k,150)}'
+                f'<span class="d" style="font-size:46px;color:#fff;text-shadow:0 4px 14px rgba(0,0,0,.8)">{C[k][0]}</span></div>{cards}</div>')
+    body+=col(A,'l')+col(B,'r')
+    body+=(f'<div class="a" style="left:535px;top:0;width:10px;height:1350px;background:linear-gradient({GOL},{GO} 40%,{GOD});box-shadow:0 0 24px rgba(209,174,102,.6)"></div>'
+           f'<div class="a" style="left:0;right:0;top:34px;display:flex;justify-content:center"><div style="display:flex;align-items:center;gap:14px;background:rgba(10,9,7,.88);border:1.5px solid {GO};padding:10px 22px 8px;box-shadow:0 10px 24px rgba(0,0,0,.6)">'
+           f'<span class="d g" style="font-size:34px;letter-spacing:.06em">Top 14</span><span class="l" style="font-size:12px;color:{CRE}">{DATA["quand"]}</span></div></div>'
+           f'<div class="a" style="left:0;right:0;top:98px;text-align:center"><span class="d g" style="font-size:78px;padding:0 30px;background:radial-gradient(closest-side,rgba(10,9,7,.85),transparent)">Les points forts</span></div>'
+           f'<div class="a l" style="left:0;right:0;top:1300px;text-align:center;font-size:11px;color:{CRE};opacity:.75">Moyenne par match · classement parmi les 14 clubs · saison 2026-2027</div>')
+    end=1262
 elif MODE=='duel':
     A,B=DATA['a'],DATA['b']
     def half(T,side):
@@ -191,9 +217,9 @@ else:
         for m in j['matchs']: body+=row(y,108,m,score=True); y+=120
         y+=8
     end=y
-FOOT=(f'<img class="a" src="file://{R}/public/logo-blanc.png" style="left:50%;top:{max(end+18,1262)}px;height:52px;transform:translateX(-50%);opacity:.95">' if MODE!='duel' else f'<img class="a" src="file://{R}/public/logo-blanc.png" style="left:50%;top:1262px;height:58px;transform:translateX(-50%);filter:drop-shadow(0 0 10px rgba(0,0,0,.9)) drop-shadow(0 0 22px rgba(0,0,0,.8))">')
+FOOT=(f'<img class="a" src="file://{R}/public/logo-blanc.png" style="left:50%;top:{max(end+18,1262)}px;height:52px;transform:translateX(-50%);opacity:.95">' if MODE not in ('duel','forces') else f'<img class="a" src="file://{R}/public/logo-blanc.png" style="left:50%;top:{1262 if MODE=="duel" else 1236}px;height:58px;transform:translateX(-50%);filter:drop-shadow(0 0 10px rgba(0,0,0,.9)) drop-shadow(0 0 22px rgba(0,0,0,.8))">')
 VIG='<div class="a" style="inset:0;background:radial-gradient(130% 100% at 50% 40%,transparent 60%,rgba(0,0,0,.6));pointer-events:none"></div>'
-PAGE=f'<div class="p">{BG}{VIG}{"" if MODE=="duel" else HDR}{body}{FOOT}</div>'
+PAGE=f'<div class="p">{BG}{VIG}{"" if MODE in ("duel","forces") else HDR}{body}{FOOT}</div>'
 from PIL import ImageFilter
 RAMP=np.array([(24,14,4),(92,60,20),(168,126,58),(209,174,102),(240,214,150),(255,246,214)],np.float32)
 def ramp(t):
