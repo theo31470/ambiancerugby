@@ -4,6 +4,7 @@ import Defile from "./deco/Defile";
 import { Supporter } from "./deco/Icones";
 import TenteLeDrop from "./deco/TenteLeDrop";
 import BoutonInstaller from "./app/BoutonInstaller";
+import Reseaux from "./Reseaux";
 
 const TRIBUNE = ["#f2b53a", "#ffffff", "#c98595", "#f2b53a", "#f6e4e8", "#934f5e"];
 
@@ -26,6 +27,8 @@ export default function Footer() {
           <div>
             <img src="/logo-blanc.png" alt="Ambiance Rugby" className="h-14 lg:h-20 w-auto" />
             <p className="mt-3 max-w-xs">Le rugby côté tribune : scores en direct, Indice Ambiance, stats et actus.</p>
+            <p className="text-white font-semibold mt-5 mb-2">Suis-nous</p>
+            <Reseaux clair />
           </div>
           <nav aria-label="Compétitions" className="hidden lg:grid gap-1.5 content-start">
             <p className="text-white font-semibold mb-1">Compétitions</p>

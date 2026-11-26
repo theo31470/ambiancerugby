@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Markdown from "@/components/Markdown";
 import Comments from "@/components/Comments";
+import Reseaux from "@/components/Reseaux";
 import TeamBadge from "@/components/TeamBadge";
 import { getArticle } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -75,6 +76,11 @@ export default async function ArticlePage({ params }: PageProps<"/actus/[slug]">
           Voir la fiche {a.team.short_name ?? a.team.name}
         </Link>
       )}
+      <aside className="mt-10 rounded-2xl bg-teinte p-5">
+        <p className="font-semibold">Tu aimes ? Retrouve-nous aussi sur les réseaux.</p>
+        <p className="text-sm text-sourdine mt-1">Les résumés, les ambiances de tribune et les coulisses du site.</p>
+        <Reseaux className="mt-3" />
+      </aside>
       <Comments articleId={a.id} path={`/actus/${a.slug}`} />
     </article>
   );

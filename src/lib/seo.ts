@@ -1,4 +1,5 @@
 import { slugify } from "./format";
+import { FACEBOOK, INSTAGRAM } from "./reseaux";
 
 /** Adresse publique du site (domaine principal). */
 export const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://ambiance-rugby.fr").replace(/\/$/, "");
@@ -47,6 +48,7 @@ export const ORGANISATION = {
   name: "Ambiance Rugby",
   url: SITE,
   logo: { "@type": "ImageObject", url: `${SITE}/icon.png` },
+  sameAs: [INSTAGRAM, FACEBOOK],
 };
 
 export function filAriane(etapes: [string, string][]) {

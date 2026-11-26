@@ -128,7 +128,7 @@ export default async function Home() {
   return (
     <div>
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd([
-        { "@context": "https://schema.org", ...ORGANISATION, sameAs: [] },
+        { "@context": "https://schema.org", ...ORGANISATION },
         { "@context": "https://schema.org", "@type": "WebSite", "@id": `${SITE}/#site`, name: "Ambiance Rugby", url: SITE, inLanguage: "fr-FR", publisher: { "@id": `${SITE}/#organisation` },
           potentialAction: { "@type": "SearchAction", target: { "@type": "EntryPoint", urlTemplate: `${SITE}/joueurs?q={search_term_string}` }, "query-input": "required name=search_term_string" } },
       ])} />

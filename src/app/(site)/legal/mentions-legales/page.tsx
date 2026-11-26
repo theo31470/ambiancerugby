@@ -36,7 +36,7 @@ export default async function MentionsLegales() {
       <p>Un commentaire ou un profil de membre vous semble illicite ou porte atteinte à vos droits ? Écrivez à <a href={`mailto:${v.email}`}>{v.email}</a> en précisant la page concernée, le contenu en cause et la raison du signalement. Nous l&apos;examinons rapidement et retirons tout contenu manifestement illicite.</p>
 
       <Titre id="liens">Réseaux sociaux et liens</Titre>
-      <p>Ambiance Rugby est aussi présent sur Instagram et TikTok. Ces plateformes ont leurs propres conditions et règles de confidentialité, qui s&apos;appliquent lorsque vous les utilisez. Nous ne sommes pas responsables du contenu des sites tiers vers lesquels renvoient nos liens.</p>
+      <p>Ambiance Rugby est aussi présent sur Instagram et Facebook. Ces plateformes ont leurs propres conditions et règles de confidentialité, qui s&apos;appliquent lorsque vous les utilisez. Nous ne sommes pas responsables du contenu des sites tiers vers lesquels renvoient nos liens.</p>
     </TexteLegal>
   );
 }
