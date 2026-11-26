@@ -20,17 +20,24 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params, searchParams }: PageProps<"/competitions/[slug]">): Promise<Metadata> {
   const c = await getCompetition((await params).slug);
   if (!c) return {};
-  const vue = (await searchParams).vue;
+  const sp = await searchParams;
+  const vue = sp.vue;
+  // une saison passée est une page à part entière (classement 2023-2024…), avec sa propre adresse canonique
+  const saisons = typeof sp.saison === "string" && sp.saison !== c.current_season ? await getSeasons(c.id) : [];
+  const saison = typeof sp.saison === "string" && saisons.includes(sp.saison) ? sp.saison : c.current_season;
   const titres: Record<string, string> = {
-    calendrier: `Calendrier ${c.name} ${c.current_season} : prochains matchs et horaires`,
-    resultats: `Résultats ${c.name} ${c.current_season} : tous les scores`,
-    clubs: `${c.name} : les équipes de la saison ${c.current_season}`,
+    calendrier: `Calendrier ${c.name} ${saison} : prochains matchs et horaires`,
+    resultats: `Résultats ${c.name} ${saison} : tous les scores`,
+    clubs: `${c.name} : les équipes de la saison ${saison}`,
     simulateur: `Simulateur ${c.name} : chances de qualification et de maintien de chaque club`,
     records: `Records ${c.name} : plus larges victoires, séries, meilleurs marqueurs d'essais`,
   };
-  const title = (typeof vue === "string" && titres[vue]) || `Classement ${c.name} ${c.current_season} : classement, calendrier et résultats`;
-  const description = `${c.name} ${c.current_season} : classement à jour avec bonus, calendrier, résultats en direct, simulateur de fin de saison et stats des équipes.`;
-  const canonical = `/competitions/${c.slug}${typeof vue === "string" && titres[vue] ? `?vue=${vue}` : ""}`;
+  const title = (typeof vue === "string" && titres[vue]) || `Classement ${c.name} ${saison} : classement, calendrier et résultats`;
+  const description = `${c.name} ${saison} : classement${saison === c.current_season ? " à jour" : " final"} avec bonus, calendrier, résultats${saison === c.current_season ? " en direct, simulateur de fin de saison" : ""} et stats des équipes.`;
+  const q = new URLSearchParams();
+  if (typeof vue === "string" && titres[vue]) q.set("vue", vue);
+  if (saison !== c.current_season && vue !== "records" && vue !== "simulateur") q.set("saison", saison);
+  const canonical = `/competitions/${c.slug}${q.size ? `?${q}` : ""}`;
   return { title: { absolute: `${title} · Ambiance Rugby` }, description, alternates: { canonical }, openGraph: { title, description, url: canonical } };
 }
 
