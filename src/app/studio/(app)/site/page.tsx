@@ -12,8 +12,8 @@ export const metadata = { title: "Site et santé" };
 const SERVICES: { nom: string; role: string; cles: string[] }[] = [
   { nom: "Base de données", role: "Supabase : membres, matchs, boutique", cles: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"] },
   { nom: "Paiements", role: "Stripe : abonnements Supporter et boutique", cles: ["STRIPE_SECRET_KEY", "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "STRIPE_WEBHOOK_SECRET"] },
-  { nom: "Fabrication", role: "Printful : impression et envoi des commandes", cles: ["PRINTFUL_API_KEY", "PRINTFUL_STORE_ID"] },
-  { nom: "E-mails", role: "Resend : factures, confirmations, SAV", cles: ["RESEND_API_KEY", "EMAIL_FROM"] },
+  { nom: "Fabrication", role: "Printful : impression et envoi des commandes", cles: ["PRINTFUL_API_KEY"] },
+  { nom: "E-mails", role: "Resend : factures, confirmations, SAV", cles: ["RESEND_API_KEY"] },
   { nom: "Alertes téléphone", role: "Notifications push", cles: ["NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"] },
   { nom: "Claude", role: "Aide à la saisie et à la rédaction", cles: ["ANTHROPIC_API_KEY"] },
 ];
