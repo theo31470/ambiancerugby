@@ -8,7 +8,7 @@ type Lien = { href: string; label: string; Icone: ComponentType<{ className?: st
 type Groupe = { titre: string; liens: Lien[] };
 
 /** Navigation de l'admin, par grands espaces, avec compteurs de ce qui attend. */
-export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0, aTraiter = 0 }: { brouillons: number; aSaisir: number; admin: boolean; commentaires?: number; aTraiter?: number }) {
+export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0, aTraiter = 0, sav = 0, emailsErreur = 0 }: { brouillons: number; aSaisir: number; admin: boolean; commentaires?: number; aTraiter?: number; sav?: number; emailsErreur?: number }) {
   const path = usePathname();
   const groupes: Groupe[] = [
     { titre: "", liens: [{ href: "/studio", label: "Aujourd'hui", Icone: Ballon, exact: true }, { href: "/studio/audience", label: "Audience", Icone: Podium }] },
@@ -32,7 +32,10 @@ export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0,
       titre: "Boutique",
       liens: [
         { href: "/studio/boutique", label: "Commandes", Icone: Pinte, badge: aTraiter, exact: true },
+        { href: "/studio/boutique/sav", label: "Service après-vente", Icone: Sifflet, badge: sav },
         { href: "/studio/boutique/produits", label: "Produits", Icone: Maillot },
+        { href: "/studio/boutique/codes", label: "Codes promo", Icone: Echarpe },
+        { href: "/studio/boutique/factures", label: "Factures et avoirs", Icone: Journal },
         { href: "/studio/boutique/reglages", label: "Réglages boutique", Icone: Beret },
       ],
     },
@@ -45,11 +48,18 @@ export default function AdminNav({ brouillons, aSaisir, admin, commentaires = 0,
       ],
     },
     {
-      titre: "Réglages",
+      titre: "Communauté",
       liens: [
         ...(admin ? [{ href: "/studio/utilisateurs", label: "Membres", Icone: Supporter }] : []),
-        ...(admin ? [{ href: "/studio/site", label: "Contenu du site", Icone: Echarpe }] : []),
+        { href: "/studio/notifications", label: "Notifications", Icone: Trompette },
+        { href: "/studio/emails", label: "Journal des e-mails", Icone: Journal, badge: emailsErreur },
+      ],
+    },
+    {
+      titre: "Système",
+      liens: [
         { href: "/studio/donnees", label: "Données et synchros", Icone: Ballon },
+        ...(admin ? [{ href: "/studio/site", label: "Site et santé", Icone: Coupe }] : []),
       ],
     },
   ];

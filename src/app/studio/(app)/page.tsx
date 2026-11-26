@@ -5,6 +5,7 @@ import { IA_PLAFOND_MOIS_USD } from "@/lib/ia";
 import { MATCH_SELECT } from "@/lib/queries";
 import { fmtRelative, isoFromNow } from "@/lib/format";
 import { deleteComment } from "@/app/actions";
+import { shopDb } from "@/lib/shop/admin";
 import MatchRow from "@/components/MatchRow";
 import type { MatchFull } from "@/lib/types";
 
@@ -49,6 +50,21 @@ export default async function AdminHome() {
     db.from("teams").select("id", { count: "exact", head: true }).eq("is_national", false).not("squad_synced_at", "is", null).lt("squad_count", 12),
     db.rpc("ia_depense_mois"),
   ]);
+  // boutique et e-mails : ce qui demande une action
+  const sdb = shopDb();
+  const [{ count: commandesATraiter }, { count: savOuverts }, { count: emailsErreur }, { data: taches }] = await Promise.all([
+    sdb.from("shop_orders").select("id", { count: "exact", head: true }).in("statut", ["payee", "probleme"]),
+    sdb.from("shop_sav").select("id", { count: "exact", head: true }).in("statut", ["ouverte", "en_cours"]),
+    sdb.from("email_log").select("id", { count: "exact", head: true }).not("error", "is", null).gte("created_at", isoFromNow(-7 * 86400e3)),
+    viewer?.role === "admin" ? sdb.rpc("studio_taches") : Promise.resolve({ data: [] }),
+  ]);
+  const tachesEnEchec = ((taches ?? []) as { actif: boolean; statut: string | null }[]).filter((x) => x.actif && x.statut === "failed").length;
+  const alertes = [
+    { n: commandesATraiter ?? 0, titre: "commande{s} à traiter", detail: "Payées ou en problème", href: "/studio/boutique?statut=a-traiter" },
+    { n: savOuverts ?? 0, titre: "demande{s} SAV ouverte{s}", detail: "Clients qui attendent une réponse", href: "/studio/boutique/sav" },
+    { n: emailsErreur ?? 0, titre: "e-mail{s} en erreur", detail: "Non partis sur 7 jours", href: "/studio/emails?vue=erreurs" },
+    { n: tachesEnEchec, titre: "tâche{s} automatique{s} en échec", detail: "Dernier passage raté", href: "/studio/site" },
+  ].filter((a) => a.n > 0);
   const idsRecents = (recents ?? []).map((m) => m.id);
   const { data: saisis } = idsRecents.length ? await db.from("player_match_stats").select("match_id").in("match_id", idsRecents) : { data: [] };
   const faits = new Set((saisis ?? []).map((x) => x.match_id));
@@ -114,7 +130,15 @@ export default async function AdminHome() {
               </Link>
             </li>
           )}
-          {!aSaisir.size && !brouillons && !sansEffectif && (
+          {alertes.map((a) => (
+            <li key={a.href}>
+              <Link href={a.href} className="flex items-start gap-3 bg-surface border-2 border-alerte/60 rounded-2xl p-4 hover:border-vin carte-vie h-full">
+                <span className="groovy text-3xl text-alerte leading-none">{a.n}</span>
+                <span><span className="font-semibold block">{a.titre.replace(/\{s\}/g, a.n > 1 ? "s" : "")}</span><span className="text-sm text-sourdine">{a.detail}</span></span>
+              </Link>
+            </li>
+          ))}
+          {!aSaisir.size && !brouillons && !sansEffectif && !alertes.length && (
             <li className="bg-surface border border-trait rounded-2xl p-4 text-sourdine">Rien en attente. Tout est à jour.</li>
           )}
         </ul>

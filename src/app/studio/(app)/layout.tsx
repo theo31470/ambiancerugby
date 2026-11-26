@@ -21,19 +21,21 @@ export default async function AdminLayout({ children }: LayoutProps<"/studio">) 
 
   // ce qui attend la rédaction : brouillons, et matchs récents de Top 14 / Pro D2 sans feuille saisie
   const db = await createClient();
-  const [{ count: brouillons }, { data: recents }, { count: commentaires }, { count: aTraiter }] = await Promise.all([
+  const [{ count: brouillons }, { data: recents }, { count: commentaires }, { count: aTraiter }, { count: sav }, { count: emailsErreur }] = await Promise.all([
     db.from("articles").select("id", { count: "exact", head: true }).eq("status", "draft"),
     db.from("matches").select("id, competition:competitions!inner(slug)").eq("status", "finished")
       .gte("kickoff_at", isoFromNow(-10 * 86400e3)).in("competition.slug", COMPS_SAISIE),
     db.from("comments").select("id", { count: "exact", head: true }).gte("created_at", isoFromNow(-86400e3)),
     db.from("shop_orders").select("id", { count: "exact", head: true }).in("statut", ["payee", "probleme"]),
+    db.from("shop_sav").select("id", { count: "exact", head: true }).in("statut", ["ouverte", "en_cours"]),
+    db.from("email_log").select("id", { count: "exact", head: true }).not("error", "is", null).gte("created_at", isoFromNow(-7 * 86400e3)),
   ]);
   const ids = (recents ?? []).map((m) => m.id);
   const { data: saisis } = ids.length ? await db.from("player_match_stats").select("match_id").in("match_id", ids) : { data: [] };
   const faits = new Set((saisis ?? []).map((s) => s.match_id));
   const aSaisir = ids.filter((id) => !faits.has(id)).length;
 
-  const nav = <AdminNav brouillons={brouillons ?? 0} aSaisir={aSaisir} commentaires={commentaires ?? 0} aTraiter={aTraiter ?? 0} admin={viewer.role === "admin"} />;
+  const nav = <AdminNav brouillons={brouillons ?? 0} aSaisir={aSaisir} commentaires={commentaires ?? 0} aTraiter={aTraiter ?? 0} sav={sav ?? 0} emailsErreur={emailsErreur ?? 0} admin={viewer.role === "admin"} />;
   return (
     <div className="min-h-screen bg-teinte/40 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="bg-bordeaux text-white lg:h-screen lg:sticky lg:top-0 flex flex-col">
