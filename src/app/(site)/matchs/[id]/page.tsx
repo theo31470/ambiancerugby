@@ -31,7 +31,7 @@ import Forme from "@/components/algo/Forme";
 import { getMatch } from "@/lib/queries";
 import { getForms, getRatings, pronostic } from "@/lib/algo";
 import { getViewer, publicClient } from "@/lib/supabase/server";
-import { STATUS_LABEL, fmtDay, fmtTime, isLive, libelleTour } from "@/lib/format";
+import { STATUS_LABEL, fmtDay, fmtTime, isLive, libelleTour, minuteDirect } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -171,7 +171,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
       <span className="flex items-center gap-2 min-w-0 justify-end flex-1"><span className="truncate">{m.home.short_name ?? m.home.name}</span><TeamBadge team={m.home} /></span>
       <span className={`titre font-extrabold text-lg tnum rounded-lg px-2.5 py-0.5 ${live ? "bg-bordeaux text-moutarde" : "bg-teinte"}`}>{m.home_score ?? 0}–{m.away_score ?? 0}</span>
       <span className="flex items-center gap-2 min-w-0 flex-1"><TeamBadge team={m.away} /><span className="truncate">{m.away.short_name ?? m.away.name}</span></span>
-      {live && <span className="inline-flex items-center gap-1.5 text-xs text-vin shrink-0"><span className="pastille" aria-hidden />{m.clock ?? "Live"}</span>}
+      {live && <span className="inline-flex items-center gap-1.5 text-xs text-vin shrink-0"><span className="pastille" aria-hidden />{minuteDirect(m)}</span>}
     </div>
   );
 

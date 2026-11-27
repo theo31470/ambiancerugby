@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { urlMatch } from "@/lib/seo";
 import TeamBadge from "./TeamBadge";
-import { STATUS_LABEL, fmtDay, fmtTime, isLive } from "@/lib/format";
+import { STATUS_LABEL, fmtDay, fmtTime, isLive, minuteDirect } from "@/lib/format";
 import type { MatchFull } from "@/lib/types";
 
 /** Une rencontre dans une liste : horaire/statut à gauche, équipes et score à droite. */
@@ -17,7 +17,7 @@ export default function MatchRow({ m, showDate = false }: { m: MatchFull; showDa
         {live ? (
           <span className="inline-flex items-center gap-1.5 font-bold text-vin">
             <span className="pastille" aria-hidden />
-            {m.status === "halftime" ? "Mi-temps" : (m.clock ? m.clock.replace(/^(\d+):\d{2}$/, "$1'") : "Direct")}
+            {minuteDirect(m)}
           </span>
         ) : (
           <>

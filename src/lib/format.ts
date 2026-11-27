@@ -153,3 +153,17 @@ export function libelleTour(round: string): string {
   const fr: Record<string, string> = { final: "Finale", "semi-finals": "Demi-finales", "quarter-finals": "Quarts de finale", "round of 16": "Huitièmes de finale" };
   return fr[r.toLowerCase()] ?? r;
 }
+
+/**
+ * Minute affichée d'un match en direct, partout sur le site. Quand on connaît l'heure réelle du début de chaque
+ * mi-temps (LNR, World Rugby), on calcule le temps de jeu ; sinon on prend l'horloge du flux. L'horloge World Rugby
+ * donne la minute de la dernière action, pas le temps de jeu : elle ne sert qu'en dernier recours.
+ */
+export function minuteDirect(m: { status: string; clock?: string | null; periode1_debut?: string | null; periode1_fin?: string | null; periode2_debut?: string | null }, maintenant: number = Date.now()): string {
+  if (m.status === "halftime" || (m.periode1_fin && !m.periode2_debut)) return "Mi-temps";
+  const depuis = (x: string) => Math.max(0, (maintenant - new Date(x).getTime()) / 60000);
+  if (m.periode2_debut) { const mn = 40 + depuis(m.periode2_debut); return mn >= 80 ? `80'+${Math.floor(mn - 80)}` : `${Math.floor(mn)}'`; }
+  if (m.periode1_debut) { const mn = depuis(m.periode1_debut); return mn >= 40 ? `40'+${Math.floor(mn - 40)}` : `${Math.floor(mn)}'`; }
+  if (m.clock && /^\d/.test(m.clock)) return m.clock.replace(/^(\d+):\d{2}$/, "$1'");
+  return m.clock || "Direct";
+}

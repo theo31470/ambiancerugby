@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import TeamBadge from "@/components/TeamBadge";
 import { ArticleHero } from "@/components/ArticleCard";
 import { Ballon, Coupe, Echarpe, Podium, Trompette } from "@/components/deco/Icones";
-import { CATEGORIES, fmtDay, fmtRelative, fmtTime, isLive } from "@/lib/format";
+import { CATEGORIES, fmtDay, fmtRelative, fmtTime, isLive, minuteDirect } from "@/lib/format";
 import { urlMatch } from "@/lib/seo";
 import type { Article, MatchFull, StandingRow, TeamLite } from "@/lib/types";
 import CarrouselPoints from "@/components/app/CarrouselPoints";
@@ -231,7 +231,7 @@ function CarteDirect({ m }: { m: MatchFull }) {
         <span className="truncate">{m.competition.short_name ?? m.competition.name}</span>
         <span className="flex items-center gap-2 rounded-full bg-white/10 px-2.5 py-1 text-moutarde">
           <span className="point-direct" aria-hidden />
-          {m.status === "halftime" ? "Mi-temps" : m.clock ? `${m.clock}` : "Direct"}
+          {minuteDirect(m)}
         </span>
       </p>
       <div className="relative mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
