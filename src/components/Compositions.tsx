@@ -10,9 +10,9 @@ type Ligne = { team_id: string; numero?: number | null; starter?: boolean | null
 type Annonce = { numero: number; cle: string; prenom: string; nom: string };
 
 /** Les 23 annoncés (LNR ou ESPN) : sert à afficher tout le banc, même les remplaçants pas encore entrés. */
-async function feuilleAnnoncee(matchId: string, lnrUrl: string | null): Promise<{ dom: Annonce[]; ext: Annonce[]; par: "lnr_id" | "espn_id" } | null> {
+async function feuilleAnnoncee(matchId: string, lnrUrl: string | null, equipes: { dom: string; ext: string }): Promise<{ dom: Annonce[]; ext: Annonce[]; par: "lnr_id" | "espn_id" } | null> {
   if (lnrUrl) {
-    const l = await lireCompositionLnr(lnrUrl).catch(() => null);
+    const l = await lireCompositionLnr(lnrUrl, { db: shopDb(), ...equipes }).catch(() => null);
     const v = (x: NonNullable<typeof l>["dom"]) => x.map((j) => ({ numero: j.numero, cle: j.lnrId, prenom: j.prenom, nom: j.nom }));
     return l ? { dom: v(l.dom), ext: v(l.ext), par: "lnr_id" } : null;
   }
@@ -33,7 +33,7 @@ export default async function Compositions({ matchId, lnrUrl, lignes, home, away
   const parNum = (l: Ligne[]) => new Map(l.map((x) => [Number(x.numero), x]));
   const H = parNum(h), A = parNum(a);
   // banc complet : les 23 annoncés, complétés par ceux déjà entrés en jeu
-  const annonce = await feuilleAnnoncee(matchId, lnrUrl);
+  const annonce = await feuilleAnnoncee(matchId, lnrUrl, { dom: home.id, ext: away.id });
   const slugs = new Map<string, { slug: string; first_name: string; last_name: string }>();
   if (annonce) {
     const cles = [...annonce.dom, ...annonce.ext].filter((j) => j.numero > 15).map((j) => j.cle);

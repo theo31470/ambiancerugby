@@ -143,7 +143,10 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   };
 
   // les 23 de chaque équipe d'après la composition officielle
-  const compo = analyserCompos(compos);
+  const groupesCompo = analyserCompos(compos);
+  const compo = groupesCompo
+    ? orienterCompos(groupesCompo, await clubsConnus(db, [...groupesCompo[0], ...groupesCompo[1]].map((j) => j.lnrId), m.home_team_id, m.away_team_id), cote)
+    : null;
   const coteCompo = new Map<string, "home" | "away">();
   if (compo) for (const [liste, side] of [[compo.dom, "home"], [compo.ext, "away"]] as const) for (const c of liste) { coteCompo.set(c.lnrId, side); if (!numeros.has(c.lnrId)) numeros.set(c.lnrId, c.numero); }
 
@@ -207,7 +210,10 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     if (!p.lnr_id) patch.lnr_id = id;
     if ((p as { source?: string }).source === "lnr" && j.firstName && !/^\p{L}\.$/u.test(j.firstName) && /^\p{L}\.$/u.test((p as { first_name?: string }).first_name ?? "")) patch.first_name = joli(j.firstName);
     if (photo && !p.verrou && (!p.photo_source || p.photo_source === "TheSportsDB")) { patch.photo_url = photo; patch.photo_source = "LNR"; }
-    if (!p.verrou && Date.now() - new Date(m.kickoff_at).getTime() < 45 * 86400e3) { patch.team_id = team; patch.in_squad = true; }
+    // (jamais d'un des deux clubs du match vers l'autre : c'est l'effectif LNR qui tranche, pas une feuille mal lue)
+    const clubActuel = (duClub ?? []).find((x) => x.id === p!.id)?.team_id;
+    const autreCamp = clubActuel && clubActuel !== team && [m.home_team_id, m.away_team_id].includes(clubActuel);
+    if (!p.verrou && !autreCamp && Date.now() - new Date(m.kickoff_at).getTime() < 45 * 86400e3) { patch.team_id = team; patch.in_squad = true; }
     if (Object.keys(patch).length) await db.from("players").update(patch).eq("id", p.id);
   }
 
@@ -308,7 +314,13 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
 
   // score : dernier score du fil (transformations comprises)
   const dernier = [...faits].reverse().find((f) => Array.isArray(f.score));
-  const dom = dernier?.score?.[0] ?? 0, ext = dernier?.score?.[1] ?? 0;
+  let dom = dernier?.score?.[0] ?? 0, ext = dernier?.score?.[1] ?? 0;
+  // contrôle : les points du fil, camp par camp. Si la LNR a le même total mais une autre répartition
+  // (camps mélangés dans son flux), ou l'ordre inverse, les points du fil font foi.
+  const VALEUR: Record<string, number> = { try: 5, penalty_try: 7, conversion: 2, penalty: 3, drop: 3 };
+  const pts = (s: "home" | "away") => fil.filter((e) => e.cote === s).reduce((n, e) => n + (VALEUR[e.type] ?? 0), 0);
+  const [pd, pe] = [pts("home"), pts("away")];
+  if (pd + pe > 0 && pd + pe === dom + ext && (pd !== dom || pe !== ext)) { dom = pd; ext = pe; }
   const essais = (s: "home" | "away") => fil.filter((e) => (e.type === "try" || e.type === "penalty_try") && e.cote === s).length;
 
   // enregistrement
@@ -348,26 +360,63 @@ export type JoueurCompo = { lnrId: string; numero: number; prenom: string; nom: 
  * Composition officielle publiée par la LNR (2 jours avant le match environ) : les 23 de chaque équipe,
  * dans l'ordre de la page (l'équipe qui reçoit d'abord). Mise en cache 30 minutes.
  */
-export async function lireCompositionLnr(url: string): Promise<{ dom: JoueurCompo[]; ext: JoueurCompo[] } | null> {
+export async function lireCompositionLnr(url: string, equipes?: { db: SupabaseClient; dom: string; ext: string }): Promise<{ dom: JoueurCompo[]; ext: JoueurCompo[] } | null> {
   const r = await fetch(`${url}/compositions`, { next: { revalidate: 1800 }, signal: AbortSignal.timeout(15_000), headers: { "user-agent": UA, accept: "text/html" } }).catch(() => null);
   if (!r?.ok) return null;
-  return analyserCompos(await r.text());
+  const g = analyserCompos(await r.text());
+  if (!g) return null;
+  const club = equipes ? await clubsConnus(equipes.db, [...g[0], ...g[1]].map((j) => j.lnrId), equipes.dom, equipes.ext) : new Map();
+  return orienterCompos(g, club);
 }
 
-/** Lit la page « compositions » de la LNR : les joueurs de chaque équipe, l'équipe qui reçoit d'abord. */
-function analyserCompos(html: string): { dom: JoueurCompo[]; ext: JoueurCompo[] } | null {
-  const liste: JoueurCompo[] = [];
+/**
+ * Lit la page « compositions » de la LNR et rend les deux équipes, dans l'ordre où elles apparaissent.
+ * La page peut répéter les joueurs (titulaires des deux camps, puis listes complètes avec remplaçants) et
+ * ne met pas toujours l'équipe qui reçoit en premier : on découpe en blocs à chaque retour au n°1, puis on
+ * regroupe les blocs qui partagent des joueurs. Le camp de chaque groupe est décidé ensuite (orienterCompos).
+ */
+export function analyserCompos(html: string): [JoueurCompo[], JoueurCompo[]] | null {
+  const blocsJ: JoueurCompo[][] = [];
   for (const x of html.matchAll(/<a\s+class="player-pitch[^"]*"\s+href="[^"]*\/joueur\/([^"/]+)"\s*>([\s\S]*?)<\/a>/g)) {
     const id = x[1], bloc = x[2];
     const numero = Number(bloc.match(/player-pitch__number">\s*(\d+)\s*</)?.[1] ?? NaN);
     if (!Number.isFinite(numero)) continue;
     const prenom = decode(bloc.match(/__first-name">([^<]*)</)?.[1] ?? "").trim();
     const nom = decode(bloc.match(/__last-name">([^<]*)</)?.[1] ?? "").trim();
-    liste.push({ lnrId: id, numero, prenom: joli(prenom), nom: joli(nom), photo: null });
+    const j = { lnrId: id, numero, prenom: joli(prenom), nom: joli(nom), photo: null };
+    const dernier = blocsJ.at(-1);
+    // nouveau bloc quand la numérotation repart en arrière
+    if (!dernier || numero < dernier[dernier.length - 1].numero) blocsJ.push([j]); else dernier.push(j);
   }
-  // la numérotation repart à 1 pour la deuxième équipe
-  const coupure = liste.findIndex((j, i) => i > 0 && j.numero < liste[i - 1].numero && j.numero <= 3);
-  if (coupure <= 0) return null;
-  const dom = liste.slice(0, coupure), ext = liste.slice(coupure);
-  return dom.length >= 15 && ext.length >= 15 ? { dom, ext } : null;
+  // regroupe les blocs qui ont au moins un joueur en commun
+  const groupes: { ids: Set<string>; joueurs: Map<string, JoueurCompo> }[] = [];
+  for (const b of blocsJ) {
+    const lies = groupes.filter((g) => b.some((j) => g.ids.has(j.lnrId)));
+    const cible = lies[0] ?? (groupes.push({ ids: new Set(), joueurs: new Map() }), groupes[groupes.length - 1]);
+    for (const autre of lies.slice(1)) { for (const [k, v] of autre.joueurs) cible.joueurs.set(k, v); autre.ids.forEach((i) => cible.ids.add(i)); groupes.splice(groupes.indexOf(autre), 1); }
+    for (const j of b) { cible.ids.add(j.lnrId); if (!cible.joueurs.has(j.lnrId)) cible.joueurs.set(j.lnrId, j); }
+  }
+  if (groupes.length !== 2) return null;
+  const [a, b] = groupes.map((g) => [...g.joueurs.values()].sort((x, y) => x.numero - y.numero));
+  return a.length >= 15 && b.length >= 15 ? [a, b] : null;
+}
+
+/**
+ * Décide quel groupe reçoit. Votes : club actuel de nos joueurs (effectifs LNR, le plus sûr), puis le camp
+ * annoncé par la LNR pour les faits de jeu et remplacements. À égalité, l'ordre de la page.
+ */
+export function orienterCompos(groupes: [JoueurCompo[], JoueurCompo[]], club: Map<string, "home" | "away">, annonce: Map<string, "home" | "away"> = new Map()) {
+  const score = (g: JoueurCompo[], side: "home" | "away") => g.reduce((n, j) => n + (club.get(j.lnrId) === side ? 3 : 0) + (annonce.get(j.lnrId) === side ? 1 : 0), 0);
+  const droit = score(groupes[0], "home") + score(groupes[1], "away");
+  const inverse = score(groupes[0], "away") + score(groupes[1], "home");
+  return inverse > droit ? { dom: groupes[1], ext: groupes[0] } : { dom: groupes[0], ext: groupes[1] };
+}
+
+/** Club actuel (dans notre base) des joueurs LNR cités, pour orienter les compositions. */
+async function clubsConnus(db: SupabaseClient, ids: string[], domId: string, extId: string) {
+  const out = new Map<string, "home" | "away">();
+  if (!ids.length) return out;
+  const { data } = await db.from("players").select("lnr_id, team_id").in("lnr_id", ids);
+  for (const p of data ?? []) if (p.team_id === domId) out.set(p.lnr_id as string, "home"); else if (p.team_id === extId) out.set(p.lnr_id as string, "away");
+  return out;
 }

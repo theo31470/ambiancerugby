@@ -105,7 +105,7 @@ async function compositionOfficielle(m: MatchAvant, home: TeamLite, away: TeamLi
     if (url) await db.from("matches").update({ lnr_url: url }).eq("id", m.id);
   }
   if (!url) return null;
-  const l = await lireCompositionLnr(url);
+  const l = await lireCompositionLnr(url, { db, dom: home.id, ext: away.id });
   if (!l) return null;
   const [d, x] = await Promise.all([versTitulaires(l.dom, notes.h), versTitulaires(l.ext, notes.a)]);
   return { source: "LNR", dom: d.tit, ext: x.tit, bancDom: d.banc, bancExt: x.banc };
