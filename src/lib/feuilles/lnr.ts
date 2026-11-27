@@ -114,6 +114,12 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   const cote = new Map<string, "home" | "away">();
   for (const r of rempl) for (const j of [r.in, r.out]) { const id = idLnr(j); if (id && r.club) cote.set(id, r.club); }
   for (const f of faits) for (const j of [f.player, f.conversionPlayer]) { const id = idLnr(j); if (id && f.club) cote.set(id, f.club); }
+  // club réel (effectifs LNR) de chaque joueur cité : le camp annoncé par le flux en direct peut être faux
+  const citesIds = [...new Set([...rempl.flatMap((r) => [r.in, r.out]), ...faits.flatMap((f) => [f.player, f.conversionPlayer])].map((j) => idLnr(j)).filter(Boolean) as string[])];
+  const clubCites = await clubsConnus(db, citesIds, m.home_team_id, m.away_team_id);
+  // le club connu l'emporte sur le camp annoncé par le flux (qui sert encore à orienter les compositions)
+  const annonce = new Map(cote);
+  for (const [id, c] of clubCites) cote.set(id, c);
   const equipes: { side: "home" | "away"; lignes: Ligne[] }[] = classements.map((ls, i) => {
     const votes = ls.map((l) => cote.get(idLnr(l.player) ?? "")).filter(Boolean);
     const home = votes.filter((v) => v === "home").length, away = votes.filter((v) => v === "away").length;
@@ -145,7 +151,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   // les 23 de chaque équipe d'après la composition officielle
   const groupesCompo = analyserCompos(compos);
   const compo = groupesCompo
-    ? orienterCompos(groupesCompo, await clubsConnus(db, [...groupesCompo[0], ...groupesCompo[1]].map((j) => j.lnrId), m.home_team_id, m.away_team_id), cote)
+    ? orienterCompos(groupesCompo, await clubsConnus(db, [...groupesCompo[0], ...groupesCompo[1]].map((j) => j.lnrId), m.home_team_id, m.away_team_id), annonce)
     : null;
   const coteCompo = new Map<string, "home" | "away">();
   if (compo) for (const [liste, side] of [[compo.dom, "home"], [compo.ext, "away"]] as const) for (const c of liste) { coteCompo.set(c.lnrId, side); if (!numeros.has(c.lnrId)) numeros.set(c.lnrId, c.numero); }
@@ -273,7 +279,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     const sst = norm(f.slugSubType ?? f.subtype);
     const st = norm(f.slugType ?? f.type);
     // la composition fait foi sur le camp d'un joueur : le côté d'un fait en direct peut être faux (transformation rangée chez l'adversaire)
-    const side: "home" | "away" = coteCompo.get(idLnr(f.player) ?? "") ?? (f.club === "away" ? "away" : "home");
+    const side: "home" | "away" = coteCompo.get(idLnr(f.player) ?? "") ?? clubCites.get(idLnr(f.player) ?? "") ?? (f.club === "away" ? "away" : "home");
     const pid = notreId.get(idLnr(f.player) ?? "") ?? null;
     const nom = nomComplet(f.player);
     let type: string | null = null;
@@ -298,7 +304,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     if (f.conversionPlayer) {
       const cid = idLnr(f.conversionPlayer);
       const cpid = notreId.get(cid ?? "") ?? null;
-      fil.push({ minute: minute(f), cote: coteCompo.get(cid ?? "") ?? side, player_id: cpid, nom: cpid ? "" : joli(nomComplet(f.conversionPlayer)), type: "conversion" });
+      fil.push({ minute: minute(f), cote: coteCompo.get(cid ?? "") ?? clubCites.get(cid ?? "") ?? side, player_id: cpid, nom: cpid ? "" : joli(nomComplet(f.conversionPlayer)), type: "conversion" });
       const r = cid ? ligne(cid, side) : null;
       if (r) r.conversions = Number(r.conversions) + 1;
     }
@@ -308,7 +314,8 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   for (const r of rempl) {
     const pin = notreId.get(idLnr(r.in) ?? "") ?? null;
     const sortant = nomComplet(r.out);
-    fil.push({ minute: Math.min(130, r.minute ?? 0), cote: r.club === "away" ? "away" : "home", player_id: pin, nom: `${pin ? "" : `${joli(nomComplet(r.in))} `}remplace ${joli(sortant)}`.trim(), type: "sub" });
+    const idIn = idLnr(r.in) ?? idLnr(r.out) ?? "";
+    fil.push({ minute: Math.min(130, r.minute ?? 0), cote: coteCompo.get(idIn) ?? clubCites.get(idIn) ?? (r.club === "away" ? "away" : "home"), player_id: pin, nom: `${pin ? "" : `${joli(nomComplet(r.in))} `}remplace ${joli(sortant)}`.trim(), type: "sub" });
   }
   fil.sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
 
