@@ -319,10 +319,11 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     let type: string | null = null;
     if (st.includes("exclusion") || st.includes("carton")) type = sst.includes("jaune") ? "yellow" : "red";
     else if (sst.includes("essai") && sst.includes("penalite")) type = "penalty_try";
+    // « transformation » d'abord : la LNR peut écrire « transformation de l'essai », qui contient aussi « essai »
+    else if (sst.includes("transformation") || st.includes("transformation")) type = "conversion";
     else if (sst.includes("essai")) type = "try";
     else if (sst.includes("penalite")) type = "penalty";
     else if (sst.includes("drop")) type = "drop";
-    else if (sst.includes("transformation")) type = "conversion";
     if (!type) continue;
     fil.push({ minute: minute(f), cote: side, player_id: pid, nom: pid ? "" : joli(nom), type });
     const id = idLnr(f.player);
