@@ -44,10 +44,10 @@ export async function generateMetadata({ params }: PageProps<"/matchs/[id]">): P
   const affiche = `${m.home.name} – ${m.away.name}`;
   const title = fini ? `${m.home.name} ${m.home_score}-${m.away_score} ${m.away.name} : résumé, notes et stats (${m.competition.short_name ?? m.competition.name})`
     : enDirect ? `${affiche} en direct : score et fil du match (${m.competition.short_name ?? m.competition.name})`
-    : `${affiche} : compositions, pronostic et avant-match (${m.competition.short_name ?? m.competition.name})`;
+    : `${affiche}${m.tv ? ` sur ${m.tv}` : ""} : heure, chaîne TV et compositions (${m.competition.short_name ?? m.competition.name})`;
   const description = fini
     ? `${m.competition.name}, ${jour} : ${m.home.name} ${m.home_score}-${m.away_score} ${m.away.name}. Fil du match, courbe d'ascendant, notes des joueurs et stats complètes.`
-    : `${m.competition.name}, ${jour} à ${fmtTime(m.kickoff_at)} : ${affiche}. Pronostic de l'algorithme, compositions, duels poste par poste et score en direct.`;
+    : `${m.competition.name}, ${jour} à ${fmtTime(m.kickoff_at)} : ${affiche}${m.tv ? `, à suivre sur ${m.tv}` : ""}. Pronostic de l'algorithme, compositions, duels poste par poste et score en direct.`;
   const url = urlMatch(m);
   return { title: { absolute: `${title} · Ambiance Rugby` }, description, alternates: { canonical: url }, openGraph: { type: "article", url, title, description } };
 }

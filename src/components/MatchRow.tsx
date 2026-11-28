@@ -25,6 +25,7 @@ export default function MatchRow({ m, showDate = false }: { m: MatchFull; showDa
             <span className={done || m.status === "scheduled" ? "font-semibold tnum" : "font-semibold text-alerte"}>
               {m.status === "scheduled" ? fmtTime(m.kickoff_at) : done ? "Terminé" : STATUS_LABEL[m.status]}
             </span>
+            {m.status === "scheduled" && m.tv && <span className="block text-[11px] leading-snug text-sourdine truncate" title={`Diffusé sur ${m.tv}`}><span aria-hidden>📺 </span>{m.tv}</span>}
           </>
         )}
       </div>

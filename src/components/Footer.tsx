@@ -54,6 +54,7 @@ export default async function Footer() {
           <nav aria-label="Le site" className="hidden lg:grid gap-1.5 content-start">
             <p className="text-white font-semibold mb-1">Le site</p>
             <Link href="/indice" className="hover:text-white">Indice Ambiance</Link>
+            <Link href="/programme-tv" className="hover:text-white">Programme TV</Link>
             <Link href="/actus" className="hover:text-white">Actus</Link>
             <Link href="/abonnement" className="hover:text-white">Devenir Supporter</Link>
             <Link href="/inscription" className="hover:text-white">Créer un compte</Link>

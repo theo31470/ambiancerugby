@@ -56,7 +56,7 @@ function prenomDuSlug(id: string, nom: string | null | undefined): string | null
 }
 
 /** Journée LNR correspondant à notre « round » (numéro, ou phase finale). */
-function journees(round: string | null) {
+export function journees(round: string | null) {
   if (!round) return [];
   if (/^\d+$/.test(round)) return [`j${round}`];
   if (/quarter/i.test(round)) return ["barrages", "quarts-de-finale", "quarts"];
@@ -66,15 +66,34 @@ function journees(round: string | null) {
 }
 
 /** Retrouve l'adresse de la feuille de match LNR dans le calendrier de la journée. */
+// un mot utile : 3 lettres ou plus, ou un numéro (« 92 » pour le Racing 92 que la LNR écrit « racing-92 »)
+const utile = (w: string) => /^\d{2,}$/.test(w) || w.length >= 3;
+const mots = (t: MatchLocal["home"]) => [t.name, t.short_name, ...(t.aliases ?? [])].flatMap((n) => norm(n).split(" ")).filter((w) => utile(w) && !VIDES.has(w));
+const colle = (t: MatchLocal["home"], slug: string) => mots(t).some((w) => slug.split("-").some((s) => utile(s) && (/^\d+$/.test(w) ? s === w : w.startsWith(s) || s.startsWith(w))));
+/** Le lien LNR « /feuille-de-match/…/12345-toulouse-racing-92 » correspond-il à ce match ? */
+export const lienCorrespond = (lien: string, dom: MatchLocal["home"], ext: MatchLocal["away"]) => { const sl = lien.split("/").pop()!.replace(/^\d+-/, ""); return colle(dom, sl) && colle(ext, sl); };
+
+/** Nom de chaîne tel qu'on l'affiche (« Canal + Sport 360 » → « Canal+ Sport 360 »). */
+export const nomChaine = (n: string) => decode(n).replace(/Canal\s*\+\s*/gi, "Canal+ ").replace(/\s+/g, " ").trim();
+
+/** Matchs d'une journée du calendrier LNR, avec les chaînes qui les diffusent (vide si pas encore annoncées). */
+export async function lireDiffuseursLnr(site: string, saison: string, journee: string) {
+  const html = await page(`${site}/calendrier-et-resultats/${saison}/${journee}`);
+  const out: { lien: string; chaines: string[] }[] = [];
+  for (const bloc of html.split(/class="match-calendar-line[ "]/).slice(1)) {
+    const lien = bloc.match(/\/feuille-de-match\/[a-z0-9-]+\/[a-z0-9-]+\/\d+-[a-z0-9-]+/)?.[0];
+    if (!lien) continue;
+    const chaines = [...new Set([...bloc.matchAll(/<img[^>]*alt="([^"]+)"[^>]*class="match-line__broadcaster/g)].map((x) => nomChaine(x[1])))];
+    out.push({ lien: site + lien, chaines });
+  }
+  return out;
+}
+
 export async function trouverMatchLnr(site: string, saison: string, round: string | null, dom: MatchLocal["home"], ext: MatchLocal["away"]) {
-  // un mot utile : 3 lettres ou plus, ou un numéro (« 92 » pour le Racing 92 que la LNR écrit « racing-92 »)
-  const utile = (w: string) => /^\d{2,}$/.test(w) || w.length >= 3;
-  const mots = (t: MatchLocal["home"]) => [t.name, t.short_name, ...(t.aliases ?? [])].flatMap((n) => norm(n).split(" ")).filter((w) => utile(w) && !VIDES.has(w));
-  const colle = (t: MatchLocal["home"], slug: string) => mots(t).some((w) => slug.split("-").some((s) => utile(s) && (/^\d+$/.test(w) ? s === w : w.startsWith(s) || s.startsWith(w))));
   for (const j of journees(round)) {
     const html = await page(`${site}/calendrier-et-resultats/${saison}/${j}`).catch(() => "");
     const liens = [...new Set([...html.matchAll(/\/feuille-de-match\/[a-z0-9-]+\/[a-z0-9-]+\/\d+-[a-z0-9-]+/g)].map((x) => x[0]))];
-    const bon = liens.find((l) => { const sl = l.split("/").pop()!.replace(/^\d+-/, ""); return colle(dom, sl) && colle(ext, sl); });
+    const bon = liens.find((l) => lienCorrespond(l, dom, ext));
     if (bon) return site + bon;
   }
   return null;
