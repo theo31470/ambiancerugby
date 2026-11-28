@@ -309,6 +309,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   const minuteBrute = (f: Fait) => (f.minute == null ? null : f.minute + (f.additionalMinute ?? 0));
   const minute = (f: Fait) => { const b = minuteBrute(f); return Math.min(130, b == null || b > jeuEcoule ? minuteVoisine(f) : b); };
   const triesFil = new Map<string, number>();
+  let precedent: [number, number] = [0, 0];
   for (const f of faits) {
     const sst = norm(f.slugSubType ?? f.subtype);
     const st = norm(f.slugType ?? f.type);
@@ -324,6 +325,13 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     else if (sst.includes("essai")) type = "try";
     else if (sst.includes("penalite")) type = "penalty";
     else if (sst.includes("drop")) type = "drop";
+    // le score cumulé du fait tranche : +2 = transformation, +5 = essai, même si la LNR a mal étiqueté la ligne
+    if (Array.isArray(f.score)) {
+      const gain = f.score[0] - precedent[0] + (f.score[1] - precedent[1]);
+      if (type === "try" && gain === 2) type = "conversion";
+      else if (type === "conversion" && gain === 5) type = "try";
+      precedent = [f.score[0], f.score[1]];
+    }
     if (!type) continue;
     fil.push({ minute: minute(f), cote: side, player_id: pid, nom: pid ? "" : joli(nom), type });
     const id = idLnr(f.player);
