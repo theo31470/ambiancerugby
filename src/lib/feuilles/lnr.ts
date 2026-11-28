@@ -269,13 +269,26 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
   // fil du match (et buteurs, absents du classement)
   const fil: EvtPropose[] = [];
   // en direct, la LNR publie parfois un fait sans minute : on prend celle du fait voisin (la transformation qui suit, sinon le fait précédent)
+  // (défini plus bas) temps de jeu écoulé
+  let jeuEcoule = 130;
   const minuteVoisine = (f: Fait): number => {
     const i = faits.indexOf(f);
-    for (let k = i + 1; k < faits.length; k++) if (faits[k].minute != null) return faits[k].minute! + (faits[k].additionalMinute ?? 0);
-    for (let k = i - 1; k >= 0; k--) if (faits[k].minute != null) return faits[k].minute! + (faits[k].additionalMinute ?? 0);
+    const ok = (g: Fait) => g.minute != null && g.minute + (g.additionalMinute ?? 0) <= jeuEcoule;
+    for (let k = i + 1; k < faits.length; k++) if (ok(faits[k])) return faits[k].minute! + (faits[k].additionalMinute ?? 0);
+    for (let k = i - 1; k >= 0; k--) if (ok(faits[k])) return faits[k].minute! + (faits[k].additionalMinute ?? 0);
     return 0;
   };
-  const minute = (f: Fait) => Math.min(130, f.minute == null ? minuteVoisine(f) : f.minute + (f.additionalMinute ?? 0));
+  // en direct, une minute plus grande que le temps de jeu écoulé est une erreur de saisie (ex. carton à la 37e noté « 80' ») :
+  // on prend alors celle du fait voisin
+  jeuEcoule = (() => {
+    if (!enCours) return 130;
+    const depuis = (d: string) => (Date.now() - new Date(d).getTime()) / 60000;
+    if (chrono.periode2_debut) return 40 + depuis(chrono.periode2_debut) + 5;
+    if (chrono.periode1_debut) return Math.min(50, depuis(chrono.periode1_debut) + 5);
+    return 130;
+  })();
+  const minuteBrute = (f: Fait) => (f.minute == null ? null : f.minute + (f.additionalMinute ?? 0));
+  const minute = (f: Fait) => { const b = minuteBrute(f); return Math.min(130, b == null || b > jeuEcoule ? minuteVoisine(f) : b); };
   const triesFil = new Map<string, number>();
   for (const f of faits) {
     const sst = norm(f.slugSubType ?? f.subtype);
