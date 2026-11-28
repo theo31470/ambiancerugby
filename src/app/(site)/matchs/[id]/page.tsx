@@ -68,6 +68,30 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
     .order("created_at");
 
   const live = isLive(m.status);
+  // En direct, la feuille officielle (LNR, World Rugby) publie les faits de jeu avec plusieurs minutes de retard sur
+  // le score. Les points déjà marqués mais pas encore détaillés apparaissent dans le fil, en provisoire.
+  const filComplet = [...(events ?? [])] as Record<string, unknown>[];
+  if (live) {
+    const { data: actions } = await shopDb().from("notif_actions").select("id,team_id,avant,apres,detectee_le").eq("match_id", m.id).order("detectee_le");
+    const PTS: Record<string, number> = { try: 5, penalty_try: 7, conversion: 2, penalty: 3, drop: 3 };
+    const auFil = (team: string) => (events ?? []).filter((e) => e.team_id === team).reduce((n, e) => n + (PTS[e.kind as string] ?? 0), 0);
+    const deja: Record<string, number> = { [m.home_team_id]: auFil(m.home_team_id), [m.away_team_id]: auFil(m.away_team_id) };
+    const p = m as { periode1_debut?: string | null; periode2_debut?: string | null };
+    const minuteDe = (iso: string) => {
+      const t = new Date(iso).getTime();
+      // l'action a été vue avec ~2 minutes de retard sur le terrain
+      if (p.periode2_debut && t > new Date(p.periode2_debut).getTime()) return Math.min(80, 40 + Math.max(0, Math.round((t - new Date(p.periode2_debut).getTime()) / 60000) - 2));
+      if (p.periode1_debut) return Math.min(40, Math.max(1, Math.round((t - new Date(p.periode1_debut).getTime()) / 60000) - 2));
+      return null;
+    };
+    for (const a of actions ?? []) {
+      if (a.apres <= (deja[a.team_id] ?? 0)) continue;
+      const reste = a.apres - Math.max(a.avant, deja[a.team_id] ?? 0);
+      const kinds = reste === 7 ? ["try", "conversion"] : reste === 5 ? ["try"] : reste === 3 ? ["penalty"] : reste === 2 ? ["conversion"] : [];
+      kinds.forEach((kind, i) => filComplet.push({ id: `provisoire-${a.id}-${i}`, minute: minuteDe(a.detectee_le), kind, text: null, team_id: a.team_id, player: null, provisoire: true }));
+      deja[a.team_id] = a.apres;
+    }
+  }
   // lieu du match pour Google (champ obligatoire) : stade connu, sinon stade ou ville du club qui reçoit
   const { data: recevant } = await publicClient().from("teams").select("stadium,city,country").eq("id", m.home_team_id).maybeSingle();
   const stadeVille = (m as { stade_ville?: string | null }).stade_ville ?? null;
@@ -314,7 +338,7 @@ export default async function MatchPage({ params }: PageProps<"/matchs/[id]">) {
           { id: "direct", label: "Direct", contenu: (
             <div className="grid gap-8">
               {events && events.length > 0
-                ? <FilDuMatch events={events as never} home={m.home} away={m.away} live={live} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { clock_at?: string | null; updated_at?: string }).clock_at ?? (m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} />
+                ? <FilDuMatch events={filComplet as never} home={m.home} away={m.away} live={live} clock={m.clock} kickoff={m.kickoff_at} updatedAt={(m as { clock_at?: string | null; updated_at?: string }).clock_at ?? (m as { updated_at?: string }).updated_at ?? null} status={m.status} periodes={m as Periodes} />
                 : <p className="text-sourdine">Le fil du match s&apos;affiche au premier fait de jeu.</p>}
               {events && events.length > 1 && <CourbeAscendant full={full} events={events as never} home={m.home} away={m.away} minuteActuelle={minute} />}
             </div>

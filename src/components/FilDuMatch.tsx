@@ -5,7 +5,7 @@ import { EVENT_LABEL, EVENT_POINTS } from "@/lib/format";
 import { phraseAction } from "@/lib/commentaires";
 import ChronoLive, { type Periodes } from "./ChronoLive";
 
-type Evt = { id: string; minute: number | null; kind: string; text: string | null; team_id: string | null; player: unknown };
+type Evt = { id: string; minute: number | null; kind: string; text: string | null; team_id: string | null; player: unknown; provisoire?: boolean };
 type Equipe = { id: string; name: string; short_name: string | null };
 type Joueur = { slug: string; first_name: string; last_name: string } | null;
 const PICTO: Record<string, string> = { try: "🏉", penalty_try: "🏉", conversion: "🎯", penalty: "🎯", drop: "🦶", yellow: "🟨", red: "🟥", sub: "🔁", note: "📣" };
@@ -54,8 +54,8 @@ export default function FilDuMatch({ events, home, away, live, clock, kickoff, u
     const p = l.e.player as Joueur;
     const marque = l.pts > 0;
     const libelle = l.e.kind === "sub" ? l.e.text ?? EVENT_LABEL.sub : `${p ? "" : `${l.e.text ?? ""} `}${EVENT_LABEL[l.e.kind] ?? l.e.kind}`.trim();
-    const phrase = l.e.kind === "note" ? l.e.text : phraseAction(l.e.kind, l.e.id, p ? `${p.first_name} ${p.last_name}` : null, nom(l.domicile ? home : away));
-    const fond = l.e.kind === "red" ? "border-alerte/50 bg-alerte/5" : l.e.kind === "yellow" ? "border-moutarde/60 bg-moutarde/10" : marque ? "border-vin/30 bg-surface shadow-sm" : "border-trait bg-surface";
+    const phrase = l.e.provisoire ? `${nom(l.domicile ? home : away)} marque, le détail arrive avec la feuille officielle.` : l.e.kind === "note" ? l.e.text : phraseAction(l.e.kind, l.e.id, p ? `${p.first_name} ${p.last_name}` : null, nom(l.domicile ? home : away));
+    const fond = l.e.provisoire ? "border-dashed border-vin/40 bg-surface" : l.e.kind === "red" ? "border-alerte/50 bg-alerte/5" : l.e.kind === "yellow" ? "border-moutarde/60 bg-moutarde/10" : marque ? "border-vin/30 bg-surface shadow-sm" : "border-trait bg-surface";
     return (
       <div className={`fil-carte rounded-2xl border px-4 py-3 ${fond} ${l.domicile ? "sm:text-right" : ""}`}>
         <div className={`flex items-center gap-2 flex-wrap ${l.domicile ? "sm:flex-row-reverse" : ""}`}>
@@ -106,7 +106,7 @@ export default function FilDuMatch({ events, home, away, live, clock, kickoff, u
           <li key={x.l.e.id} className="relative grid grid-cols-[3rem_1fr] sm:grid-cols-[1fr_4rem_1fr] items-center gap-0 py-2 fil-entree">
             <div className="hidden sm:block pr-3 sm:col-start-1 row-start-1">{x.l.domicile && carte(x.l)}</div>
             <span className={`relative z-10 justify-self-center sm:col-start-2 row-start-1 grid place-items-center w-11 h-11 rounded-full titre font-extrabold tnum text-sm border-2 ${x.l.pts > 0 ? "bg-moutarde text-bordeaux border-moutarde" : "bg-surface text-vin border-trait"}`}>
-              {x.l.e.minute != null ? `${x.l.e.minute}'` : "·"}
+              {x.l.e.minute != null ? `${x.l.e.provisoire ? "≈" : ""}${x.l.e.minute}'` : "·"}
             </span>
             <div className="sm:hidden col-start-2 row-start-1 pl-2">{carte(x.l)}</div>
             <div className="hidden sm:block pl-3 sm:col-start-3 row-start-1">{!x.l.domicile && carte(x.l)}</div>
