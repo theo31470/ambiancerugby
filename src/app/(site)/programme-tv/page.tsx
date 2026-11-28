@@ -13,14 +13,19 @@ export const metadata: Metadata = {
 };
 export const revalidate = 1800;
 
-/** Où regarder : les matchs des 10 prochains jours dont la chaîne est connue, jour par jour. */
-export default async function ProgrammeTvPage() {
+async function matchsAvecChaine() {
+  const maintenant = Date.now();
   const { data } = await publicClient().from("matches").select(MATCH_SELECT)
     .in("status", ["scheduled", "live", "halftime"]).not("tv", "is", null)
-    .gte("kickoff_at", new Date(Date.now() - 3 * 3600e3).toISOString())
-    .lte("kickoff_at", new Date(Date.now() + 10 * 86400e3).toISOString())
+    .gte("kickoff_at", new Date(maintenant - 3 * 3600e3).toISOString())
+    .lte("kickoff_at", new Date(maintenant + 10 * 86400e3).toISOString())
     .order("kickoff_at");
-  const matchs = (data ?? []) as unknown as MatchFull[];
+  return (data ?? []) as unknown as MatchFull[];
+}
+
+/** Où regarder : les matchs des 10 prochains jours dont la chaîne est connue, jour par jour. */
+export default async function ProgrammeTvPage() {
+  const matchs = await matchsAvecChaine();
   const jours = new Map<string, MatchFull[]>();
   for (const m of matchs) {
     const j = fmtDay(m.kickoff_at, { weekday: "long", day: "numeric", month: "long" });
