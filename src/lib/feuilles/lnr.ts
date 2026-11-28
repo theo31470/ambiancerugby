@@ -15,7 +15,9 @@ const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#039;/g, "'").
 const VIDES = new Set(["stade", "rugby", "club", "union", "section", "olympique", "racing", "pays", "sporting", "hérault", "herault", "us", "usa", "ca", "su", "rc", "as", "asm", "fc", "cs", "lou"]);
 
 async function page(url: string) {
-  const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20_000), headers: { "user-agent": UA, accept: "text/html" } });
+  // paramètre unique + en-têtes no-cache : sans eux, le cache de la LNR peut servir une page vieille de plusieurs minutes
+  const frais = `${url}${url.includes("?") ? "&" : "?"}_=${Math.floor(Date.now() / 1000)}`;
+  const r = await fetch(frais, { cache: "no-store", signal: AbortSignal.timeout(20_000), headers: { "user-agent": UA, accept: "text/html", "cache-control": "no-cache", pragma: "no-cache" } });
   if (!r.ok) throw new Error(`LNR : HTTP ${r.status}`);
   return r.text();
 }
