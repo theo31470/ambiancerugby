@@ -157,6 +157,8 @@ async function gameRow(g: any, c: Competition, label: string, idx: TeamIndex): P
     competition_id: c.id, season: label, round: g.week ? String(g.week).replace(/^Regular Season - /i, "") : null,
     kickoff_at: g.date, home_team_id: home.id, away_team_id: away.id,
     home_score: st === "scheduled" ? null : g.scores?.home ?? null, away_score: st === "scheduled" ? null : g.scores?.away ?? null,
+    // score brut d'API-Sports, gardé à part : la base le départage avec celui de la feuille officielle (garder_score_direct)
+    ...(st === "live" || st === "halftime" ? { api_dom: g.scores?.home ?? null, api_ext: g.scores?.away ?? null } : {}),
     status: st, clock: st === "live" ? HORLOGE[g.status?.short] ?? null : null,
     linescores: lines.length ? lines : null, source: "apisports", external_id: String(g.id),
   };
@@ -175,6 +177,8 @@ async function upsertGames(db: SupabaseClient, rows: GameRow[]) {
   const changed = rows.filter((r) => {
     const e = existing.get(r.external_id);
     if (!e) return true;
+    // en direct, chaque passage est écrit (api_vu_le) : la base sait ainsi qu'API-Sports confirme toujours son score
+    if (r.api_vu_le) return true;
     if (new Date(e.kickoff_at as string).getTime() !== new Date(r.kickoff_at as string).getTime()) return true;
     return keys.some((k) => (e[k] ?? null) !== (r[k] ?? null));
   });
@@ -401,7 +405,9 @@ Deno.serve(async (req) => {
           if (!c) continue;
           // le match du jour appartient à la saison suivie de la compétition
           if (g.league?.season && c.apisports_season && g.league.season !== c.apisports_season) continue;
-          rows.push(await gameRow(g, c, c.current_season, idx));
+          const row = await gameRow(g, c, c.current_season, idx);
+          if (row.status === "live" || row.status === "halftime") row.api_vu_le = new Date().toISOString();
+          rows.push(row);
         }
         const r = await upsertGames(db, rows);
         total += r.changed;
