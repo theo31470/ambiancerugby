@@ -306,10 +306,24 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     if (chrono.periode1_debut) return Math.min(50, depuis(chrono.periode1_debut) + 5);
     return 130;
   })();
-  const minuteBrute = (f: Fait) => (f.minute == null ? null : f.minute + (f.additionalMinute ?? 0));
+  // une minute additionnelle absurde (« 40 + 40 ») est une faute de saisie : on garde la minute seule
+  const minuteBrute = (f: Fait) => (f.minute == null ? null : f.minute + ((f.additionalMinute ?? 0) <= 12 ? (f.additionalMinute ?? 0) : 0));
   const minute = (f: Fait) => { const b = minuteBrute(f); return Math.min(130, b == null || b > jeuEcoule ? minuteVoisine(f) : b); };
   const triesFil = new Map<string, number>();
   let precedent: [number, number] = [0, 0];
+  const retrait = { home: 0, away: 0 };
+  // « essai » d'un botteur (déjà vu à la transformation) à la même minute qu'un essai d'un coéquipier non transformé :
+  // c'est la transformation de cet essai, saisie à tort comme essai
+  const botteurs = new Set<string>();
+  for (const f of faits) { const c = idLnr(f.conversionPlayer); if (c) botteurs.add(c); }
+  const estEssai = (f: Fait) => { const s = norm(f.slugSubType ?? f.subtype); return s.includes("essai") && !s.includes("penalite") && !s.includes("transformation"); };
+  const fauxEssais = new Set<string>();
+  for (const f of faits) {
+    const p = idLnr(f.player);
+    if (!estEssai(f) || f.conversionPlayer || !p || !botteurs.has(p) || f.minute == null) continue;
+    const frere = faits.find((g) => g !== f && estEssai(g) && g.club === f.club && !g.conversionPlayer && g.minute != null && Math.abs(g.minute - f.minute!) <= 1 && idLnr(g.player) && idLnr(g.player) !== p && !botteurs.has(idLnr(g.player)!));
+    if (frere) fauxEssais.add(f.id);
+  }
   for (const f of faits) {
     const sst = norm(f.slugSubType ?? f.subtype);
     const st = norm(f.slugType ?? f.type);
@@ -329,9 +343,10 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
     if (Array.isArray(f.score)) {
       const gain = f.score[0] - precedent[0] + (f.score[1] - precedent[1]);
       if (type === "try" && gain === 2) type = "conversion";
-      else if (type === "conversion" && gain === 5) type = "try";
       precedent = [f.score[0], f.score[1]];
     }
+    // saisie erronée fréquente : le botteur est noté « essai » à la place de sa transformation (+5 au lieu de +2)
+    if (type === "try" && fauxEssais.has(f.id)) { type = "conversion"; retrait[side] += 3; }
     if (!type) continue;
     fil.push({ minute: minute(f), cote: side, player_id: pid, nom: pid ? "" : joli(nom), type });
     const id = idLnr(f.player);
@@ -364,7 +379,7 @@ export async function importerFeuilleLnr(db: SupabaseClient, m: MatchLocal & { r
 
   // score : dernier score du fil (transformations comprises)
   const dernier = [...faits].reverse().find((f) => Array.isArray(f.score));
-  let dom = dernier?.score?.[0] ?? 0, ext = dernier?.score?.[1] ?? 0;
+  let dom = (dernier?.score?.[0] ?? 0) - retrait.home, ext = (dernier?.score?.[1] ?? 0) - retrait.away;
   // contrôle : les points du fil, camp par camp. Si la LNR a le même total mais une autre répartition
   // (camps mélangés dans son flux), ou l'ordre inverse, les points du fil font foi.
   const VALEUR: Record<string, number> = { try: 5, penalty_try: 7, conversion: 2, penalty: 3, drop: 3 };
